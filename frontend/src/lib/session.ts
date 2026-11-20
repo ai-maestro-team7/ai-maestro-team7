@@ -37,12 +37,33 @@ export function readSession(): Session | null {
   }
 }
 
+/** 탭에 남기는 사용자별 값 (채팅 대화 ID, 면접 인계 자소서). 로그아웃·계정 변경 때 지운다 */
+const USER_TAB_KEYS = ["team07.interviewHandoff", "team07.chatSessionId"];
+
+function clearUserTabData(): void {
+  for (const key of USER_TAB_KEYS) window.sessionStorage.removeItem(key);
+}
+
+/** 토큰의 sub (사용자 고유 ID). 소셜 로그인은 아이디가 "Google 계정"처럼 같아서 아이디로 구분할 수 없다 */
+export function sessionOwner(session: Session | null = readSession()): string | null {
+  if (!session) return null;
+  try {
+    const raw = session.accessToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const claims = JSON.parse(window.atob(raw.padEnd(Math.ceil(raw.length / 4) * 4, "="))) as { sub?: string };
+    return claims.sub || session.username;
+  } catch {
+    return session.username;
+  }
+}
+
 export function saveSession(session: Session): void {
+  if (sessionOwner(readSession()) !== sessionOwner(session)) clearUserTabData(); // 다른 계정으로 바뀌면 지운다
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }
 
 export function clearSession(): void {
+  clearUserTabData();
   window.localStorage.removeItem(STORAGE_KEY);
   window.dispatchEvent(new Event(CHANGE_EVENT));
 }
@@ -68,20 +89,4 @@ export function readUsername(): string | null {
 /** 개발 모드로 로그인한 세션인지. `readUsername`처럼 값만 구독하게 불리언으로 준다. */
 export function readDevMode(): boolean {
   return readSession()?.devMode === true;
-}
-
-/**
- * 사용자별 저장소 키에 붙이는 값. 액세스 토큰의 `sub`(Cognito 사용자 ID)를 쓰고, 읽지 못하면 아이디를 쓴다.
- * 로그아웃했다가 다시 들어와도 같은 값이라 그 사용자의 기록을 다시 찾을 수 있다.
- */
-export function sessionOwner(session: Pick<Session, "accessToken" | "username">): string {
-  try {
-    const payload = session.accessToken.split(".")[1];
-    const raw = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const normalized = raw.padEnd(Math.ceil(raw.length / 4) * 4, "=");
-    const claims = JSON.parse(window.atob(normalized)) as { sub?: string };
-    return claims.sub || session.username;
-  } catch {
-    return session.username;
-  }
 }

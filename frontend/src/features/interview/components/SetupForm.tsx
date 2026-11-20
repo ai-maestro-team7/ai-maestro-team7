@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useMemo, useState, useSyncExternalStore } from "react";
 import { TwoColumn } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -11,6 +11,7 @@ import { RadioList } from "@/components/ui/RadioList";
 import { TextArea } from "@/components/ui/TextArea";
 import { TextField } from "@/components/ui/TextField";
 import { loginHref } from "@/features/auth/lib";
+import { parseHandoff, readHandoffRaw, subscribeHandoff } from "@/features/chat/lib";
 import { ApiError, AUTH_REQUIRED } from "@/lib/api";
 import { startInterview } from "../api";
 import { interviewDefaults, MODE_OPTIONS, RULES, TYPE_OPTIONS } from "../data";
@@ -24,7 +25,13 @@ export function SetupForm() {
   const router = useRouter();
   const params = useSearchParams();
   const [job, setJob] = useState(() => readJob(params.get("job")));
-  const [coverLetter, setCoverLetter] = useState<string>(interviewDefaults.coverLetter);
+  // 채팅에서 넘어왔으면 넘겨받은 자소서를 채운다 (개발계획서4 §10). 서버 렌더에는 값이 없다
+  const handoffRaw = useSyncExternalStore(subscribeHandoff, readHandoffRaw, () => null);
+  const handoff = useMemo(() => parseHandoff(handoffRaw), [handoffRaw]);
+  const [editedCoverLetter, setCoverLetter] = useState<string | null>(null);
+  const coverLetter = editedCoverLetter ?? handoff?.coverLetter ?? (handoff?.documentId ? "" : interviewDefaults.coverLetter);
+  // 저장된 자소서(A 문서)를 골랐고 칸을 비워 두면 /start에 documentId를 넘긴다
+  const savedDocument = handoff?.documentId && !coverLetter.trim() ? (handoff.documentTitle ?? "저장된 자기소개서") : null;
   const [interviewType, setInterviewType] = useState<InterviewType>(interviewDefaults.interviewType);
   const [mode, setMode] = useState<InterviewMode>(() => parseMode(params.get("mode")));
   const [consent, setConsent] = useState(true);
@@ -37,7 +44,9 @@ export function SetupForm() {
     const trimmedJob = job.trim();
     if (!trimmedJob) next.job = "희망 직무를 입력해 주세요.";
     else if (trimmedJob.length > RULES.jobMax) next.job = `희망 직무는 ${RULES.jobMax}자까지 쓸 수 있어요.`;
-    if (coverLetter.length < RULES.resumeMin) next.coverLetter = `자기소개서를 ${RULES.resumeMin}자 이상 입력해 주세요.`;
+    if (savedDocument) {
+      // 저장된 자소서로 진행. 길이는 서버가 문서에서 읽어 확인한다
+    } else if (coverLetter.length < RULES.resumeMin) next.coverLetter = `자기소개서를 ${RULES.resumeMin}자 이상 입력해 주세요.`;
     else if (coverLetter.length > RULES.resumeMax)
       next.coverLetter = `자기소개서는 ${RULES.resumeMax.toLocaleString()}자까지 쓸 수 있어요.`;
     if (nextMode === "camera" && !consent) next.consent = "음성 + 카메라로 진행하려면 카메라 분석에 동의해 주세요.";
@@ -54,7 +63,7 @@ export function SetupForm() {
     try {
       const { sessionId } = await startInterview({
         job: job.trim(),
-        resumeText: coverLetter,
+        ...(savedDocument && handoff?.documentId ? { documentId: handoff.documentId } : { resumeText: coverLetter }),
         interviewType,
         // 카메라 방식이고 동의했을 때만 시선을 본다. 그 밖에는 태도가 측정되지 않는다
         cameraConsent: nextMode === "camera" && consent,
@@ -105,6 +114,11 @@ export function SetupForm() {
             onChange={(event) => setJob(event.target.value)}
             error={errors.job}
           />
+          {savedDocument && (
+            <p className="text-small text-grey-600">
+              채팅에서 고른 ‘{savedDocument}’로 질문을 만들어요. 다른 자기소개서를 쓰려면 아래에 붙여 넣으세요.
+            </p>
+          )}
           <TextArea
             id="interview-cover-letter"
             label="자기소개서"
