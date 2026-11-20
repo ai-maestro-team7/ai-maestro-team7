@@ -77,13 +77,13 @@
     - 초기 Session(`currentIndex` 0, `followUpUsed` false, `answers` [], `baseline` null, `scoringVersion`, `modelId`, `promptVersion`, `currentQuestion` q1, 검사한 `profile`)과 `nextQuestion`
     - _Requirements: 8.1~8.7, 3.3_
 
-- [ ] 8. 꼬리질문 판단과 답변 처리
-  - [ ] 8.1 `follow_up.py`에 `judge_follow_up`을 만든다. 꼬리질문이 여러 개면 첫 번째만 쓴다
+- [x] 8. 꼬리질문 판단과 답변 처리
+  - [x] 8.1 `follow_up.py`에 `judge_follow_up`을 만든다. 꼬리질문이 여러 개면 첫 번째만 쓴다
     - _Requirements: 10.1, 10.2, 10.3, 10.4_
-  - [ ] 8.2 `flow.py`에 `process_answer`를 만든다 (design §5.2)
+  - [x] 8.2 `flow.py`에 `process_answer`를 만든다 (design §5.2)
     - 끝난 면접·`answerId` 불일치·`IN_PROGRESS`는 `INVALID_INPUT`, `TRANSCRIBE_FAILED`·`NO_ANSWER` 처리, 꼬리질문 최대 1개, `FOLLOW_UP`/`NEXT_QUESTION`/`REPORT`, `currentQuestion` 갱신, `answers` 기록, 입력 Session 불변
     - _Requirements: 9.1~9.12, 3.5_
-  - [ ] 8.3 `tests/test_flow.py`를 쓴다 (design §12 시나리오 대응)
+  - [x] 8.3 `tests/test_flow.py`를 쓴다 (design §12 시나리오 대응)
     - 시작(`profile` 있음·없음), 한 바퀴(q1 꼬리질문 포함 → `REPORT`), 무응답, 변환 실패, 꼬리질문 2개 이상, 꼬리질문 답변 뒤 판단 없음, 평가 불가 기본 질문 뒤 판단 없음, 끝난 면접, `answerId` 불일치, 꼬리질문 판단 형식 오류 시 `AI_OUTPUT_INVALID`, 입력 Session 불변
     - _Requirements: 8.6, 9.1~9.12, 10.3, 14.2, 14.3_
 
