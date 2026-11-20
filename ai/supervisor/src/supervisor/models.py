@@ -88,7 +88,10 @@ class ChatAction(SupModel):
     profile_id: str | None = None
     profile_version: int | None = None
     target_ncs_code: str | None = None
+    # START_INTERVIEW·REQUEST_COVER_LETTER: "이 공고로" 면접할 때 그 공고. 면접 화면이 공고 올리기를 끄고 이 공고로 질문을 만든다 (#167)
     job_posting_id: str | None = None
+    posting_title: str | None = None
+    posting_organization: str | None = None
 
 
 class ErrorInfo(SupModel):
