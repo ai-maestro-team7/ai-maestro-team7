@@ -76,7 +76,7 @@ def test_busan_intern_posting():
     assert snap.organization == "영화진흥위원회" and snap.company.name == "영화진흥위원회"
     assert snap.title.startswith("2027년 상반기 청년 체험형 인턴(일반)")
     assert snap.closes_at == "2026-12-03" and snap.rolling is False
-    assert snap.work_region.model_dump() == {"sido": "26", "sigungu": None, "label": "부산", "unknown": False}
+    assert snap.work_region.model_dump(exclude={"overseas", "country"}) == {"sido": "26", "sigungu": None, "label": "부산", "unknown": False}
     assert snap.job.name == "경영.회계.사무 · 문화.예술.디자인.방송"
     assert (snap.job.code, snap.job.middle, snap.job.major) == (None, None, "경영.회계.사무")
     assert snap.job.ncs_codes == ["R600002", "R600008"]

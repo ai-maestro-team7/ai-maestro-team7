@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<response>
+  <openXmlEmployInfo-header>
+    <resultCode>0</resultCode>
+    <resultMsg>SUCCESS_INFO</resultMsg>
+  </openXmlEmployInfo-header>
+  <openXmlEmployInfo-body>
+    <items>
+      <item>
+        <ENT_NAME>서초문화재단</ENT_NAME>
+        <ENT_TITLE>(재)서초문화재단 임원(비상임 이사) 공개모집 공고</ENT_TITLE>
+        <ENT_GB>지방출연기관</ENT_GB>
+        <ENT_KIND>문화·복지·관광</ENT_KIND>
+        <SIDO_CD>서울특별시</SIDO_CD>
+        <STATUS>모집중</STATUS>
+        <EMPYEAR>2026</EMPYEAR>
+        <ENT_RECRUIT>기타</ENT_RECRUIT>
+        <EMPLOY_NUM>1</EMPLOY_NUM>
+        <EMPLOY_GB>경력</EMPLOY_GB>
+        <JOB_TYPE>비상임</JOB_TYPE>
+        <RE_MAN_YN>N</RE_MAN_YN>
+        <POSITION>-</POSITION>
+        <YEARINCOME>무급</YEARINCOME>
+        <OFFICE_HOURS>null</OFFICE_HOURS>
+        <WORK_PLACE>null</WORK_PLACE>
+        <DUTY_DETAIL>-</DUTY_DETAIL>
+        <RETIREMENT>-</RETIREMENT>
+        <JUDGE_METHOD>-</JUDGE_METHOD>
+        <LOCAL_YN>N</LOCAL_YN>
+        <LOCAL_NAME>-</LOCAL_NAME>
+        <LOCAL_REASON>-</LOCAL_REASON>
+        <ENT_LICENSE1>-</ENT_LICENSE1>
+        <ENT_LICENSE2>-</ENT_LICENSE2>
+        <ENT_LICENSE3>-</ENT_LICENSE3>
+        <ENT_LICENSE4>-</ENT_LICENSE4>
+        <SPECIAL_ITEM>없음</SPECIAL_ITEM>
+        <PUB_DATE>2026-11-09</PUB_DATE>
+        <PUB_END_DATE>2026-11-23</PUB_END_DATE>
+        <ACCUSATION>-</ACCUSATION>
+        <REFERENCE>-</REFERENCE>
+        <EXHIBIT>-</EXHIBIT>
+        <JOB_SEEK_ETC>-</JOB_SEEK_ETC>
+        <FILE_NAME1>붙임1-서초문화재단 임원(비상임이사) 모집 공고문.pdf</FILE_NAME1>
+        <FILE_NAME2>붙임2-서초문화재단 임원(비상임이사) 모집 지원서 양식.hwp</FILE_NAME2>
+        <FILE_NAME3>-</FILE_NAME3>
+        <URL>https://job.cleaneye.go.kr/user/ypCareersData.do?idx=81061</URL>
+        <ADDRESS>서울시 서초구 사평대로 55, 심산기념문화센터</ADDRESS>
+        <NO>81061</NO>
+        <UPD_DATE>2026-11-09</UPD_DATE>
+      </item>
+      <item>
+        <ENT_NAME>서울의료원</ENT_NAME>
+        <ENT_TITLE>2026년 제20회 기간제근로자 전문의( 중환자실 당직 전문의) 상시모집 공고</ENT_TITLE>
+        <ENT_GB>지방출연기관</ENT_GB>
+        <ENT_KIND>의료</ENT_KIND>
+        <SIDO_CD>서울특별시</SIDO_CD>
+        <STATUS>모집중</STATUS>
+        <EMPYEAR>2026</EMPYEAR>
+        <ENT_RECRUIT>보건·의료</ENT_RECRUIT>
+        <EMPLOY_NUM>1</EMPLOY_NUM>
+        <EMPLOY_GB>신입+경력</EMPLOY_GB>
+        <JOB_TYPE>기간제</JOB_TYPE>
+        <RE_MAN_YN>N</RE_MAN_YN>
+        <POSITION>-</POSITION>
+        <YEARINCOME>1억원 이상</YEARINCOME>
+        <OFFICE_HOURS>null</OFFICE_HOURS>
+        <WORK_PLACE>null</WORK_PLACE>
+        <DUTY_DETAIL>-</DUTY_DETAIL>
+        <RETIREMENT>-</RETIREMENT>
+        <JUDGE_METHOD>서류전형(55점/적격여부 확인), 면접(45점), 신체검사 및 인성검사(MMPI)</JUDGE_METHOD>
+        <LOCAL_YN>N</LOCAL_YN>
+        <LOCAL_NAME>-</LOCAL_NAME>
+        <LOCAL_REASON>-</LOCAL_REASON>
+        <ENT_LICENSE1>의사면허증</ENT_LICENSE1>
+        <ENT_LICENSE2>내과 전문의 자격증</ENT_LICENSE2>
+        <ENT_LICENSE3>-</ENT_LICENSE3>
+        <ENT_LICENSE4>-</ENT_LICENSE4>
+        <SPECIAL_ITEM>없음</SPECIAL_ITEM>
+        <PUB_DATE>2026-07-28</PUB_DATE>
+        <PUB_END_DATE>2026-12-31</PUB_END_DATE>
+        <ACCUSATION>-</ACCUSATION>
+        <REFERENCE>-</REFERENCE>
+        <EXHIBIT>입사지원서, 자기소개서</EXHIBIT>
+        <JOB_SEEK_ETC>-</JOB_SEEK_ETC>
+        <FILE_NAME1>-</FILE_NAME1>
+        <FILE_NAME2>-</FILE_NAME2>
+        <FILE_NAME3>-</FILE_NAME3>
+        <URL>https://job.cleaneye.go.kr/user/ypCareersData.do?idx=78134</URL>
+        <ADDRESS>서울특별시 중랑구 신내로 156</ADDRESS>
+        <NO>78134</NO>
+        <UPD_DATE>2026-07-28</UPD_DATE>
+      </item>
+    </items>
+    <totalCount>2</totalCount>
+  </openXmlEmployInfo-body>
+</response>

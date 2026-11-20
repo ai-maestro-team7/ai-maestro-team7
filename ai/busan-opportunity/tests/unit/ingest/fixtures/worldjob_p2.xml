@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?><WORLDJOB>
+  <HEADER>
+    <ERR_CD>00</ERR_CD>
+    <ERR_NM>NORMAL SERVICE</ERR_NM>
+  </HEADER>
+  <BODY>
+    <ITEM>
+      <careerStleNm>무관</careerStleNm>
+      <entNm>호텔아이파크(주)부산</entNm>
+      <lplcKscoNm>호텔업</lplcKscoNm>
+      <rctntcBgnDe>2026-10-16</rctntcBgnDe>
+      <rctntcEndDe>2026-11-30</rctntcEndDe>
+      <rctntcKscoNm>호텔 서비스원</rctntcKscoNm>
+      <rctntcLang />
+      <rctntcNationNm>대한민국</rctntcNationNm>
+      <rctntcNmprCo>3</rctntcNmprCo>
+      <rctntcOriginNm>해당사항 없음</rctntcOriginNm>
+      <rctntcSj>[2026 리스타트 박람회] 파크하얏트부산 객실부 신입 및 경력직 채용</rctntcSj>
+      <rctntcVisaNm />
+    </ITEM>
+    <ITEM>
+      <careerStleNm>무관</careerStleNm>
+      <entNm>호텔아이파크(주)부산</entNm>
+      <lplcKscoNm>호텔업</lplcKscoNm>
+      <rctntcBgnDe>2026-10-16</rctntcBgnDe>
+      <rctntcEndDe>2026-11-30</rctntcEndDe>
+      <rctntcKscoNm>호텔 서비스원</rctntcKscoNm>
+      <rctntcLang />
+      <rctntcNationNm>대한민국</rctntcNationNm>
+      <rctntcNmprCo>3</rctntcNmprCo>
+      <rctntcOriginNm>해당사항 없음</rctntcOriginNm>
+      <rctntcSj>[2026 리스타트 박람회] 파크하얏트부산 객실부 신입 및 경력직 채용</rctntcSj>
+      <rctntcVisaNm />
+    </ITEM>
+    <totalCount>5</totalCount>
+    <pageNo>2</pageNo>
+    <numOfRows>3</numOfRows>
+    <lastPageNo>2</lastPageNo>
+  </BODY>
+</WORLDJOB>

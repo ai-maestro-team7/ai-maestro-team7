@@ -162,6 +162,11 @@ class AgentConfig(OppModel):
     max_postings: int = 5
 
 
+class LocalLifeConfig(OppModel):
+    festival_max: int = 2    # 상세에 보여 줄 축제 수. 많이 보여 주면 홍보처럼 보인다
+    transit_max: int = 3
+
+
 class DataConfig(OppModel):
     stale_after_hours: int
     busan_sido: str
@@ -182,6 +187,7 @@ class OpportunityConfig(OppModel):
     leave_reason: LeaveReasonConfig
     explanation: ExplanationConfig = Field(default_factory=ExplanationConfig)
     agent: AgentConfig = Field(default_factory=AgentConfig)
+    local_life: LocalLifeConfig = Field(default_factory=LocalLifeConfig)
     data: DataConfig
 
 

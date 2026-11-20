@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<response>
+  <openXmlEmployInfo-header>
+    <resultCode>0</resultCode>
+    <resultMsg>SUCCESS_INFO</resultMsg>
+  </openXmlEmployInfo-header>
+  <openXmlEmployInfo-body>
+    <items>
+      <item>
+        <ENT_NAME>재단법인 전라남도사회서비스원</ENT_NAME>
+        <ENT_TITLE>2026년 제5차 전남장애인종합복지관 채용 공고(근로지원인 인력풀 모집)</ENT_TITLE>
+        <ENT_GB>지방출연기관</ENT_GB>
+        <ENT_KIND>문화·복지·관광</ENT_KIND>
+        <SIDO_CD>전남광주통합특별시</SIDO_CD>
+        <STATUS>모집중</STATUS>
+        <EMPYEAR>2026</EMPYEAR>
+        <ENT_RECRUIT>사회복지·종교</ENT_RECRUIT>
+        <EMPLOY_NUM>52</EMPLOY_NUM>
+        <EMPLOY_GB>신입+경력</EMPLOY_GB>
+        <JOB_TYPE>기간제</JOB_TYPE>
+        <RE_MAN_YN>N</RE_MAN_YN>
+        <POSITION>-</POSITION>
+        <YEARINCOME>1200만원 이하</YEARINCOME>
+        <OFFICE_HOURS>null</OFFICE_HOURS>
+        <WORK_PLACE>null</WORK_PLACE>
+        <DUTY_DETAIL>-</DUTY_DETAIL>
+        <RETIREMENT>60</RETIREMENT>
+        <JUDGE_METHOD>공고문 참고(https://recruit.incruit.com/jnpass/job/)</JUDGE_METHOD>
+        <LOCAL_YN>N</LOCAL_YN>
+        <LOCAL_NAME>-</LOCAL_NAME>
+        <LOCAL_REASON>-</LOCAL_REASON>
+        <ENT_LICENSE1>-</ENT_LICENSE1>
+        <ENT_LICENSE2>-</ENT_LICENSE2>
+        <ENT_LICENSE3>-</ENT_LICENSE3>
+        <ENT_LICENSE4>-</ENT_LICENSE4>
+        <SPECIAL_ITEM>자격증</SPECIAL_ITEM>
+        <PUB_DATE>2026-11-11</PUB_DATE>
+        <PUB_END_DATE>9999-09-09</PUB_END_DATE>
+        <ACCUSATION>-</ACCUSATION>
+        <REFERENCE>-</REFERENCE>
+        <EXHIBIT>-</EXHIBIT>
+        <JOB_SEEK_ETC>-</JOB_SEEK_ETC>
+        <FILE_NAME1>2026년 제5차 전남장애인종합복지관(근로지원인 인력풀 모집) 채용 공고.pdf</FILE_NAME1>
+        <FILE_NAME2>-</FILE_NAME2>
+        <FILE_NAME3>-</FILE_NAME3>
+        <URL>https://job.cleaneye.go.kr/user/ypCareersData.do?idx=81418</URL>
+        <ADDRESS>전라남도 무안군 삼향읍 오룡3길 22</ADDRESS>
+        <NO>81418</NO>
+        <UPD_DATE>2026-11-19</UPD_DATE>
+      </item>
+    </items>
+    <totalCount>1</totalCount>
+  </openXmlEmployInfo-body>
+</response>

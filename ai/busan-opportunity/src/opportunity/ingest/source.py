@@ -26,6 +26,22 @@ class ListPages:
     warnings: list[str] = field(default_factory=list)
 
 
+def result_state(spec_list: dict, parsed) -> str:
+    """응답 머리의 결과 코드 → "ok" / "empty" / "error". 매핑표에 코드 경로가 없으면 늘 "ok"다.
+
+    지방공공기관 채용정보는 공고가 없는 시·도에 resultCode=3을 준다. 이것은 실패가 아니라 빈 목록이다.
+    """
+    path = spec_list.get("result_code_path")
+    if not path:
+        return "ok"
+    code = str(walk(parsed, path) or "").strip()
+    if code in spec_list.get("empty_codes", ()):
+        return "empty"
+    if code in spec_list.get("ok_codes", ()):
+        return "ok"
+    return "error" if code else "ok"  # 코드 칸이 없으면 항목 경로로 판단한다
+
+
 def _int_or_none(value) -> int | None:
     try:
         return int(str(value).replace(",", "").strip())
@@ -61,16 +77,20 @@ class SourceClient:
 
         전체 건수를 알면 다음 페이지로 계속 가고, 모르면 실패한 자리에서 멈춘다.
         extra는 페이지마다 붙일 인자(강소기업의 지역 코드 등), name은 원본 파일 이름 앞부분이다.
+        매핑표의 `page_param`이 None이면 페이지 인자 없이 한 번만 부른다 (지방공공기관 채용정보).
+        응답 머리의 결과 코드가 빈 목록 코드면 경고 없이 0건, 모르는 코드면 그 페이지를 실패로 센다.
         """
         cfg = self.spec["list"]
         stem = _UNSAFE.sub("_", name)[:40]
+        paged = cfg.get("page_param") is not None
         size = cfg["page_size"]
         first = cfg["first_page"]
         out = ListPages()
         total_pages: int | None = None
-        for offset in range(cfg["max_pages"]):
+        for offset in range(cfg["max_pages"] if paged else 1):
             page = first + offset
-            url = self._url(cfg, {**(extra or {}), cfg["page_param"]: page, cfg["size_param"]: size})
+            paging = {cfg["page_param"]: page, cfg["size_param"]: size} if paged else {}
+            url = self._url(cfg, {**(extra or {}), **paging})
             try:
                 body, parsed = fetch_parsed(self._http_get, url, label=f"{self.name}:{stem}:p{page}",
                                             sleep=self._sleep, timeout=HTTP_TIMEOUT_SECONDS)
@@ -81,20 +101,30 @@ class SourceClient:
                     break
                 continue
             self._save(f"{stem}-{page:04d}", body)
+            state = result_state(cfg, parsed)
+            if state == "error":
+                out.failed_pages += 1
+                out.warnings.append(f"p{page} 실패: 결과 코드 {walk(parsed, cfg['result_code_path'])}")
+                break
             out.pages += 1
+            if state == "empty":
+                break
             items = [item for item in as_list(walk(parsed, cfg["items_path"])) if isinstance(item, dict)]
             out.records.extend(items)
             total = _int_or_none(walk(parsed, cfg.get("total_path")))
-            if total_pages is None and total is not None:
-                total_pages = max(1, math.ceil(total / size))
             if not items:
                 if page == first:
                     out.warnings.append("첫 페이지에서 항목을 찾지 못함 · 응답 필드 매핑 확인 필요")
                 break
+            if not paged:
+                break
+            if total_pages is None and total is not None:
+                total_pages = max(1, math.ceil(total / size))
             if len(items) < size or (total_pages is not None and offset + 1 >= total_pages):
                 break
         else:
-            out.warnings.append(f"최대 {cfg['max_pages']}페이지에서 멈춤")
+            if paged:
+                out.warnings.append(f"최대 {cfg['max_pages']}페이지에서 멈춤")
         return out
 
     # ------------------------------------------------------------ 상세

@@ -30,6 +30,7 @@ from .enums import (
 from .policy import PolicyBenefit
 from .posting import Badge, Job, PostingSnapshot, Salary, WorkRegion
 from .profile import NotificationPrefs
+from .region import LocalLifeView
 from .user_state import Notification
 
 
@@ -71,6 +72,7 @@ class PostingCard(OppModel):
     badges: list[Badge] = Field(default_factory=list)
     facts: list[str] = Field(default_factory=list)  # 근거 사실. 문장이 아니라 사실 목록
     busan_alternatives_count: int | None = None     # 수도권 공고에만
+    commute_minutes: int | None = None              # 거주 구 → 근무 구 대중교통 분. 값이 있을 때만
     is_sample: bool = False
 
 
@@ -218,6 +220,7 @@ class PostingDetailResponse(OppModel):
     regional_talent: RegionalTalentView | None = None
     related_policies: list[PolicyBrief] = Field(default_factory=list)
     alternatives_preview: list[AlternativeItem] = Field(default_factory=list)  # 수도권 공고면 최대 2개
+    local_life: LocalLifeView | None = None  # 부산 공고에만
     facts: list[str] = Field(default_factory=list)
     data_as_of: str | None = None
 

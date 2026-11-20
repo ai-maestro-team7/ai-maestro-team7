@@ -7,11 +7,14 @@ API에 값이 없으면 만들지 않고 비워 두거나 "확인 필요" 상태
 import hashlib
 import json
 import re
-from collections.abc import Mapping
+from collections import Counter
+from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
 from ..core import clock
+from ..core.copy_rules import OVERSEAS_LABEL
 from ..core.regions import SIDO_NAMES
 from ..models.enums import (
     BadgeType,
@@ -70,20 +73,36 @@ from .field_maps import (
     COMPANY_ID_PREFIX,
     EXTRA_SIDO_NAMES,
     GANGSO_BADGE_SOURCE,
+    HASH_ID_LENGTH,
     INCOME_AMOUNT,
     INCOME_AMOUNT_UNIT_LABEL,
     INCOME_OTHER,
+    KLID,
+    KLID_CAREER,
+    KLID_EMPLOYMENT,
+    KLID_HEADCOUNT_LABEL,
+    KLID_JOB_NAME_BLANKS,
+    KLID_MERGED_SIDO,
+    KLID_NULL_TEXTS,
+    KLID_OPEN_STATUSES,
+    KLID_ROLLING_MIN_DAYS,
+    KLID_SIDO_ALIASES,
     NATIONAL_MIN_SIDO,
     SIDO_ALIASES,
     STAGE_BY_CATEGORY,
     STAGE_BY_SUBCATEGORY,
     WORK24,
     WORK24_GANGSO,
+    WORLDJOB,
+    WORLDJOB_BLANK_TEXTS,
+    WORLDJOB_CAREER,
+    WORLDJOB_DOMESTIC_COUNTRIES,
+    WORLDJOB_ROLLING_MIN_DAYS,
     YOUTHCENTER,
 )
 from .http import walk
 
-POSTING_ID_PREFIX = {"work24": "wk24", "alio": "alio"}
+POSTING_ID_PREFIX = {"work24": "wk24", "alio": "alio", "klid": "klid", "worldjob": "wj"}
 POLICY_ID_PREFIX = "ythc"
 VERIFIED_BY_YOUTHCENTER = "YOUTHCENTER_API"
 MULTI_REGION_LABEL = "근무지 여러 곳 · 공고문 확인"
@@ -572,6 +591,352 @@ def normalize_alio(record: Mapping, *, as_of, detail: Mapping | None = None, job
     )
     digest = compute_content_hash(snapshot)
     return snapshot.model_copy(update={"content_hash": digest, "snapshot_id": snapshot_id_for(as_of, digest)})
+
+
+# ---------------------------------------------------------------- 공고 (지방공공기관)
+KLID_DESCRIPTION_HEADINGS = ("모집 개요", "직무 내용", "자격·면허", "우대", "지역 제한", "전형 절차")
+KLID_LOCAL_LIMIT = "지역 제한: {name}"
+KLID_LOCAL_LIMIT_REASON = "지역 제한: {name} ({reason})"
+# "공고문 참조"처럼 내용 없이 공고문을 가리키기만 하는 글. 설명·서류 칸에 넣지 않는다
+_SEE_NOTICE = re.compile(r"^[(\[]?\s*(붙임|첨부)?\s*(채용\s*)?(공고\s*(문|서)?|파일|문서)\s*(을|를)?\s*"
+                         r"(참조|참고|확인|에\s*의함)\s*[)\]]?\.?$")
+_KLID_ADDRESS_PREFIX = re.compile(r"^\s*\(?\s*(우\s*\.?\s*)?\d{5}\s*\)?\s*,?\s*")  # "(우.54853) ", "10400, "
+_KLID_SALARY = re.compile(r"^\s*(\d[\d,]*)\s*(억|만)\s*원?\s*(이상|이하)\s*$")
+
+
+def _klid_text(raw: str) -> str:
+    """빈 칸 표시("null", "-")와 공고문 참조 문구를 빈 글로 바꾼다."""
+    text = _paragraph(raw)
+    if text in KLID_NULL_TEXTS or _SEE_NOTICE.match(text.replace(" ", "")) or _SEE_NOTICE.match(text):
+        return ""
+    return text
+
+
+def _sido_alias(name: str) -> str | None:
+    key = (name or "").strip()
+    return SIDO_ALIASES.get(key) or KLID_SIDO_ALIASES.get(key)
+
+
+def _sigungu_index(sido: str, region_names: Mapping[str, str] | None) -> dict[str, str]:
+    """지역 표에서 한 시·도의 시·군·구 이름 → 코드. "부산 해운대구"는 "해운대구", "경기 수원시 장안구"는 "수원시 장안구"."""
+    out: dict[str, str] = {}
+    for code, name in (region_names or {}).items():
+        if code[:2] != sido or code.endswith("000"):
+            continue
+        parts = name.split()
+        if len(parts) > 1:
+            out[" ".join(parts[1:])] = code
+    return out
+
+
+def parse_klid_region(sido_name: str, address: str, *,
+                      region_names: Mapping[str, str] | None = None) -> WorkRegion:
+    """시·도 이름(SIDO_CD) → 시·도 코드. 주소에 시·군·구가 있으면 지역 표로 sigungu까지 채운다.
+
+    - 시·도 이름을 모르면 unknown이다 (부산으로 세지 않는다).
+    - 주소 첫 낱말이 다른 시·도면 시·군·구를 찾지 않는다. 시·도 없이 "안양시 동안구 …"로 시작하면 시·도 안에서 찾는다.
+    - 지역 표가 없거나 이름이 맞지 않으면 sigungu는 None이다. 낱말 둘("수원시 장안구")을 하나("수원시")보다 먼저 맞춘다.
+    """
+    sido = _sido_alias(sido_name)
+    if sido is None:
+        return WorkRegion(unknown=True)
+    tokens = _KLID_ADDRESS_PREFIX.sub("", (address or "").strip()).split()
+    address_sido = _sido_alias(tokens[0]) if tokens else None
+    if address_sido is not None:
+        if KLID_MERGED_SIDO.get(address_sido, address_sido) != sido:
+            return WorkRegion(sido=sido, label=_sido_label(sido))
+        tokens = tokens[1:]
+    units = [c for c in (region_names or {}) if c[:2] == sido and not c.endswith("000")]
+    if len(units) == 1:  # 세종(36110)처럼 시·군·구가 하나뿐인 시·도
+        return WorkRegion(sido=sido, sigungu=units[0], label=region_names[units[0]])
+    index = _sigungu_index(sido, region_names)
+    for width in (2, 1):
+        name = " ".join(tokens[:width])
+        if len(tokens) >= width and name in index:
+            code = index[name]
+            return WorkRegion(sido=sido, sigungu=code, label=(region_names or {}).get(code) or _sido_label(sido))
+    names = [_sido_label(sido)]
+    for token in tokens[:2]:
+        if token.endswith(("시", "군", "구")):
+            names.append(token)
+        else:
+            break
+    return WorkRegion(sido=sido, label=" ".join(names))
+
+
+def parse_klid_salary(raw: str) -> Salary:
+    """연봉 구간 글 → 만 원/년. "N만원 이상"은 min=N, "N만원 이하"는 max=N, "1억원 이상"은 min=10000.
+
+    "무급"이나 읽지 못한 글은 disclosed=false다 (금액을 만들지 않는다).
+    """
+    found = _KLID_SALARY.match((raw or "").replace(" ", ""))
+    if not found:
+        return Salary(disclosed=False)
+    number, unit, bound = found.groups()
+    value = round(_manwon(number, "억" if unit == "억" else "만"))
+    if value <= 0:
+        return Salary(disclosed=False)
+    if bound == "이상":
+        return Salary(disclosed=True, min=value, max=None, unit=MoneyUnit.MANWON_YEAR)
+    return Salary(disclosed=True, min=None, max=value, unit=MoneyUnit.MANWON_YEAR)
+
+
+def parse_klid_employment(raw: str) -> EmploymentType:
+    name = (raw or "").replace(" ", "")
+    return KLID_EMPLOYMENT.get(name, EmploymentType.UNKNOWN)
+
+
+def parse_klid_career(raw: str) -> CareerType:
+    name = (raw or "").replace(" ", "")
+    return KLID_CAREER.get(name) or parse_career(name)
+
+
+def klid_description(get, licenses: list[str], *, opens: str | None, closes: str | None) -> str | None:
+    """모집 개요·직무·자격·우대·지역 제한·전형을 "[제목]" 아래에 이어 한 글로 만든다. 값은 원문 그대로다.
+
+    자격·면허는 필수인지 우대인지 응답에서 알 수 없어 지원 자격 조건(eligibilityRules)으로 만들지 않는다.
+    지역 제한(LOCAL_YN=Y)도 글로만 둔다. 판정에는 쓰지 않는다.
+    """
+    overview = []
+    kind, field_ = _klid_text(get("org_kind")), _klid_text(get("org_field"))
+    if kind:
+        overview.append(f"기관 구분: {kind}" + (f" ({field_})" if field_ else ""))
+    for label, value in (("모집 분야", _klid_text(get("job_name"))), ("고용 형태", _klid_text(get("employment_name"))),
+                         ("직급", _klid_text(get("position"))), ("연봉(원문)", _klid_text(get("salary_text")))):
+        if value:
+            overview.append(f"{label}: {value}")
+    headcount = re.sub(r"\D", "", get("headcount"))
+    if headcount and int(headcount) > 0:
+        overview.append("모집 인원: " + KLID_HEADCOUNT_LABEL.format(n=int(headcount)))
+    if opens or closes:
+        overview.append(f"모집 기간: {opens or '확인 필요'} ~ {closes or '확인 필요'}")
+
+    local = ""
+    if get("local_yn").upper() == "Y":
+        name, reason = _klid_text(get("local_name")), _klid_text(get("local_reason"))
+        if name:
+            local = (KLID_LOCAL_LIMIT_REASON.format(name=name, reason=reason) if reason
+                     else KLID_LOCAL_LIMIT.format(name=name))
+    bodies = ("\n".join(overview), _klid_text(get("duty")), "\n".join(licenses), _klid_text(get("special")), local,
+              _klid_text(get("selection")))
+    parts = [f"[{heading}]\n{body}" for heading, body in zip(KLID_DESCRIPTION_HEADINGS, bodies) if body]
+    return "\n\n".join(parts) or None
+
+
+def _hash_id(parts: list[str]) -> str:
+    raw = "\x1f".join(parts)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:HASH_ID_LENGTH]
+
+
+def _klid_date(raw: str) -> str | None:
+    return next(iter(find_dates(raw or "")), None)
+
+
+def _finish(snapshot: PostingSnapshot, as_of) -> PostingSnapshot:
+    digest = compute_content_hash(snapshot)
+    return snapshot.model_copy(update={"content_hash": digest, "snapshot_id": snapshot_id_for(as_of, digest)})
+
+
+def normalize_klid(record: Mapping, *, as_of, detail: Mapping | None = None, job_codes: Mapping | None = None,
+                   region_names: Mapping[str, str] | None = None, hash_id: bool = False) -> PostingSnapshot:
+    """지방공공기관 채용정보 → 스냅샷. ID는 `klid-{NO}`. NO가 없거나 hash_id=True면 `klid-h{내용 해시 16자}`.
+
+    - 모집중·모집예정이 아닌 공고는 넣지 않는다 (SkipRecord "closed_status").
+    - 근무지는 `parse_klid_region` (시·도 이름 + 기관 주소의 시·군·구). 주소는 기관 주소라서 실제 근무지와 다를 수 있다.
+    - 급여는 `parse_klid_salary`. 직무 코드는 없다 (job.code·major는 None).
+    - 같은 NO가 내용이 다른 두 공고에 붙어 오면 부르는 쪽이 hash_id=True로 다시 부른다.
+    - detail, job_codes는 쓰지 않는다. 수집 실행기가 출처마다 같은 모양으로 부르려고 받는다.
+    """
+    fields = KLID["fields"]
+    merged = {**record, **(detail or {})}
+
+    def get(name: str) -> str:
+        value = pick(merged, fields.get(name))
+        return "" if value in KLID_NULL_TEXTS else value
+
+    title, organization = get("title"), get("organization")
+    if not title:
+        raise SkipRecord("missing_title")
+    if not organization:
+        raise SkipRecord("missing_organization")
+    status = get("status").replace(" ", "")
+    if status not in KLID_OPEN_STATUSES:
+        raise SkipRecord("closed_status")
+    closes_at = _klid_date(get("closes_ymd"))
+    if closes_at is None:
+        raise SkipRecord("no_deadline")
+    opens_at = _klid_date(get("opens_ymd"))
+    raw_id = get("external_id")
+    external_id = None if hash_id else (clean_id(raw_id) if raw_id else None)
+    if external_id is None:
+        external_id = "h" + _hash_id([organization, title, get("sido_name"), get("job_name"), opens_at or "",
+                                      raw_id])
+    when = clock.parse_as_of(as_of)
+    days_left = (date.fromisoformat(closes_at) - when.date()).days
+    rolling = days_left > KLID_ROLLING_MIN_DAYS
+
+    region = parse_klid_region(get("sido_name"), get("work_place") or get("address"), region_names=region_names)
+    job_text = get("job_name")
+    job = Job(code=None, middle=None, major=None,
+              name=job_text if job_text and job_text not in KLID_JOB_NAME_BLANKS else title)
+    employment = parse_klid_employment(get("employment_name"))
+    career_text = get("career_name")
+    career = parse_klid_career(career_text)
+    salary = parse_klid_salary(get("salary_text"))
+    licenses = list(dict.fromkeys(
+        t for t in (_klid_text(text_of(merged.get(key))) for key in fields["licenses"]) if t))
+    description = klid_description(get, licenses, opens=opens_at, closes=closes_at)
+    documents_text = _klid_text(get("documents_text"))
+    documents = [d for d in (_FILE_NUMBER.sub("", item).strip() for item in split_items(documents_text)) if d]
+    url = http_url(get("url"))
+
+    api: dict[str, ExtractedBy] = {"title": ExtractedBy.API, "organization": ExtractedBy.API,
+                                   "closesAt": ExtractedBy.API}
+    for name, present in (("workRegion", not region.unknown), ("job", job_text not in ("", *KLID_JOB_NAME_BLANKS)),
+                          ("salary", salary.disclosed), ("employmentType", employment != EmploymentType.UNKNOWN),
+                          ("careerType", career != CareerType.UNKNOWN), ("jobDescription", description is not None),
+                          ("documents", bool(documents)), ("officialUrl", url is not None)):
+        if present:
+            api[name] = ExtractedBy.API
+
+    snapshot = PostingSnapshot(
+        job_posting_id=f"{POSTING_ID_PREFIX['klid']}-{external_id}", snapshot_id="pending", title=title,
+        organization=organization, job_description=description, closes_at=closes_at, official_url=url,
+        source_type=SourceType.OFFICIAL, checked_at=clock.iso(when), source=PostingSource.KLID,
+        company=Company(name=organization, hq_sido=region.sido), org_type=OrgType.LOCAL_PUBLIC,
+        work_region=region, job=job, employment_type=employment, career_type=career, education_min=None,
+        salary=salary, rolling=rolling, selection_steps=[], documents=documents,
+        eligibility_rules=_alio_rules(None, "", career, career_text),
+        extract_status=ExtractStatus.PENDING, extracted_by=api, content_hash="pending",
+    )
+    return _finish(snapshot, as_of)
+
+
+# ---------------------------------------------------------------- 공고 (해외취업)
+WORLDJOB_DESCRIPTION_LABELS = (("industry", "업종"), ("language", "언어 조건"), ("visa", "비자"),
+                               ("headcount", "모집 인원"), ("origin", "공고 출처 기관"))
+
+
+def _worldjob_text(raw: str) -> str:
+    text = (raw or "").strip()
+    return "" if text in WORLDJOB_BLANK_TEXTS else text
+
+
+def parse_worldjob_region(country: str) -> WorkRegion:
+    """나라 이름 → 해외 근무지. "대한민국"은 국내 공고인데 시·도가 없어 unknown이다. 나라가 비면 unknown."""
+    name = _worldjob_text(country)
+    if not name:
+        return WorkRegion(unknown=True)
+    if name in WORLDJOB_DOMESTIC_COUNTRIES:
+        return WorkRegion(unknown=True)
+    return WorkRegion(overseas=True, country=name, sido=None, label=OVERSEAS_LABEL.format(country=name))
+
+
+def worldjob_description(get) -> str | None:
+    lines = []
+    for name, label in WORLDJOB_DESCRIPTION_LABELS:
+        value = _worldjob_text(get(name))
+        if name == "headcount":
+            digits = re.sub(r"\D", "", value)
+            value = KLID_HEADCOUNT_LABEL.format(n=int(digits)) if digits and int(digits) > 0 else ""
+        if value:
+            lines.append(f"{label}: {value}")
+    return "[모집 개요]\n" + "\n".join(lines) if lines else None
+
+
+def worldjob_id(record: Mapping) -> str:
+    """공고 번호가 응답에 없어서 내용 해시로 ID를 만든다. 마감일·언어·비자·인원은 넣지 않는다 (연장돼도 같은 ID)."""
+    fields = WORLDJOB["fields"]
+    return _hash_id([pick(record, fields[name]) for name in WORLDJOB["id_fields"]])
+
+
+def normalize_worldjob(record: Mapping, *, as_of, detail: Mapping | None = None,
+                       job_codes: Mapping | None = None) -> PostingSnapshot:
+    """해외취업 모집공고 → 스냅샷. ID는 `wj-{내용 해시 16자}`.
+
+    - 근무지는 해외(overseas=true, country=나라 이름). 부산·수도권 어느 쪽으로도 세지 않는다.
+    - 급여·원문 링크는 응답에 없어 disclosed=false, officialUrl=None이다.
+    - 업종·언어·비자·인원·출처 기관은 jobDescription에 원문 그대로 둔다.
+    """
+    fields = WORLDJOB["fields"]
+    merged = {**record, **(detail or {})}
+
+    def get(name: str) -> str:
+        return pick(merged, fields.get(name))
+
+    title, organization = get("title"), get("organization")
+    if not title:
+        raise SkipRecord("missing_title")
+    if not organization:
+        raise SkipRecord("missing_organization")
+    closes_at = next(iter(find_dates(get("closes_ymd"))), None)
+    if closes_at is None:
+        raise SkipRecord("no_deadline")
+    when = clock.parse_as_of(as_of)
+    rolling = (date.fromisoformat(closes_at) - when.date()).days > WORLDJOB_ROLLING_MIN_DAYS
+
+    region = parse_worldjob_region(get("country"))
+    job_text = get("job_name")
+    job = Job(code=None, middle=None, major=None, name=job_text or title)
+    career_text = get("career_name")
+    career = WORLDJOB_CAREER.get(career_text.replace(" ", "")) or parse_career(career_text)
+    description = worldjob_description(get)
+
+    api: dict[str, ExtractedBy] = {"title": ExtractedBy.API, "organization": ExtractedBy.API,
+                                   "closesAt": ExtractedBy.API}
+    for name, present in (("workRegion", not region.unknown), ("job", bool(job_text)),
+                          ("careerType", career != CareerType.UNKNOWN), ("jobDescription", description is not None)):
+        if present:
+            api[name] = ExtractedBy.API
+
+    snapshot = PostingSnapshot(
+        job_posting_id=f"{POSTING_ID_PREFIX['worldjob']}-{worldjob_id(merged)}", snapshot_id="pending",
+        title=title, organization=organization, job_description=description, closes_at=closes_at, official_url=None,
+        source_type=SourceType.OFFICIAL, checked_at=clock.iso(when), source=PostingSource.WORLDJOB,
+        company=Company(name=organization), org_type=OrgType.PRIVATE, work_region=region, job=job,
+        employment_type=EmploymentType.UNKNOWN, career_type=career, education_min=None,
+        salary=Salary(disclosed=False), rolling=rolling, selection_steps=[], documents=[],
+        eligibility_rules=_alio_rules(None, "", career, career_text),
+        extract_status=ExtractStatus.PENDING, extracted_by=api, content_hash="pending",
+    )
+    return _finish(snapshot, as_of)
+
+
+# ---------------------------------------------------------------- 공고 묶음
+@dataclass
+class PostingBatch:
+    snapshots: dict[str, PostingSnapshot] = field(default_factory=dict)
+    records: dict[str, Mapping] = field(default_factory=dict)
+    skipped: Counter = field(default_factory=Counter)
+    duplicates: int = 0  # 같은 ID, 같은 내용이 두 번 온 건수 (해외취업은 똑같은 행이 온다)
+    rehashed: int = 0    # 같은 ID인데 내용이 달라 해시 ID로 바꾼 건수
+
+
+def normalize_postings(records: Iterable[Mapping], normalize: Callable[..., PostingSnapshot], *,
+                       rehash_on_collision: bool = False, **kwargs) -> PostingBatch:
+    """레코드마다 정규화한다. 건너뛴 이유는 건수로 센다. 모델 검사에 실패한 레코드는 "invalid_model"로 센다.
+
+    rehash_on_collision=True면 같은 ID에 내용이 다른 레코드가 오면 `hash_id=True`로 다시 정규화한다 (지방공공기관).
+    """
+    batch = PostingBatch()
+    for record in records:
+        try:
+            snap = normalize(record, **kwargs)
+            previous = batch.snapshots.get(snap.job_posting_id)
+            if previous is not None and previous.content_hash != snap.content_hash and rehash_on_collision:
+                snap = normalize(record, hash_id=True, **kwargs)
+                batch.rehashed += 1
+        except SkipRecord as e:
+            batch.skipped[e.reason] += 1
+            continue
+        except ValueError:  # pydantic ValidationError는 ValueError다
+            batch.skipped["invalid_model"] += 1
+            continue
+        if snap.job_posting_id in batch.snapshots:
+            batch.duplicates += 1
+        batch.snapshots[snap.job_posting_id] = snap
+        batch.records[snap.job_posting_id] = record
+    return batch
 
 
 # ---------------------------------------------------------------- 정책 (온통청년)

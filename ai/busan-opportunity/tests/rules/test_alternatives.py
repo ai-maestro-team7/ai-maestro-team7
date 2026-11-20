@@ -1,10 +1,13 @@
 """같은 일, 부산에서 (B-05, §4.5 altScore, §4.6). T-15, T-21, T-22."""
 
 import pytest
+from rules.test_ncs_match import OVERSEAS_VN, add_posting
 
 from opportunity.core import alternatives, copy_rules
 from opportunity.models import LeaveReason, OppError, TrackEvent
-from opportunity.models.posting import AltCandidate, AltCandidates
+from opportunity.models.posting import AltCandidate, AltCandidates, Job
+from opportunity.models.region import LocalLifeData
+from opportunity.ports import VectorHit
 from opportunity.seeds import demo_world as w
 
 
@@ -147,3 +150,53 @@ def test_limit_and_not_found(deps, as_of):
     with pytest.raises(OppError) as e:
         find(deps, as_of, w.SEOUL_DATA, limit=0)
     assert e.value.code == "INVALID_INPUT"
+
+
+# ---------------------------------------------------------------- 해외 공고
+OVERSEAS = "wk24-T-OVERSEAS"
+OVERSEAS_SIDO26 = "wk24-T-OVERSEAS-26"  # sido=26이 남아 있는 해외 공고
+WORK24_DATA = Job(code="D0101", middle="D01", major="D", name="데이터 분석가")
+
+
+def add_overseas(deps):
+    add_posting(deps, OVERSEAS, job=WORK24_DATA, work_region=OVERSEAS_VN)
+    add_posting(deps, OVERSEAS_SIDO26, job=WORK24_DATA,
+                work_region=OVERSEAS_VN.model_copy(update={"sido": "26", "unknown": False}))
+
+
+def test_overseas_is_never_a_busan_alternative(deps, as_of):
+    add_overseas(deps)
+    set_alts(deps, w.SEOUL_DATA, [(OVERSEAS, 0.97), (OVERSEAS_SIDO26, 0.96), (w.BUSAN_DATA, 0.86)])
+    assert alt_ids(find(deps, as_of, w.SEOUL_DATA)) == [w.BUSAN_DATA]
+
+
+def test_overseas_not_found_by_vector_fallback(deps, as_of):
+    add_overseas(deps)
+    assert deps.catalog.get_alts(w.SEOUL_FINANCE_PUBLIC) is None
+    deps.vectors.query = lambda vector, *, top_k, filter=None: [  # 필터를 무시하고 해외 공고를 돌려주는 경우
+        VectorHit(key=key, similarity=0.95) for key in (OVERSEAS, OVERSEAS_SIDO26)]
+    response = find(deps, as_of, w.SEOUL_FINANCE_PUBLIC, "demo3")
+    assert not {OVERSEAS, OVERSEAS_SIDO26} & set(alt_ids(response))
+
+
+@pytest.mark.parametrize("base", [OVERSEAS, OVERSEAS_SIDO26])
+def test_overseas_base_finds_busan_alternatives_like_capital(deps, as_of, base):
+    add_overseas(deps)
+    response = find(deps, as_of, base)
+    assert response.reason is None  # ALREADY_BUSAN이 아니다
+    assert response.alternatives and not response.no_alternative
+    for alt in response.alternatives:
+        latest = deps.catalog.get_latest(alt.job_posting_id)
+        assert latest.is_busan and not latest.is_overseas
+    assert base not in alt_ids(response)
+
+
+# ---------------------------------------------------------------- 통근 사실
+def test_alternative_commute_fact_only_with_table_value(deps, as_of):
+    label = copy_rules.COMMUTE_LABEL.format(minutes=35)
+    assert not any(label in a.facts for a in find(deps, as_of, w.SEOUL_DATA).alternatives)
+    deps.local_life = LocalLifeData(commute_minutes={"26290>26350": 35}, commute_source="부산교통공사 (테스트)",
+                                    commute_as_of="2026-11-20")
+    items = {a.job_posting_id: a for a in find(deps, as_of, w.SEOUL_DATA).alternatives}
+    assert label in items[w.BUSAN_DATA].facts  # 해운대구. demo1은 남구에 산다
+    assert label not in items[w.BUSAN_DATA_PUBLIC].facts  # 남구 → 남구는 표에 없다

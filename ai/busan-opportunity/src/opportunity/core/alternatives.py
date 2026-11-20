@@ -10,11 +10,12 @@ from ..models.api import AlternativeItem, AlternativesResponse
 from ..models.enums import CheonggeulType, LeaveReason, TrackEvent
 from ..models.errors import invalid_input, posting_not_found
 from ..models.posting import PostingLatest
-from . import copy_rules, facts, regions
+from . import copy_rules, facts
 from .context import UserContext, freshness, load_context
 from .ranking import (
     active_filter,
     cosine_similarity,
+    is_busan_posting,
     is_open,
     match_level,
     profile_vector,
@@ -77,12 +78,11 @@ def _expanded_pass(deps: Deps, ctx: UserContext, base: PostingLatest, first: dic
 
 def _eligible(deps: Deps, ctx: UserContext, base: PostingLatest, sims: dict[str, float],
               threshold: float) -> list[tuple[PostingLatest, float]]:
-    """유사도 기준을 넘고, 근무지가 부산으로 확인되고, 진행 중인 공고만 남긴다."""
+    """유사도 기준을 넘고, 근무지가 부산으로 확인되고(해외 제외), 진행 중인 공고만 남긴다."""
     keys = [k for k, s in sims.items() if s >= threshold and k != base.job_posting_id]
     latest = deps.catalog.batch_get_latest(keys) if keys else {}
     cfg = deps.config
-    return [(p, sims[k]) for k, p in latest.items()
-            if regions.is_busan(cfg, p.work_region) and is_open(p, ctx.as_of)]
+    return [(p, sims[k]) for k, p in latest.items() if is_busan_posting(cfg, p) and is_open(p, ctx.as_of)]
 
 
 def _items(deps: Deps, ctx: UserContext, rows: list[tuple[PostingLatest, float]], reason: LeaveReason | None, *,
@@ -104,13 +104,14 @@ def _items(deps: Deps, ctx: UserContext, rows: list[tuple[PostingLatest, float]]
         talent = facts.regional_talent_view(cfg, ctx.profile, posting)
         why = copy_rules.WHY_SHOWN_BY_REASON.get(reason, copy_rules.WHY_SHOWN_DEFAULT) if r else None
         reason_facts = [facts.FACT_SALARY_DISCLOSED] if facts.salary_disclosed(posting.salary) else []
+        commute = facts.commute_fact(facts.commute_minutes(deps.local_life, ctx.profile, posting.work_region))
         items.append(AlternativeItem(
             job_posting_id=posting.job_posting_id, title=posting.title, organization=posting.organization,
             work_region=posting.work_region, closes_at=posting.closes_at,
             similarity=round(similarity, facts.SCORE_DIGITS), match_score=round(match.score, facts.SCORE_DIGITS),
             match_level=match_level(cfg, match.score), alt_score=round(alt, facts.SCORE_DIGITS),
             badges=facts.valid_badges(posting.badges),
-            facts=facts.compact([facts.similarity_fact(similarity), *reason_facts,
+            facts=facts.compact([facts.similarity_fact(similarity), *reason_facts, commute,
                                  *facts.badge_facts(posting.badges, talent),
                                  facts.deadline_fact(posting.closes_at, ctx.as_of)]),
             why_shown=why or copy_rules.WHY_SHOWN_DEFAULT, is_sample=posting.is_sample,
@@ -120,7 +121,10 @@ def _items(deps: Deps, ctx: UserContext, rows: list[tuple[PostingLatest, float]]
 
 def alternatives_for(deps: Deps, ctx: UserContext, base: PostingLatest, *, leave_reason: LeaveReason | None,
                      size: int, profile_vec: list[float] | None = None) -> AlternativesResponse:
-    """이미 읽은 사용자 문맥으로 대안을 찾는다. 상세 화면의 미리보기도 이 함수를 쓴다."""
+    """이미 읽은 사용자 문맥으로 대안을 찾는다. 상세 화면의 미리보기도 이 함수를 쓴다.
+
+    해외 공고도 수도권 공고와 같은 방식으로 찾는다. reason(ALREADY_BUSAN)은 부산 공고에만 넣는다.
+    """
     cfg = deps.config
     reason = LeaveReason(leave_reason) if leave_reason is not None else ctx.prefs.leave_reason
     seoul_life = reason == LeaveReason.WANT_SEOUL_LIFE
@@ -129,7 +133,7 @@ def alternatives_for(deps: Deps, ctx: UserContext, base: PostingLatest, *, leave
     data_as_of, _ = freshness(deps, ctx.as_of)
     response = AlternativesResponse(base_job_posting_id=base.job_posting_id, leave_reason_applied=reason,
                                     suggest_compare=not seoul_life, data_as_of=data_as_of)
-    if regions.is_busan(cfg, base.work_region):
+    if is_busan_posting(cfg, base):
         response.reason = ALREADY_BUSAN
         return response
 

@@ -10,6 +10,8 @@ class PostingSource(StrEnum):
     PARTNER = "PARTNER"          # 기업 직접 등록 (ptn-, 2차 예약)
     SCHOOL_PROGRAM = "SCHOOL_PROGRAM"  # 학교 프로그램 (sch-, 2차 예약)
     DEMO = "DEMO"                # 직접 정리한 데모 공고
+    KLID = "KLID"                # 지방공공기관 채용정보 (klid-)
+    WORLDJOB = "WORLDJOB"        # 해외취업 모집공고 (wj-)
 
 
 class SourceType(StrEnum):
