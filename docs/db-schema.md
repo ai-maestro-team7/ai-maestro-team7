@@ -50,8 +50,8 @@
 |---|---|---|---|
 | **공통 프로필** (모두 읽음) | `PROFILE#BASIC` | — | `birthYear`, `residenceSido`, `residenceSigungu`, `residenceSince`, `universityRegion`, `graduationStatus`, `employmentStatus`, `monthlyIncome`, `householdIncomeLevel`, `desiredJobs[]`, `desiredRegion`, **`educationLevel`(`HIGH_SCHOOL`/`ASSOCIATE`/`BACHELOR`/`MASTER`/`DOCTOR`), `major`, `priorities[]`** (B 요청), `careerYears`, **`desiredSalaryMin`(정수, 만 원/년), `desiredCareerType`(`NEW`/`EXPERIENCED`/`ANY`)** (채팅 조건 저장 D-40), `talentPoolConsent`(예약, 기본 false), `isDemo`(데모 계정). `desiredJobs[] = [{work24Code, ncsCode, name}]` 최대 3개 |
 | **워크스페이스** | `WORKSPACE#{wsId}` | `USER#{u}#WSLIST` / `{status}#{updatedAt}` | `workspaceId`, `jobPostingId`, `snapshotId`, `targetNcsCode`, `status`, `selectedDocuments{RESUME, COVER_LETTER: {documentId, version}}`, `latestAnalysisId`, `latestReviewId`, `latestLearningPathId`, `latestInterviewId` |
-| 문서 (최신·목록용) | `DOC_LATEST#{docId}` | — | `documentId`, `documentType`, `title`, `latestVersion`, 최신 버전의 `s3Key`·`extractedTextKey`·`extractionStatus` 사본 |
-| 문서 버전 | `DOC#{docId}#V#0001` | — | `version`, `parentVersion`, `s3Key`, `extractedTextKey`, `extractionStatus`, `sourceDocumentId`, `relatedStoryIds[]`, `checksum`, `sizeBytes` |
+| 문서 (최신·목록용) | `DOC_LATEST#{docId}` | — | `documentId`, `documentType`, `title`, `latestVersion`, 최신 버전의 `s3Key`·`extractedTextKey`·`extractionStatus` 사본. 업로드 완료 전(`PENDING`)에만 `expiresAt`(발급 후 24시간) |
+| 문서 버전 | `DOC#{docId}#V#0001` | — | `version`, `parentVersion`, `s3Key`, `extractedTextKey`, `extractionStatus`, `sourceDocumentId`, `relatedStoryIds[]`, `checksum`, `sizeBytes`. 업로드 완료 전(`PENDING`)에만 `expiresAt`(발급 후 24시간), 완료하면 뺀다 |
 | 역량 프로필 (최신) | `PROFILE#LATEST` | — | `latestProfileId`, `latestVersion` |
 | 역량 프로필 버전 | `PROFILE#{profileId}#V#0001` | — | `skills[]`, `evidence[]`, `projects[]`, `certificates[]`, `needsConfirmation[]`, `sourceDocumentIds[]`, `modelId`, `promptVersion` |
 | 경험 블록 (최신·목록용) | `STORY_LATEST#{storyId}` | — | `storyId`, `title`, `status`, `latestVersion` |
@@ -122,7 +122,7 @@
 
 1. `ACCOUNT.status = DELETING` → 모든 쓰기(작업 Lambda, B 배치 포함)는 이 값을 확인하고 저장
 2. Query `PK = USER#{u}` 페이지네이션 → `BatchWriteItem` 25개씩, `UnprocessedItems`는 지수 백오프 재시도. **`OPP#` 아이템도 같은 PK라 함께 지워진다**
-3. S3: `career-docs/users/{hashedUserId}/`, `uploads/interview/{ivId}/`. 개인 문서 저장과 회원 탈퇴 삭제는 모두 `backend/common.py`의 `hash_user_id()`를 사용한다. 인증된 Cognito `sub`의 UTF-8 바이트를 SHA-256으로 해시한 소문자 64자리 16진수이며, 접두사를 안정적으로 다시 계산할 수 있도록 키나 솔트를 사용하지 않는다. 해시는 인증이나 접근 제어를 대신하지 않는다.
+3. S3: `career-docs/users/{hashedUserId}/`, `career-docs/pending/users/{hashedUserId}/`(업로드 완료 전 원본), `uploads/interview/{ivId}/`. 개인 문서 저장과 회원 탈퇴 삭제는 모두 `backend/common.py`의 `hash_user_id()`를 사용한다. 인증된 Cognito `sub`의 UTF-8 바이트를 SHA-256으로 해시한 소문자 64자리 16진수이며, 접두사를 안정적으로 다시 계산할 수 있도록 키나 솔트를 사용하지 않는다. 해시는 인증이나 접근 제어를 대신하지 않는다.
 4. B의 EventBridge 일정(`scheduleNames[]`, `OPP#ALERT#.scheduleName`)은 아이템을 지우기 전에 읽어서 삭제 (B 함수 호출)
 5. 마지막에 `ACCOUNT` 삭제. 단계별 건수만 로그로
 
@@ -253,7 +253,7 @@ ID 안에는 `#`를 쓰지 않는다. 키 구분자이고, 주소에 들어가�
 
 | 저장소 | 용도 | 경로·설정 |
 |---|---|---|
-| `team07-career-docs-<계정ID>` | 개인 문서 원본·추출본·첨삭 결과 | `users/{hashedUserId}/documents/{docId}/v{n}/…`, `users/{hashedUserId}/reviews/{reviewId}.json` |
+| `team07-career-docs-<계정ID>` | 개인 문서 원본·추출본·첨삭 결과 | `users/{hashedUserId}/documents/{docId}/v{n}/…`, `users/{hashedUserId}/reviews/{reviewId}.json`. 업로드 완료 전 원본은 `pending/users/…`에 두고 완료 때 `users/…`로 옮긴다. `pending/`은 1일 자동 삭제 |
 | `team07-kb-source-<계정ID>` | KB 원천 (13쌍) | `docs/` |
 | `team07-uploads-<계정ID>` | 면접 녹음(변환 후 삭제), 질문 음성. 7일 자동 삭제 | `uploads/interview/{ivId}/{answers,transcripts,questions}/…` |
 | `team07-opp-data-<계정ID>` | B: 공공 API 원본, 정규화본, 시드, 데모 스냅샷, 수집 기록 | `raw/{출처}/{날짜}/`, `normalized/{날짜}/`, `seed/`, `snapshots/demo-2026-11-21/`, `runs/{날짜}.json` |

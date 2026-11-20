@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { NextStepPanel } from "@/components/ui/NextStepPanel";
 import { Panel } from "@/components/ui/Panel";
+import { PageSkeleton } from "@/components/ui/Skeleton";
 import { Stats } from "@/components/ui/Stats";
 import { TwoColumn } from "@/components/layout/PageContainer";
 import { errorMessage, getAnalysis, poll, readFlow, safeExternalUrl } from "@/features/mentoring/api";
@@ -59,7 +60,7 @@ export function DiagnosisResultClient() {
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  if (loading) return <p role="status" className="text-body text-grey-700">진단 결과를 불러오고 있어요.</p>;
+  if (loading) return <PageSkeleton label="진단 결과를 불러오고 있어요" />;
   if (error || !result) {
     return (
       <Panel className="flex flex-col items-start gap-3 p-6">

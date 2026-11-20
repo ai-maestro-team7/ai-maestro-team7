@@ -1,7 +1,7 @@
 import Link from "next/link";
-import { type Column, DataTable, TableCell, TableRow } from "@/components/ui/DataTable";
+import { type Column, DataTable, DataTableSkeleton, TableCell, TableRow } from "@/components/ui/DataTable";
 import { cn } from "@/lib/cn";
-import { deadlineLines, jobDetailHref, MATCH_LABELS, matchReason, ORG_TYPE_LABELS, orgInitial } from "../lib";
+import { deadlineLines, jobDetailHref, MATCH_LABELS, matchReason, ORG_TYPE_LABELS } from "../lib";
 import type { PostingCard } from "../types";
 import { SaveToggle } from "./SaveToggle";
 
@@ -24,6 +24,9 @@ const JOB_COLUMNS: Column[] = [
   { key: "save", label: "저장", className: COLUMNS.save, srOnly: true },
 ];
 
+/** 머리줄과 행에 같이 주는 좌우 여백 */
+const ROW_INSET = "px-4";
+
 /** 공고 아래 작은 줄: 직종, 배지(출처가 있는 것만 서버가 보낸다), 부산 대안 수 */
 function subline(job: PostingCard): string {
   const parts = [job.job.name, ...job.badges.map((badge) => badge.label)];
@@ -36,14 +39,8 @@ function subline(job: PostingCard): string {
 export function JobRow({ job, asOf }: { job: PostingCard; asOf: string }) {
   const deadline = deadlineLines(job.closesAt, job.rolling, asOf);
   return (
-    <TableRow className="relative py-4 hover:bg-grey-50">
-      <TableCell className={cn(COLUMNS.company, "flex items-center gap-3")}>
-        <span
-          aria-hidden
-          className="flex size-10 shrink-0 items-center justify-center rounded-control bg-grey-100 text-small font-bold text-grey-600"
-        >
-          {orgInitial(job.organization)}
-        </span>
+    <TableRow className={cn("relative py-4 hover:bg-grey-50", ROW_INSET)}>
+      <TableCell className={cn(COLUMNS.company, "flex items-center")}>
         <span className="truncate text-body font-medium text-grey-900">{job.organization}</span>
       </TableCell>
       <TableCell className={cn(COLUMNS.posting, "flex flex-col gap-0.5")}>
@@ -70,7 +67,7 @@ export function JobRow({ job, asOf }: { job: PostingCard; asOf: string }) {
         <span className="truncate text-small text-grey-600">{matchReason(job.facts)}</span>
       </TableCell>
       <TableCell className={COLUMNS.save}>
-        <SaveToggle jobTitle={`${job.organization} ${job.title}`} />
+        <SaveToggle jobPostingId={job.jobPostingId} jobTitle={`${job.organization} ${job.title}`} />
       </TableCell>
     </TableRow>
   );
@@ -78,10 +75,23 @@ export function JobRow({ job, asOf }: { job: PostingCard; asOf: string }) {
 
 export function JobTable({ jobs, asOf }: { jobs: PostingCard[]; asOf: string }) {
   return (
-    <DataTable columns={JOB_COLUMNS} label="채용 공고 목록">
+    <DataTable columns={JOB_COLUMNS} label="채용 공고 목록" headerClassName={ROW_INSET}>
       {jobs.map((job) => (
         <JobRow key={job.jobPostingId} job={job} asOf={asOf} />
       ))}
     </DataTable>
+  );
+}
+
+/** 공고를 불러오는 동안 보여주는 표 자리 */
+export function JobTableSkeleton({ rows = 3 }: { rows?: number }) {
+  return (
+    <DataTableSkeleton
+      columns={JOB_COLUMNS}
+      label="공고를 불러오는 중"
+      rows={rows}
+      headerClassName={ROW_INSET}
+      rowClassName={cn("py-4", ROW_INSET)}
+    />
   );
 }

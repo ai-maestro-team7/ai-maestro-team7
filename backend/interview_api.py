@@ -42,6 +42,7 @@ DOCS_BUCKET = os.environ.get("CAREER_DOCS_BUCKET", "")
 REGION = os.environ.get("AWS_REGION", "ap-northeast-2")
 MAX_AUDIO = 6 * 1024 * 1024
 MAX_IMAGE = 5 * 1024 * 1024
+MAX_ANSWER_TEXT = 3000  # 글로 쓴 답변 (텍스트 방식). 2분 말하기 분량의 서너 배
 TRANSCRIBE_WAIT_SEC = 240
 INTERVIEW_TYPES = {"PERSONALITY", "JOB", "MIXED"}
 FRAME_TYPES = {"CALIBRATION", "ANSWER"}
@@ -238,6 +239,25 @@ def enqueue(task):
     _lambda.invoke(FunctionName=fn, InvocationType="Event", Payload=json.dumps(task).encode())
 
 
+AI_RETRY_CALLS = 3  # 면접 함수 호출 횟수 (함수 안의 재시도와 별개). AI 출력 형식 오류는 다시 부르면 대부분 통과한다
+
+
+def call_ai(fn, *args):
+    """면접 함수를 부른다. AI 출력 형식 오류(AI_OUTPUT_INVALID, retryable)면 같은 입력으로 다시 부른다.
+
+    함수는 받은 session을 바꾸지 않으므로 다시 불러도 안전하다. 다시 부르지 않으면 꼬리질문 판단이 한 번
+    어긋났을 때 세션 전체가 FAILED가 되고, 녹음은 이미 지워져서 사용자가 이어 갈 방법이 없다 (#121).
+    그 밖의 오류(입력 오류, AWS 오류)는 그대로 올린다.
+    """
+    for attempt in range(1, AI_RETRY_CALLS + 1):
+        try:
+            return fn(*args)
+        except Exception as e:  # noqa: BLE001
+            if getattr(e, "code", None) != "AI_OUTPUT_INVALID" or attempt == AI_RETRY_CALLS:
+                raise
+            print(f"[WARN] {getattr(fn, '__name__', 'ai')} AI_OUTPUT_INVALID attempt={attempt} → 다시 호출")
+
+
 def save_next_question(user_id, iv_id, result, extra=None):
     """질문 음성 만들기 → S3 저장 → 상태 NEXT_QUESTION_READY"""
     nq = dict(result["nextQuestion"])
@@ -251,7 +271,8 @@ def save_next_question(user_id, iv_id, result, extra=None):
 
 def task_start(t):
     user_id, iv_id, inp = t["userId"], t["sessionId"], t["input"]
-    result = impl.start_interview(iv_id, inp["job"], inp["resumeText"], inp["interviewType"], inp["cameraConsent"], inp.get("profile"))
+    result = call_ai(impl.start_interview, iv_id, inp["job"], inp["resumeText"], inp["interviewType"], inp["cameraConsent"],
+                     inp.get("profile"))
     save_next_question(user_id, iv_id, result)
 
 
@@ -260,24 +281,27 @@ def task_answer(t):
     item = get_interview(user_id, iv_id)
     job = item["transcribeJobs"][answer_id]
 
-    deadline = time.time() + TRANSCRIBE_WAIT_SEC
-    while True:
-        tr = impl.get_transcription_result(job["jobName"])
-        if tr.get("status") != "IN_PROGRESS" or time.time() > deadline:
-            break
-        time.sleep(2)
-    if tr.get("status") == "IN_PROGRESS":
-        tr = {"status": "FAILED"}  # 너무 오래 걸리면 변환 실패로 기록하고 면접은 계속
+    if "text" in job:  # 글로 쓴 답변: 변환 없이 그대로 쓴다 (단어별 시간 없음)
+        tr = {"status": "COMPLETED", "text": job["text"], "words": []}
+    else:
+        deadline = time.time() + TRANSCRIBE_WAIT_SEC
+        while True:
+            tr = impl.get_transcription_result(job["jobName"])
+            if tr.get("status") != "IN_PROGRESS" or time.time() > deadline:
+                break
+            time.sleep(2)
+        if tr.get("status") == "IN_PROGRESS":
+            tr = {"status": "FAILED"}  # 너무 오래 걸리면 변환 실패로 기록하고 면접은 계속
 
-    # 녹음과 Transcribe 결과 파일(답변 원문이 들어 있음)은 변환이 끝나면 바로 삭제 (7일 자동 삭제는 안전장치)
-    if UPLOAD_BUCKET:
-        for k in (job.get("audioKey"), job.get("transcriptKey")):
-            if k:
-                s3().delete_object(Bucket=UPLOAD_BUCKET, Key=k)
+        # 녹음과 Transcribe 결과 파일(답변 원문이 들어 있음)은 변환이 끝나면 바로 삭제 (7일 자동 삭제는 안전장치)
+        if UPLOAD_BUCKET:
+            for k in (job.get("audioKey"), job.get("transcriptKey")):
+                if k:
+                    s3().delete_object(Bucket=UPLOAD_BUCKET, Key=k)
 
     update_interview(user_id, iv_id, {"stage": "JUDGING"})
     answer_result = {"answerId": answer_id, "timeLimitReached": job["timeLimitReached"], "transcription": tr}
-    result = impl.process_answer(item["session"], answer_result)
+    result = call_ai(impl.process_answer, item["session"], answer_result)
 
     if result["action"] == "REPORT":
         update_interview(user_id, iv_id, {"session": result["session"], "lastAnswer": result["lastAnswer"],
@@ -298,7 +322,7 @@ def make_report(user_id, iv_id):
         session["baseline"] = impl.compute_baseline(calib)
     answer_frames = [{k: f.get(k) for k in ("type", "questionId", "answerId", "capturedAt", "accepted", "valid", "gaze", "head", "eyesOpen")}
                      for f in frames if f["type"] == "ANSWER"]
-    report = impl.generate_report(session, answer_frames)
+    report = call_ai(impl.generate_report, session, answer_frames)
     report.setdefault("interviewDate", now_iso()[:10])
     table().put_item(Item=to_dynamo({"PK": pk(user_id), "SK": sk(iv_id, "REPORT"), "entityType": "InterviewReport",
                                      "sessionId": iv_id, "report": report, "createdAt": now_iso()}))
@@ -367,16 +391,24 @@ def h_start(event, user_id, params, request_id):
 def h_answer(event, user_id, params, request_id):
     fields, files = parse_multipart(event)
     iv_id, answer_id = fields.get("sessionId"), fields.get("answerId")
-    if not iv_id or not answer_id or "audio" not in files:
-        raise TeamError(400, "INVALID_INPUT", "sessionId, answerId, audio가 필요해요.")
-    audio, audio_type = files["audio"]
-    if len(audio) > MAX_AUDIO:
-        raise TeamError(413, "FILE_TOO_LARGE", "녹음 파일이 너무 커요 (6MB 이하).")
+    # 답변은 녹음(audio) 또는 글(text) 가운데 하나다. 글은 마이크를 쓰지 않는 "텍스트" 진행 방식에서 온다 (#121)
+    has_text = "text" in fields and "audio" not in files
+    if not iv_id or not answer_id or ("audio" not in files and not has_text):
+        raise TeamError(400, "INVALID_INPUT", "sessionId, answerId, audio(또는 text)가 필요해요.")
+    if has_text:
+        if len(fields["text"]) > MAX_ANSWER_TEXT:
+            raise TeamError(400, "INVALID_INPUT", f"답변은 {MAX_ANSWER_TEXT:,}자까지 쓸 수 있어요.")
+    else:
+        audio, audio_type = files["audio"]
+        if len(audio) > MAX_AUDIO:
+            raise TeamError(413, "FILE_TOO_LARGE", "녹음 파일이 너무 커요 (6MB 이하).")
     get_interview(user_id, iv_id)  # 없으면 404
 
     # 중복 제출 방지: 지금 받을 answerId이고 아직 제출되지 않았을 때만 (조건부 쓰기)
     try:
-        update_interview(user_id, iv_id, {"stage": "TRANSCRIBING", "status": "PROCESSING", "nextQuestion": None},
+        # 글 답변은 음성 변환이 없으므로 바로 다음 단계(JUDGING)로 표시한다
+        update_interview(user_id, iv_id, {"stage": "JUDGING" if has_text else "TRANSCRIBING", "status": "PROCESSING",
+                                          "nextQuestion": None},
                          condition="expectedAnswerId = :aid AND NOT contains(submittedAnswerIds, :aid)",
                          cond_values={":aid": answer_id})
     except ClientError as e:
@@ -386,6 +418,18 @@ def h_answer(event, user_id, params, request_id):
         if answer_id in (item.get("submittedAnswerIds") or []):
             raise TeamError(409, "ANSWER_ALREADY_SUBMITTED", "이미 제출된 답변이에요.")
         raise TeamError(409, "INVALID_STATE", "지금은 이 답변을 받을 수 없어요.")
+
+    if has_text:
+        # 변환 작업 없이 글을 그대로 넘긴다. 단어별 시간이 없어 전달력(말 속도·침묵)은 측정되지 않는다
+        table().update_item(
+            Key={"PK": pk(user_id), "SK": sk(iv_id)},
+            UpdateExpression="SET submittedAnswerIds = list_append(submittedAnswerIds, :one), transcribeJobs.#aid = :job",
+            ExpressionAttributeNames={"#aid": answer_id},
+            ExpressionAttributeValues=to_dynamo({":one": [answer_id], ":job": {
+                "text": fields["text"], "timeLimitReached": as_bool(fields.get("timeLimitReached"))}}),
+        )
+        enqueue({"task": "interview.answer", "userId": user_id, "sessionId": iv_id, "answerId": answer_id, "requestId": request_id})
+        return 202, {"sessionId": iv_id, "answerId": answer_id, "status": "PROCESSING", "stage": "JUDGING"}
 
     media_format = {"audio/webm": "webm", "audio/ogg": "ogg", "audio/mp4": "mp4", "audio/wav": "wav",
                     "audio/x-wav": "wav", "audio/mpeg": "mp3", "audio/flac": "flac"}.get(audio_type.split(";")[0], "webm")

@@ -179,6 +179,61 @@ def main():
     done = api.get_interview("u-1", sid2)
     check("보정 1장 → baseline은 None 그대로 저장, 리포트는 생성", done["status"] == "COMPLETED" and done["session"]["baseline"] is None)
 
+    # 글로 쓴 답변 (텍스트 방식, #121): 녹음 없이 text만 보내도 면접이 끝까지 간다
+    s, b = call("POST", "/api/v1/interview/start", body={"job": "데이터 분석", "interviewType": "MIXED", "cameraConsent": False, "resumeText": RESUME})
+    sid3 = b["sessionId"]
+    first = call("GET", f"/api/v1/interview/{sid3}/status")[1]["nextQuestion"]["answerId"]
+    s, b = call("POST", "/api/v1/interview/answer", multipart={"sessionId": sid3, "answerId": first, "timeLimitReached": "false",
+                                                               "text": "공공데이터로 방문객 추이를 분석했습니다."})
+    check("글 답변 → 202, 음성 변환 없이 JUDGING", s == 202 and b["stage"] == "JUDGING")
+    mid = api.get_interview("u-1", sid3)
+    check("글 답변은 Transcribe 작업을 만들지 않음", "jobName" not in mid["transcribeJobs"][first] and mid["transcribeJobs"][first]["text"])
+    check("글 답변도 다음 질문으로 넘어감", mid["stage"] == "NEXT_QUESTION_READY" and mid["lastAnswer"] == {"answerId": first, "evaluable": True, "reason": None})
+    s, b = call("POST", "/api/v1/interview/answer", multipart={"sessionId": sid3, "answerId": first, "timeLimitReached": "false", "text": "다시"})
+    check("글 답변 중복 제출 → 409", s == 409 and b["error"]["code"] == "ANSWER_ALREADY_SUBMITTED")
+    aid = call("GET", f"/api/v1/interview/{sid3}/status")[1]["nextQuestion"]["answerId"]
+    s, b = call("POST", "/api/v1/interview/answer", multipart={"sessionId": sid3, "answerId": aid, "timeLimitReached": "false", "text": "가" * 3001})
+    check("글 답변 3,000자 초과 → 400", s == 400 and b["error"]["code"] == "INVALID_INPUT")
+    s, b = call("POST", "/api/v1/interview/answer", multipart={"sessionId": sid3, "answerId": aid, "timeLimitReached": "false", "text": "   "})
+    check("빈 글 답변 → 평가 불가(NO_ANSWER)로 기록하고 계속", s == 202 and api.get_interview("u-1", sid3)["lastAnswer"]["reason"] == "NO_ANSWER")
+    for _ in range(4):
+        st = call("GET", f"/api/v1/interview/{sid3}/status")[1]
+        if st["status"] == "COMPLETED":
+            break
+        call("POST", "/api/v1/interview/answer", multipart={"sessionId": sid3, "answerId": st["nextQuestion"]["answerId"],
+                                                           "timeLimitReached": "false", "text": "회귀분석 결과를 전년 자료와 비교해 검증했습니다."})
+    check("글 답변만으로 리포트까지 완료", call("GET", f"/api/v1/interview/{sid3}/status")[1]["status"] == "COMPLETED")
+    s, b = call("POST", "/api/v1/interview/answer", multipart={"sessionId": sid3, "answerId": "a-q1-1", "timeLimitReached": "false"})
+    check("audio도 text도 없으면 400", s == 400 and b["error"]["code"] == "INVALID_INPUT")
+
+    # AI 출력 형식 오류는 같은 입력으로 다시 부른다 (#121). 한 번 어긋났다고 세션이 FAILED가 되지 않는다
+    class AiOutputInvalid(Exception):
+        code, retryable = "AI_OUTPUT_INVALID", True
+
+    real_process, flaky = api.impl.process_answer, {"calls": 0, "fail": 1}
+
+    def flaky_process(session, answer_result):
+        flaky["calls"] += 1
+        if flaky["calls"] <= flaky["fail"]:
+            raise AiOutputInvalid()
+        return real_process(session, answer_result)
+
+    api.impl.process_answer = flaky_process
+    try:
+        s, b = call("POST", "/api/v1/interview/start", body={"job": "데이터 분석", "interviewType": "MIXED", "cameraConsent": False, "resumeText": RESUME})
+        sid4 = b["sessionId"]
+        aid = call("GET", f"/api/v1/interview/{sid4}/status")[1]["nextQuestion"]["answerId"]
+        call("POST", "/api/v1/interview/answer", multipart={"sessionId": sid4, "answerId": aid, "timeLimitReached": "false", "text": "결측치 기준을 정했습니다."})
+        st = call("GET", f"/api/v1/interview/{sid4}/status")[1]
+        check("AI 출력 오류 1번 → 다시 불러서 다음 질문으로 진행", st["status"] == "PROCESSING" and st["stage"] == "NEXT_QUESTION_READY" and flaky["calls"] == 2)
+        flaky.update(calls=0, fail=99)
+        call("POST", "/api/v1/interview/answer", multipart={"sessionId": sid4, "answerId": st["nextQuestion"]["answerId"], "timeLimitReached": "false", "text": "다시 답합니다."})
+        st = call("GET", f"/api/v1/interview/{sid4}/status")[1]
+        check("AI 출력 오류가 계속되면 3번 부른 뒤 FAILED(AI_OUTPUT_INVALID, retryable)", st["status"] == "FAILED" and st["error"]["code"] == "AI_OUTPUT_INVALID"
+              and st["error"]["retryable"] is True and flaky["calls"] == api.AI_RETRY_CALLS)
+    finally:
+        api.impl.process_answer = real_process
+
     # 지워진 세션을 뒤늦은 작업이 되살리지 않음 (회원 탈퇴 중 경쟁 상태)
     s, b = call("POST", "/api/v1/interview/start", body={"job": "데이터 분석", "interviewType": "MIXED", "cameraConsent": False, "resumeText": RESUME})
     gone = b["sessionId"]

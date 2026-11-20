@@ -101,7 +101,9 @@ private_bucket() { # name [lifecycle-json]
 
 # 명세 §7.2 — 개인 문서(이력서 등) / KB 원천 문서 분리
 echo "[S3] 멘토링 버킷"
-private_bucket "$CAREER_DOCS_BUCKET"
+# 업로드 완료 전 원본은 pending/ 아래에 있다. 완료되면 users/로 옮기므로, 남은 것은 떠난 업로드뿐이라 1일 뒤 지운다
+private_bucket "$CAREER_DOCS_BUCKET" \
+  '{"Rules":[{"ID":"expire-pending-uploads-1d","Status":"Enabled","Filter":{"Prefix":"pending/"},"Expiration":{"Days":1}}]}'
 aws s3api put-bucket-cors --bucket "$CAREER_DOCS_BUCKET" --cors-configuration \
   "{\"CORSRules\":[{\"AllowedOrigins\":[\"$ALLOWED_ORIGIN\"],\"AllowedMethods\":[\"PUT\"],\"AllowedHeaders\":[\"*\"],\"MaxAgeSeconds\":3000}]}"
 private_bucket "$KB_SOURCE_BUCKET"

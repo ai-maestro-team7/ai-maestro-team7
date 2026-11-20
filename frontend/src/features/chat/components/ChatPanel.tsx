@@ -11,6 +11,7 @@ import { asOfLabel, readChatSessionId, saveChatSessionId } from "../lib";
 import type { ChatMessage } from "../types";
 import { CoverLetterForm, SaveConditions, StartInterview } from "./ChatActions";
 import { PolicyCard, PostingCard } from "./ChatCards";
+import { AttachButton, PdfDropZone } from "./PdfAttach";
 import { ResumeForm } from "./ResumeForm";
 
 const EXAMPLES = [
@@ -116,6 +117,10 @@ export function ChatPanel() {
     void send("이력서를 올렸어요. 이력서로 맞는 공고와 청년정책 찾아 줘", [{ documentId }]);
   }
 
+  function onPdfReady(documentId: string, fileName: string) {
+    void send(`‘${fileName}’을 올렸어요. 내 서류로 맞는 공고와 청년정책 찾아 줘`, [{ documentId }]);
+  }
+
   if (!username) {
     return (
       <section aria-labelledby="chat-title" className="flex min-w-0 flex-1 flex-col gap-3.5">
@@ -163,7 +168,9 @@ export function ChatPanel() {
       {resumeOpen ? (
         <ResumeForm onReady={onResumeReady} onCancel={() => setResumeOpen(false)} />
       ) : (
-        <AskBox value={draft} onChange={setDraft} onSubmit={() => void send(draft)} disabled={busy} />
+        <PdfDropZone disabled={busy} onReady={onPdfReady}>
+          <AskBox value={draft} onChange={setDraft} onSubmit={() => void send(draft)} disabled={busy} />
+        </PdfDropZone>
       )}
       <div className="flex flex-wrap items-center gap-2">
         {messages.length === 0 && EXAMPLES.map((example) => (
@@ -183,7 +190,8 @@ export function ChatPanel() {
         )}
       </div>
       <p className="text-small text-grey-600">
-        공고·정책은 공식 데이터(고용24·잡알리오·온통청년)에서 찾고 출처와 기준일을 함께 보여드려요. 적합도는 실제 합격 확률이
+        공고·정책은 공식 데이터(고용24·잡알리오·온통청년)에서 먼저 찾고, 없으면 팀이 넣어 둔 데이터에서 찾아 따로 표시해요.
+        이력서·자기소개서 PDF는 클립 버튼으로 고르거나 입력칸에 끌어다 놓을 수 있어요 (10MB 이하). 적합도는 실제 합격 확률이
         아닙니다.
       </p>
     </section>
@@ -308,8 +316,9 @@ function AskBox({
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex h-13 w-full items-center gap-3 rounded-field border border-grey-300 pr-1.75 pl-4 focus-within:border-blue-500"
+      className="flex h-13 w-full items-center gap-2 rounded-field border border-grey-300 pr-1.75 pl-1.75 focus-within:border-blue-500"
     >
+      <AttachButton disabled={disabled} />
       <label htmlFor="chat-message" className="sr-only">
         AI 멘토에게 보낼 말
       </label>

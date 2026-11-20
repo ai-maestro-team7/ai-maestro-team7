@@ -56,6 +56,9 @@ class UploadConfig(_ConfigModel):
     max_pages: int = Field(ge=1)
     presign_expires_seconds: int = Field(ge=30, le=3600)
     file_name_max_chars: int = Field(ge=1)
+    # 업로드 완료가 오지 않은 PENDING 문서 기록을 DynamoDB TTL로 지우는 시간.
+    # S3 `pending/` 원본은 버킷 수명 주기(1일)로 지운다 (infra/setup-data.sh)
+    pending_ttl_hours: int = Field(ge=1, le=168)
 
 
 class MetricsConfig(_ConfigModel):

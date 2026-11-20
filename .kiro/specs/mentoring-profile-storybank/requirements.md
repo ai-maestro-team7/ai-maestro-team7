@@ -70,7 +70,7 @@ mentoring-profile-storybank는 A 파트(`docs/개발계획서1.md`)의 첫 후�
 1. THE Mentoring_API SHALL User_Id를 백엔드가 넘긴 값에서만 얻고, 요청 본문·쿼리·헤더에 있는 `userId`나 `ownerUserId`는 무시한다 (api §3).
 2. THE Mentoring_Package SHALL 사용자 데이터를 모두 `team07-career-mentor`의 `PK = USER#{User_Id}` 아래에 저장하고, 각 항목에 `ownerUserId`를 함께 둔다 (db §0 원칙 2).
 3. WHEN 요청한 `documentId`, `profileId`, `storyId`가 없거나 다른 사용자의 것이면, THE Mentoring_API SHALL 존재 여부를 드러내지 않도록 같은 404 응답을 돌려준다. 코드는 문서면 `DOCUMENT_NOT_FOUND`, 그 밖은 `NOT_FOUND`다 (api §5 "남의 리소스는 404", 계약 `errors.py`).
-4. THE Mentoring_Package SHALL S3 객체 키를 서버에서만 만들고 `users/{hashedUserId}/` 아래에 둔다. 요청으로 받은 S3 키는 쓰지 않는다 (A F-08 "서버가 생성한 key만 사용", db §7).
+4. THE Mentoring_Package SHALL S3 객체 키를 서버에서만 만들고 `users/{hashedUserId}/` 아래에 둔다. 업로드 완료 전 원본만 `pending/users/{hashedUserId}/` 아래에 두고 완료 때 옮긴다 (1일 자동 삭제). 요청으로 받은 S3 키는 쓰지 않는다 (A F-08 "서버가 생성한 key만 사용", db §7).
 5. THE Mentoring_Package SHALL Scan을 쓰지 않고 GetItem·Query로만 사용자 데이터를 읽는다 (db §0 원칙 9).
 6. FOR ALL 이 스펙의 REST 경로, 사용자 A의 리소스 ID로 사용자 B가 요청하면 응답 본문에 사용자 A의 원문, 인용, 파일 이름이 들어 있지 않아야 한다 (A UT-15).
 

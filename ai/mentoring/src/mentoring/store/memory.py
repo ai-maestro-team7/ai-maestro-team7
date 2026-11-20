@@ -137,6 +137,14 @@ class MemoryObjectStore:
         found = self.files.get(key)
         return MemoryObjectInfo(len(found[0]), found[1]) if found else None
 
+    def copy(self, source_key: str, target_key: str) -> None:
+        if source_key in self.files:
+            self.files[target_key] = self.files[source_key]
+        elif source_key in self.objects:
+            self.objects[target_key] = self.objects[source_key]
+        else:
+            raise KeyError(source_key)
+
     def delete(self, key: str) -> None:
         self.objects.pop(key, None)
         self.files.pop(key, None)

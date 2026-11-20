@@ -3,7 +3,8 @@
 부산커리어 화면. Figma "v2 · AI 티 걷어낸 버전"(파일 `orxq9z9EWqrYDNVviAG1aW`, 페이지 `27:1331`)을 Next.js로 옮겼다.
 로그인(카카오·Google)과 채용 공고·청년 정책 화면(홈 요약 포함)은 B 부산 기회 추천 API(`/api/v1/opportunities/*`)에 연결했다.
 진단·첨삭·학습 로드맵은 `/api/v1/mentoring` API를 부른다.
-나머지 화면(멘토, 모의면접)은 아직 `src/features/*/data.ts`의 Mock 데이터를 읽는다.
+모의면접은 `/api/v1/interview/*`를 부른다: 설정에서 세션을 만들고, 장비 점검에서 마이크·카메라를 확인하고(정면 보정), 면접에서 질문 음성 재생·녹음·2초 간격 캡처·답변 제출을 하고, 리포트에서 채점 결과를 보여준다 (`src/features/interview/`).
+홈의 AI 멘토만 아직 `src/features/mentor/data.ts`의 Mock 데이터를 읽는다.
 요구사항·설계·작업 목록은 `.kiro/specs/frontend-ui/`에 있다.
 
 ## 실행

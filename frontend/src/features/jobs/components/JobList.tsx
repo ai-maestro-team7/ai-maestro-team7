@@ -5,14 +5,14 @@ import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
-import { ApiErrorNotice, ApiLoading } from "@/features/auth/components/ApiFallback";
+import { ApiErrorNotice } from "@/features/auth/components/ApiFallback";
 import { useUsername } from "@/features/auth/useUsername";
 import { formatDateTime } from "@/lib/format";
 import { useApi } from "@/lib/useApi";
 import { fetchFeed } from "../data";
 import { asOfDate, REGION_FILTERS, SORT_LABELS } from "../lib";
 import type { FeedResponse, JobRegion, JobSort, PostingCard } from "../types";
-import { JobTable } from "./JobTable";
+import { JobTable, JobTableSkeleton } from "./JobTable";
 
 type MorePages = { key: string; items: PostingCard[]; nextCursor?: string; pending: boolean; failed: boolean };
 
@@ -61,7 +61,7 @@ export function JobList() {
         </button>
       </div>
 
-      {state.status === "loading" && <ApiLoading className="py-24" label="공고를 불러오는 중" />}
+      {state.status === "loading" && <JobTableSkeleton rows={6} />}
       {state.status === "error" && <ApiErrorNotice error={state.error} onRetry={reload} />}
       {state.status === "success" && (
         <FeedResult

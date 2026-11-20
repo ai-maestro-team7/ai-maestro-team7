@@ -4,6 +4,7 @@ import { Bookmark, Search } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
+import { UserMenu } from "@/features/auth/components/UserMenu";
 import { loginHref } from "@/features/auth/lib";
 import { useUsername } from "@/features/auth/useUsername";
 import { cn } from "@/lib/cn";
@@ -58,19 +59,14 @@ export function Gnb() {
           </form>
         </div>
         <div className="flex items-center gap-5 text-small">
-          {/* 저장한 공고는 Figma에 이동할 화면이 없어 표시만 한다. 알림은 프론트 담당 결정으로 뺐다. */}
-          <span className="hidden items-center gap-1 text-grey-700 md:flex">
+          {/* 알림은 프론트 담당 결정으로 뺐다. */}
+          <Link href="/saved/" className="hidden items-center gap-1 text-grey-700 hover:text-grey-900 md:flex">
             <Bookmark className="size-4" strokeWidth={2} aria-hidden />
             저장한 공고
-          </span>
+          </Link>
           <span aria-hidden className="hidden h-3 w-px bg-grey-300 md:block" />
           {username ? (
-            <>
-              <span className="font-medium text-grey-900">{username} 님</span>
-              <button type="button" onClick={handleLogout} className="text-grey-600 hover:text-grey-900">
-                로그아웃
-              </button>
-            </>
+            <UserMenu username={username} onLogout={handleLogout} />
           ) : (
             <Link href={loginHref(pathname)} className="font-medium text-blue-500">
               로그인

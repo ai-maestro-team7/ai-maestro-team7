@@ -1,11 +1,11 @@
 "use client";
 
-import { ApiErrorNotice, ApiLoading } from "@/features/auth/components/ApiFallback";
+import { ApiErrorNotice } from "@/features/auth/components/ApiFallback";
 import { useUsername } from "@/features/auth/useUsername";
 import { useApi } from "@/lib/useApi";
 import { fetchPolicies } from "../data";
 import type { PolicyWalletResponse } from "../types";
-import { PolicyTable } from "./PolicyTable";
+import { PolicyTable, PolicyTableSkeleton } from "./PolicyTable";
 
 const HOME_COUNT = 3;
 
@@ -14,7 +14,7 @@ export function OpenPolicies() {
   const username = useUsername();
   const [state, reload] = useApi<PolicyWalletResponse>(`${username}|home`, fetchPolicies);
 
-  if (state.status === "loading") return <ApiLoading />;
+  if (state.status === "loading") return <PolicyTableSkeleton rows={HOME_COUNT} />;
   if (state.status === "error") return <ApiErrorNotice error={state.error} onRetry={reload} />;
   return <PolicyTable policies={(state.data.buckets.OPEN_NOW ?? []).slice(0, HOME_COUNT)} />;
 }
