@@ -1,0 +1,18 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/documents/doc-none"
+  },
+  "response": {
+    "status": 404,
+    "body": {
+      "error": {
+        "code": "DOCUMENT_NOT_FOUND",
+        "message": "문서를 찾을 수 없어요.",
+        "requestId": "req-mock",
+        "retryable": false,
+        "details": {}
+      }
+    }
+  }
+}

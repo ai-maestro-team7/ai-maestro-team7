@@ -1,0 +1,26 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/documents/text",
+    "body": {
+      "text": "짧음"
+    }
+  },
+  "response": {
+    "status": 400,
+    "body": {
+      "error": {
+        "code": "INVALID_INPUT",
+        "message": "이력서 텍스트는 50자 이상 30,000자 이하로 입력해 주세요.",
+        "requestId": "req-mock",
+        "retryable": false,
+        "details": {
+          "field": "text",
+          "minChars": 50,
+          "maxChars": 30000,
+          "length": 2
+        }
+      }
+    }
+  }
+}
