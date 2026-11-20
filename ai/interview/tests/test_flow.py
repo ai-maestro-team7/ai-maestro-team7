@@ -396,11 +396,13 @@ def test_unevaluable_answer_does_not_read_config(monkeypatch):
     assert out["lastAnswer"]["reason"] == "NO_ANSWER"
 
 
-def test_backend_positional_call_and_placeholder_transcript():
-    # 백엔드는 process_answer(item["session"], answer_result)로 부르고, 임시 get_transcription_result 결과를 넘긴다
+def test_backend_positional_call_with_transcribe_result():
+    # 백엔드는 process_answer(item["session"], answer_result)로 부르고, get_transcription_result 결과를 그대로 넘긴다
+    from interview import voice
+
     session = initial_session()
     result = {"answerId": "a-q1-1", "timeLimitReached": False,
-              "transcription": interview.get_transcription_result("job-1")}
+              "transcription": voice.parse_transcript(sample_json("transcribe/result_normal.json"))}
     out = interview.process_answer(session, result, llm=FakeLLM([SUFFICIENT]))
     assert out["action"] == "NEXT_QUESTION"
     assert set(out) == {"session", "action", "nextQuestion", "lastAnswer"}
