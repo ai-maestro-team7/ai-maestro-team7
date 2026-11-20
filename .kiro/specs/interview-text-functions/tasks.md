@@ -110,10 +110,10 @@
   - [x] 11.4 §5.2 `/start` 요청 예시의 `profile`을 계약 `CareerProfileSummary` 형식(`projects`, `skills`, `needsConfirmation`, 계약 예시 `data-analysis-demo`와 같은 내용)으로 바꾸고, 필드 규칙 표의 `profile` 행을 계약 이름으로 고친다
     - _Requirements: 15.5_
 
-- [ ] 12. 마무리
-  - [ ] 12.1 전체 테스트를 실행하고 결과(통과 수, 건너뛴 수)를 PR 본문용으로 기록한다
+- [x] 12. 마무리
+  - [x] 12.1 전체 테스트를 실행하고 결과(통과 수, 건너뛴 수)를 PR 본문용으로 기록한다
     - _Requirements: 14.1~14.5_
-  - [ ] 12.2 PR 참고 사항에 백엔드 담당 요청을 적는다
+  - [x] 12.2 PR 참고 사항에 백엔드 담당 요청을 적는다
     - 머지 뒤 배포하면 `/health`의 `interviewImpl`이 `interview`인지 확인
     - Session에 새 필드 3개(`modelId`, `promptVersion`, `currentQuestion`)가 생김 (백엔드 코드 변경 없음)
     - 백엔드 담당 요청: `/start`에서 `profile`을 `team07_contracts.CareerProfileSummary`로 먼저 검사해 400 `INVALID_INPUT`을 돌려주기. 지금은 검사 없이 202를 주고(`backend/interview_api.py` 336행), 뒤에서 `start_interview`가 거절하면 세션이 `FAILED`가 된다 (design §15 열린 질문 1)
