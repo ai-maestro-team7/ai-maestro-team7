@@ -14,6 +14,8 @@ export type ChatPosting = {
   closesAt: string;
   deadline?: string;
   salary: string;
+  /** 공공기관이면 "기관 직원 평균 연 9,118만 원 (2025년 결산 · 알리오 경영공시, 신입 초봉 아님)" */
+  orgPay?: string;
   career?: string;
   matchLevel: string;
   eligibility?: string;

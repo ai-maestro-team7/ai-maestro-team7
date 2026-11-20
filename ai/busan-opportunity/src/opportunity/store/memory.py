@@ -9,7 +9,7 @@ from datetime import datetime
 
 from ..models.policy import Policy
 from ..core.name_index import name_row
-from ..models.posting import AltCandidates, CompanyRecord, PostingLatest, PostingSnapshot
+from ..models.posting import AltCandidates, CompanyRecord, OrgPay, PostingLatest, PostingSnapshot
 from ..models.profile import BasicProfile, OppPrefs
 from ..models.user_state import ExplanationCache, Notification, PolicyAlert, SavedItem
 from ..ports import IdemResult, VectorHit
@@ -21,6 +21,7 @@ class MemoryCatalog:
         self.snapshots: dict[tuple[str, str], PostingSnapshot] = {}
         self.latest: dict[str, PostingLatest] = {}
         self.regional_index: dict[str, str] = {}  # jobPostingId → closesAt
+        self.org_pay: dict[str, OrgPay] = {}  # orgId → 기관 평균보수
         self.alts: dict[str, AltCandidates] = {}
         self.policies: dict[str, Policy] = {}
         self.companies: dict[str, CompanyRecord] = {}
@@ -67,6 +68,12 @@ class MemoryCatalog:
 
     def put_latest(self, latest):
         self.latest[latest.job_posting_id] = latest
+
+    def put_org_pay(self, pay):
+        self.org_pay[pay.org_id] = pay
+
+    def org_pays(self):
+        return sorted(self.org_pay.values(), key=lambda p: p.org_id)
 
     def put_regional_index(self, latest):
         self.regional_index[latest.job_posting_id] = latest.closes_at

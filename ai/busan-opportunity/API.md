@@ -23,9 +23,9 @@
 
 | 메서드 | 경로 | 하는 일 | 쿼리·본문 | 응답 예시 |
 |---|---|---|---|---|
-| GET | `/postings` | 맞춤 피드 | 쿼리 `region`(`ALL`·`BUSAN`·`CAPITAL`·`OVERSEAS`·시도 코드, 기본 `ALL`), `sort`(`BUSAN_FIRST`·`MATCH`·`DEADLINE`·`RECENT`), `jobCodes`(쉼표), `keyword`(제목·회사·직무 이름에 들어 있는 글자. 프로필 후보 밖의 공고도 이름 색인에서 찾는다, B-D08), `sector`(`ALL`·`PUBLIC` 공기업·`PRIVATE` 사기업, B-D10), `cursor`, `limit`, `regionalTalent`(`true`면 공고문의 지역 조건이 학교 지역·사는 곳과 맞을 수 있는 공고만. 카드의 `regionalTalent`가 `LIKELY`, B-D09) | `GET_postings.json` |
+| GET | `/postings` | 맞춤 피드 | 쿼리 `region`(`ALL`·`BUSAN`·`CAPITAL`·`OVERSEAS`·시도 코드, 기본 `ALL`), `sort`(`BUSAN_FIRST`·`MATCH`·`DEADLINE`·`RECENT`), `jobCodes`(쉼표), `keyword`(제목·회사·직무 이름에 들어 있는 글자. 프로필 후보 밖의 공고도 이름 색인에서 찾는다, B-D08), `sector`(`ALL`·`PUBLIC` 공기업·`PRIVATE` 사기업, B-D11), `cursor`, `limit`, `regionalTalent`(`true`면 공고문의 지역 조건이 학교 지역·사는 곳과 맞을 수 있는 공고만. 카드의 `regionalTalent`가 `LIKELY`, B-D09). 공공기관 카드에는 `orgPay{average, year, unit, source, asOf, sourceUrl}`(기관 직원 평균보수, 공고 급여 아님, B-D11)가 붙는다 | `GET_postings.json` |
 | GET | `/public/postings` | 로그인 없이 보는 공고 목록 (토큰 없음, B-D10). 마감 임박순, 적합도 같은 개인 값 없음 | 쿼리 `keyword`, `region`(피드와 같음), `sector`(`ALL`·`PUBLIC` 공기업: 공공기관·지방공공기관·`PRIVATE` 사기업), `orgType`(한 가지만), `career`(`ALL`·`NEW`·`EXPERIENCED`, 신입·경력 무관 공고는 둘 다), `employment`(`ALL`·`FULL_TIME`·`CONTRACT`·`PART_TIME`·`INTERN`), `cursor`, `limit`(1~50, 기본 20). 응답 `{items, total, nextCursor, dataAsOf, stale}` | `GET_public_postings.json` |
-| GET | `/postings/{id}` | 공고 상세 | - | 서울 `GET_postings_id.json`, 부산 `GET_postings_id_busan.json` |
+| GET | `/postings/{id}` | 공고 상세. 공공기관이면 `orgPay`에 연도별 기관 직원 평균보수가 있다 (B-D11) | - | 서울 `GET_postings_id.json`, 부산 `GET_postings_id_busan.json` |
 | GET | `/postings/{id}/explanation` | 추천 이유 문장 | - | `GET_postings_id_explanation.json` |
 | POST | `/postings/{id}/ask` | 이 공고에 질문 | 본문 `{"question"}` (300자까지) | `POST_postings_id_ask.json`, `POST_postings_id_ask_unanswered.json` |
 | GET | `/postings/{id}/alternatives` | 같은 일, 부산에서 | 쿼리 `leaveReason`, `limit` | `GET_postings_id_alternatives.json` |

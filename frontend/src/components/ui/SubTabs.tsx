@@ -27,8 +27,10 @@ export function SubTabs<K extends string>({ items, activeKey, onChange, panelId,
       {items.map((item) => {
         const active = item.key === activeKey;
         const classes = cn(
-          "-mb-px flex h-11 shrink-0 items-center whitespace-nowrap border-b-2 text-body",
-          active ? "border-grey-900 font-bold text-grey-900" : "border-transparent font-medium text-grey-600 hover:text-grey-800",
+          "-mb-px flex h-11 shrink-0 items-center whitespace-nowrap border-b-2 text-body transition-colors",
+          active
+            ? "border-grey-900 font-bold text-grey-900"
+            : "border-transparent font-medium text-grey-600 hover:border-grey-300 hover:text-grey-800",
         );
 
         if (item.href) {

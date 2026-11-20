@@ -10,6 +10,7 @@
 | v1.1 | 면접 담당 요청, 멘토링 담당 피드백 반영 (Workspace, GSI에 userId, `*_LATEST#`, 문서 버전, TASK, 삭제 규칙, 평가 로그) |
 | v1.2 | B 피드백 반영: 공고·정책·기업은 `team07-catalog`(B 설계), B 사용자 데이터는 `career-mentor`의 `OPP#`, 공통 프로필은 `PROFILE#BASIC`로. 알림 ID 형식, 저장 공고 ↔ 워크스페이스 연결 규칙 추가 |
 | v1.6 | B: 공고 이름 색인 `POSTNAMES` / `POSTING#{jobPostingId}` 추가. 검색어·회사 이름 검색에 쓴다 (`ai/busan-opportunity/DECISIONS.md` B-D08) |
+| v1.9 | `team07-catalog`: 공공기관 직원 평균보수 `ORGPAY` / `ORG#{orgId}` 추가. 알리오 경영공시를 매주 모아 공고 카드·상세·연봉 조건에 쓴다 (`ai/busan-opportunity/DECISIONS.md` B-D11) |
 | v1.7 | `team07-catalog`: 공고 `regionalTalent`에 `conditions[]{kind, sido, sigungu, label}`(공고문에서 읽은 지역 조건) 추가. 지역 조건 색인 `INDEX#REGIONAL` / `POSTING#{id}` 추가 (`ai/busan-opportunity/DECISIONS.md` B-D09) |
 | v1.8 | B: 이름 색인 `POSTNAMES`에 분류 칸(`orgType`, `sido`, `isOverseas`, `careerType`, `employmentType`) 추가. 로그인 없이 보는 공고 목록에 쓴다 (`ai/busan-opportunity/DECISIONS.md` B-D10) |
 | v1.5 | 기본 정보 화면: `PROFILE#BASIC`에 `schoolName`(대학 이름, 전문대 이상, 50자)·`certificates[]`(가진 자격증, 10개, 50자) 추가. `universityRegion`은 최종 학교 소재지로 쓴다 (대학원이면 학부 대학, 고졸이면 고등학교). 지역인재 판정과 자격 요건 비교에 쓴다 |
@@ -166,6 +167,7 @@ MVP는 CloudWatch 구조화 로그(EMF). 필드 `evaluationId`, `requestId`, `an
 | 부산 대안 후보 | `POSTING#{jobPostingId}` | `ALTS` | — | `candidates[{jobPostingId, similarity}]` (최대 10), `computedAt` |
 | 청년정책 | `POLICY#{policyId}` | `META` | `POLICY#{시도코드}` / `applyEnd` | `title`, `summary`, `amountMax`, `ageMin`, `ageMax`, `residenceRule`, `incomeRule`, `applyStart`, `applyEnd`, `url`, `source`, `kind`, `regions[]`, `category`, `stage`, `eligibility{…}`, `benefit{…}`, `application{…}`, `lastCycle`, `exclusiveWith[]`, `checklist[]`, `verified`, `verifiedBy`, `verifiedAt`, `youthcenterId` |
 | 지역 조건 색인 | `INDEX#REGIONAL` | `POSTING#{jobPostingId}` | — | `jobPostingId`, `closesAt`. 공고문에 지역 조건이 있는 진행 중 공고만. 수집·보강이 `LATEST`를 쓸 때 넣고, 조건이 없어지거나 마감되면 지운다 |
+| 기관 평균보수 | `ORGPAY` | `ORG#{orgId}` | — | `orgId`(알리오 기관 코드, 채용공시 `pblntInstCd`와 같음), `name`, `orgType`, `ministry`, `years[{year, average, budget}]`(만 원/년), `latestYear`, `latestAverage`, `tenureMonths`, `source`, `asOf`, `sourceUrl`. 일반정규직 1인당 평균 보수액이라 신입 초봉이 아니다 |
 | 기업 | `COMPANY#{companyId}` | `META` | `COMPANY#{시도코드}` / `name` | `name`, `bizNo`, `industry`, `size`, `highlights[]`, `source`, `asOf` |
 
 규칙 (B 초안)
@@ -186,6 +188,7 @@ MVP는 CloudWatch 구조화 로그(EMF). 필드 `evaluationId`, `requestId`, `an
 | 공고 상세 | GetItem `LATEST` → GetItem `SNAP#{snapshotId}` |
 | 부산 공고 마감 임박순 | GSI1 `POSTING#26`, `GSI1SK >= 오늘` |
 | 부산 대안 후보 | GetItem `ALTS` |
+| 기관 평균보수 | Query `PK = ORGPAY` (Lambda 안에서 1분 캐시) → 공고의 `organization`으로 맞춤 |
 | 지역 혜택 필터 후보 | Query `PK = INDEX#REGIONAL` (`closesAt >= 오늘`) → BatchGetItem `LATEST` |
 | 지역 정책 | GSI1 `POLICY#26` / `POLICY#11` / `POLICY#00` |
 | 직무 코드별·기업별·유사 공고 | S3 Vectors 메타데이터 필터 (`jobMajor`, `sido`, `isBusan`, `active`, `deadline`) |

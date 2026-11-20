@@ -59,6 +59,29 @@ export type PostingEligibility = {
 
 export type JobInfo = { code?: string; name?: string; major?: string };
 
+/** 기관 직원 평균보수 (알리오 경영공시, 일반정규직). 직원 전체 평균이라 신입 초봉이 아니다 (B-D10) */
+export type OrgPayBrief = {
+  /** 만 원/년 */
+  average: number;
+  year: number;
+  source: string;
+  asOf: string;
+  sourceUrl: string;
+};
+
+export type OrgPay = {
+  orgId: string;
+  name: string;
+  orgType?: string;
+  years: { year: number; average: number; budget: boolean }[];
+  latestYear: number;
+  latestAverage: number;
+  tenureMonths?: number;
+  source: string;
+  asOf: string;
+  sourceUrl: string;
+};
+
 /** 피드 카드 (`PostingCard`) */
 export type PostingCard = {
   jobPostingId: string;
@@ -81,6 +104,8 @@ export type PostingCard = {
   /** 지역 조건: LIKELY(학교 지역·사는 곳이 맞아 대상일 수 있음), CHECK_NEEDED(맞는지 공고문 확인). 해당 없으면 없음 */
   regionalTalent?: "LIKELY" | "CHECK_NEEDED";
   isSample: boolean;
+  /** 공공기관이면 기관 직원 평균보수. 공고 급여가 아니다 */
+  orgPay?: OrgPayBrief;
 };
 
 export type FeedResponse = {
@@ -155,6 +180,8 @@ export type PostingDetailResponse = {
   alternativesPreview: AlternativeItem[];
   facts: string[];
   dataAsOf?: string;
+  /** 공공기관이면 기관 직원 평균보수 연도별 */
+  orgPay?: OrgPay;
 };
 
 /** 로그인 없이 보는 공고 한 줄 (`PublicPostingCard`). 적합도·자격 판정 같은 개인 값이 없다. */
@@ -174,6 +201,8 @@ export type PublicPostingCard = {
   employmentType: EmploymentType;
   badges: Badge[];
   isSample: boolean;
+  /** 공공기관이면 기관 직원 평균보수. 공고 급여가 아니다 */
+  orgPay?: OrgPayBrief;
 };
 
 /** `GET /api/v1/opportunities/public/postings`. total은 분류·검색어에 맞는 진행 중 공고 수(모든 쪽 합)다. */

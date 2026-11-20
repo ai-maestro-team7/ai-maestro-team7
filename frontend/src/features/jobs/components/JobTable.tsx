@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { type Column, DataTable, DataTableSkeleton, TableCell, TableRow } from "@/components/ui/DataTable";
 import { cn } from "@/lib/cn";
-import { deadlineLines, displayTitle, jobDetailHref, MATCH_LABELS, matchReason, ORG_TYPE_LABELS } from "../lib";
+import { deadlineLines, displayTitle, jobDetailHref, MATCH_LABELS, matchReason, ORG_TYPE_LABELS, orgPayText } from "../lib";
 import type { PostingCard } from "../types";
 import { SaveToggle } from "./SaveToggle";
 
@@ -39,16 +39,21 @@ function subline(job: PostingCard): string {
 export function JobRow({ job, asOf }: { job: PostingCard; asOf: string }) {
   const deadline = deadlineLines(job.closesAt, job.rolling, asOf);
   return (
-    <TableRow className={cn("relative py-4 hover:bg-grey-50", ROW_INSET)}>
-      <TableCell className={cn(COLUMNS.company, "flex items-center")}>
+    <TableRow className={cn("group relative py-4 transition-colors hover:bg-grey-50", ROW_INSET)}>
+      <TableCell className={cn(COLUMNS.company, "flex flex-col justify-center gap-0.5")}>
         <span className="truncate text-body font-medium text-grey-900">{job.organization}</span>
+        {job.orgPay && (
+          <span className="truncate text-small text-grey-600" title={`${job.orgPay.year}년 결산 · ${job.orgPay.source}`}>
+            {orgPayText(job.orgPay.average)}
+          </span>
+        )}
       </TableCell>
       <TableCell className={cn(COLUMNS.posting, "flex flex-col gap-0.5")}>
         {/* after:inset-0 으로 행 전체를 링크 영역으로 넓힌다 */}
         <Link
           href={jobDetailHref(job.jobPostingId)}
           title={job.title}
-          className="truncate text-body font-bold text-grey-900 after:absolute after:inset-0 after:content-['']"
+          className="truncate text-body font-bold text-grey-900 transition-colors group-hover:text-blue-500 after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-blue-500"
         >
           {displayTitle(job.title)}
         </Link>

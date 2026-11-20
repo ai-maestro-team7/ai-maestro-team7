@@ -23,6 +23,8 @@ log = logging.getLogger(__name__)
 
 HttpGet = Callable[[str, float], bytes]
 """`http_get(url, timeout_seconds) -> 응답 본문`. 실패하면 예외를 던진다."""
+HttpPostJson = Callable[[str, dict, float], bytes]
+"""`http_post_json(url, body, timeout_seconds) -> 응답 본문`. 본문은 JSON으로 보낸다. 실패하면 예외를 던진다."""
 
 _ENCODED = re.compile(r"%[0-9A-Fa-f]{2}")
 _FORBIDDEN_XML = re.compile(rb"<!(DOCTYPE|ENTITY)", re.IGNORECASE)
@@ -37,6 +39,20 @@ def default_http_get(url: str, timeout: float = HTTP_TIMEOUT_SECONDS) -> bytes:
     request = urllib.request.Request(url, headers={"Accept": "application/json, application/xml"})
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 (https 공공 API만 부른다)
+            return response.read()
+    except urllib.error.HTTPError as e:
+        raise FetchError(f"HTTP {e.code}") from None
+    except Exception as e:
+        raise FetchError(f"요청 실패 ({type(e).__name__})") from None
+
+
+def default_http_post_json(url: str, body: dict, timeout: float = HTTP_TIMEOUT_SECONDS) -> bytes:
+    """JSON 본문 POST 한 번. 알리오 경영공시 목록처럼 POST로만 주는 곳에 쓴다. 오류는 `default_http_get`과 같다."""
+    data = json.dumps(body, ensure_ascii=False).encode("utf-8")
+    request = urllib.request.Request(url, data=data, method="POST",
+                                     headers={"Content-Type": "application/json", "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310 (https 공공 누리집만 부른다)
             return response.read()
     except urllib.error.HTTPError as e:
         raise FetchError(f"HTTP {e.code}") from None

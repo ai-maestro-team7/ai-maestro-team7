@@ -15,9 +15,9 @@ from ..config import OpportunityConfig
 from ..core import clock
 from ..models.posting import PostingSnapshot
 from ..ports import CatalogRepo, RawStore, Secrets
-from . import alio, klid, work24, worldjob, youthcenter
-from .field_maps import DETAIL_MAX_PER_RUN
-from .http import FetchError, HttpGet, KeyCache, default_http_get
+from . import alio, alio_pay, klid, work24, worldjob, youthcenter
+from .field_maps import DETAIL_MAX_PER_RUN, HTTP_TIMEOUT_SECONDS
+from .http import FetchError, HttpGet, HttpPostJson, KeyCache, default_http_get, default_http_post_json
 from .normalize import (
     SkipRecord,
     normalize_alio,
@@ -46,7 +46,7 @@ POSTING_SOURCES = {
     "worldjob": (worldjob, normalize_worldjob),
 }
 REHASH_ON_COLLISION = {"klid"}  # 공고 번호가 겹치면 내용 해시 ID로 바꾸는 출처
-ALL_SOURCES = ("work24", "alio", "klid", "worldjob", "youthcenter", "work24_gangso")
+ALL_SOURCES = ("work24", "alio", "klid", "worldjob", "youthcenter", "work24_gangso", "alio_pay")
 
 
 def _load_seed_json(raw_store: RawStore, key: str) -> dict:
@@ -175,9 +175,23 @@ def _run_companies(config, catalog, raw_store, keys, *, when, day, http_get, sle
     }
 
 
+def _run_org_pays(catalog, raw_store, *, when, day, http_get, http_post, sleep) -> dict:
+    """공공기관 직원 평균보수 (알리오 경영공시, B-D11). 기관마다 `ORGPAY`에 한 줄씩 쓴다. 읽은 숫자만 S3에 남긴다."""
+    pays, stats = alio_pay.fetch_org_pays(http_get, http_post, timeout=HTTP_TIMEOUT_SECONDS,
+                                          **({"sleep": sleep} if sleep else {}), now=lambda: when)
+    for pay in pays:
+        catalog.put_org_pay(pay)
+    raw_store.put(f"raw/alio_pay/{day}/org_pays.json",
+                  json.dumps([p.to_api() for p in pays], ensure_ascii=False).encode("utf-8"))
+    failed = stats["failed"] + stats["unparsed"]
+    status = "EMPTY" if not stats["listed"] else ("NEEDS_MAPPING" if not pays else ("PARTIAL" if failed else "OK"))
+    return {"status": status, "normalized": len(pays), **stats}
+
+
 def run_ingest(config: OpportunityConfig, catalog: CatalogRepo, raw_store: RawStore, secrets: Secrets, *,
                sources: Sequence[str], as_of: str | date | datetime | None = None,
-               http_get: HttpGet | None = None, sleep: Callable[[float], None] | None = None) -> dict:
+               http_get: HttpGet | None = None, sleep: Callable[[float], None] | None = None,
+               http_post: HttpPostJson | None = None) -> dict:
     """출처별로 수집해 적재한다. 출처별 건수와 실패는 `runs/{날짜}.json`에 남긴다.
 
     - 한 출처가 실패해도 다음 출처로 간다. 실패한 출처는 `status=FAILED`와 오류 종류만 남는다.
@@ -198,6 +212,9 @@ def run_ingest(config: OpportunityConfig, catalog: CatalogRepo, raw_store: RawSt
             elif name == "youthcenter":
                 result = _run_policies(config, catalog, raw_store, keys, when=when, day=day, http_get=fetch,
                                        sleep=sleep)
+            elif name == "alio_pay":
+                result = _run_org_pays(catalog, raw_store, when=when, day=day, http_get=fetch,
+                                       http_post=http_post or default_http_post_json, sleep=sleep)
             elif name == "work24_gangso":
                 result = _run_companies(config, catalog, raw_store, keys, when=when, day=day, http_get=fetch,
                                         sleep=sleep)

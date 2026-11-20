@@ -13,6 +13,7 @@ from . import facts, policies, regions
 from .alternatives import alternatives_for
 from .context import freshness, load_context
 from .local_life import build_local_life
+from .org_pay import org_pay_for, org_pay_index
 from .ranking import cosine_similarity, is_open, match_level, profile_vector, score_posting
 
 
@@ -70,7 +71,7 @@ def get_posting(deps: Deps, user_id: str, job_posting_id: str, *,
         match_level=match_level(cfg, match.score), eligibility=result, badges=badges, regional_talent=talent,
         related_policies=related, alternatives_preview=preview,
         local_life=build_local_life(deps, ctx.profile, snapshot, as_of=ctx.as_of),
-        facts=fact_list, data_as_of=data_as_of,
+        facts=fact_list, data_as_of=data_as_of, org_pay=org_pay_for(org_pay_index(deps), latest),
     )
 
 

@@ -1,7 +1,16 @@
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { type Column, DataTable, DataTableSkeleton, TableCell, TableRow } from "@/components/ui/DataTable";
 import { cn } from "@/lib/cn";
-import { CAREER_LABELS, deadlineLines, displayTitle, EMPLOYMENT_LABELS, jobDetailHref, ORG_TYPE_LABELS } from "../lib";
+import {
+  CAREER_LABELS,
+  deadlineLines,
+  displayTitle,
+  EMPLOYMENT_LABELS,
+  jobDetailHref,
+  ORG_TYPE_LABELS,
+  orgPayText,
+} from "../lib";
 import type { PublicPostingCard } from "../types";
 
 /** 로그인 없이 보는 공고 표. 맞춤 표(JobTable)의 적합도·저장 열 대신 경력·고용 형태 열이 있다. */
@@ -11,6 +20,7 @@ const COLUMNS = {
   place: "w-40 shrink-0",
   terms: "w-28 shrink-0",
   deadline: "w-25 shrink-0",
+  go: "w-4 shrink-0",
 } as const;
 
 const PUBLIC_COLUMNS: Column[] = [
@@ -19,6 +29,7 @@ const PUBLIC_COLUMNS: Column[] = [
   { key: "place", label: "근무지 · 구분", className: COLUMNS.place },
   { key: "terms", label: "경력 · 고용", className: COLUMNS.terms },
   { key: "deadline", label: "마감", className: COLUMNS.deadline },
+  { key: "go", label: "공고 보기", className: COLUMNS.go, srOnly: true },
 ];
 
 const ROW_INSET = "px-4";
@@ -38,20 +49,28 @@ function employmentText(job: PublicPostingCard): string {
   return job.employmentType === "UNKNOWN" ? "고용 형태 공고 확인" : EMPLOYMENT_LABELS[job.employmentType];
 }
 
-/** 행 전체가 공고 상세 링크다. 상세는 로그인해야 보이고, 로그인 전이면 상세 화면이 로그인 안내를 보여 준다. */
+/**
+ * 행 전체가 공고 상세 링크다. 상세는 로그인해야 보이고, 로그인 전이면 상세 화면이 로그인 안내를 보여 준다.
+ * 마우스를 올리면 제목이 파래지고 오른쪽에 화살표가 나온다. 키보드로 오면 행 테두리가 보인다.
+ */
 function PublicJobRow({ job, asOf }: { job: PublicPostingCard; asOf: string }) {
   const deadline = deadlineLines(job.closesAt, job.rolling, asOf);
   return (
-    <TableRow className={cn("relative py-4 hover:bg-grey-50", ROW_INSET)}>
-      <TableCell className={cn(COLUMNS.company, "flex items-center")}>
+    <TableRow className={cn("group relative py-4 transition-colors hover:bg-grey-50", ROW_INSET)}>
+      <TableCell className={cn(COLUMNS.company, "flex flex-col justify-center gap-0.5")}>
         <span className="truncate text-body font-medium text-grey-900" title={job.organization}>
           {job.organization}
         </span>
+        {job.orgPay && (
+          <span className="truncate text-small text-grey-600" title={`${job.orgPay.year}년 결산 · ${job.orgPay.source}`}>
+            {orgPayText(job.orgPay.average)}
+          </span>
+        )}
       </TableCell>
       <TableCell className={cn(COLUMNS.posting, "flex flex-col gap-0.5")}>
         <Link
           href={jobDetailHref(job.jobPostingId)}
-          className="truncate text-body font-bold text-grey-900 after:absolute after:inset-0 after:content-['']"
+          className="truncate text-body font-bold text-grey-900 transition-colors group-hover:text-blue-500 after:absolute after:inset-0 after:content-[''] focus-visible:outline-none focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-blue-500"
           title={job.title}
         >
           {displayTitle(job.title)}
@@ -71,6 +90,13 @@ function PublicJobRow({ job, asOf }: { job: PublicPostingCard; asOf: string }) {
       <TableCell className={cn(COLUMNS.deadline, "flex flex-col")}>
         <span className="text-body text-grey-800">{deadline.main}</span>
         <span className="text-small text-grey-600">{deadline.sub}</span>
+      </TableCell>
+      <TableCell className={cn(COLUMNS.go, "flex items-center")}>
+        <ChevronRight
+          aria-hidden
+          className="size-4 -translate-x-1 text-grey-400 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100"
+          strokeWidth={2}
+        />
       </TableCell>
     </TableRow>
   );
