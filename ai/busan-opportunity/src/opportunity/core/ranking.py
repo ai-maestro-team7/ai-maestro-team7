@@ -463,7 +463,8 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
                     query_terms: Sequence[str] | None = None, min_salary: int | None = None,
                     career_type: str | CareerType | None = None, organization: str | None = None,
                     scope: str | None = None, regional_talent: bool = False) -> FeedResponse:
-    """전국 공고를 찾아 정렬한다. 후보는 벡터 질의 두 번(부산, 전국)으로 모은다. 이 경로에 LLM은 없다.
+    """전국 공고를 찾아 정렬한다. 후보는 벡터 질의 두 번(부산, 전국)으로 모으고, 지역을 골랐으면 그 지역 질의를 더한다.
+    이 경로에 LLM은 없다.
 
     sort가 None이면 사용자 설정을 쓴다. BUSAN_FIRST와 MATCH는 공고 집합이 같고 순서만 다르다 (T-01).
     마감된 공고는 뺀다 (T-21). 수도권 공고에는 busanAlternativesCount를 붙인다.
@@ -492,17 +493,21 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
     sort = Sort(sort) if sort is not None else ctx.prefs.sort
 
     # 1. 후보: 부산 필터 질의와 전국 질의를 합친다. 같은 공고는 높은 유사도를 쓴다.
+    #    지역을 골랐으면(수도권, 시·도) 그 지역만 찾는 질의를 하나 더 한다. 전국 상위 후보에서 거르기만 하면
+    #    공고가 많을 때 고른 지역 공고가 몇 건밖에 남지 않는다 (수도권 20건을 요청해 9건이 나왔다, 2026-11-21).
     vector = profile_vector(deps, ctx.profile, query_terms)
     top_k = cfg.ranking.candidate_top_k
+    sidos = _region_sidos(cfg, region)
+    queries = [(top_k.busan, active_filter(ctx.as_of, isBusan=True)), (top_k.all, active_filter(ctx.as_of))]
+    if sidos:
+        queries.append((top_k.all, active_filter(ctx.as_of, sido={"$in": sidos})))
     similarity: dict[str, float] = {}
-    for hits in (deps.vectors.query(vector, top_k=top_k.busan, filter=active_filter(ctx.as_of, isBusan=True)),
-                 deps.vectors.query(vector, top_k=top_k.all, filter=active_filter(ctx.as_of))):
+    for hits in (deps.vectors.query(vector, top_k=k, filter=f) for k, f in queries):
         for hit in hits:
             similarity[hit.key] = max(hit.similarity, similarity.get(hit.key, hit.similarity))
     latest_by_id = deps.catalog.batch_get_latest(list(similarity))
 
     # 2. 거르기: 마감, 지역, 직종 코드, 검색어, 대화 조건(기관, 최소 연봉, 경력 구분)
-    sidos = _region_sidos(cfg, region)
     rows = []
     for pid, posting in latest_by_id.items():
         if not (is_open(posting, ctx.as_of) and _in_region(posting, region, sidos)
