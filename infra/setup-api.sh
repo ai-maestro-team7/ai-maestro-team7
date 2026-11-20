@@ -22,17 +22,31 @@ FUNCTION_ARN_EXPECTED=arn:aws:lambda:${AWS_REGION}:${ACCOUNT_ID}:function:${FUNC
 OPP_VARS="TABLE_CATALOG=$CATALOG_TABLE,OPP_VECTOR_BUCKET=$OPP_VECTOR_BUCKET,OPP_VECTOR_INDEX=$OPP_VECTOR_INDEX,OPP_DATA_BUCKET=$OPP_DATA_BUCKET,OPP_SECRET_ID=$OPP_SECRET_ID,MODEL_ID=$MODEL_ID,EMBEDDING_MODEL_ID=$EMBEDDING_MODEL_ID,SCHEDULER_TARGET_ARN=$FUNCTION_ARN_EXPECTED,SCHEDULER_ROLE_ARN=$SCHEDULER_ROLE_ARN"
 ENV_VARS="Variables={UPLOAD_BUCKET=$UPLOAD_BUCKET,CAREER_DOCS_BUCKET=$CAREER_DOCS_BUCKET,TABLE_CAREER_MENTOR=${PREFIX}-career-mentor,TABLE_REFERENCE=${PREFIX}-reference,TABLE_CACHE=${PREFIX}-cache,ALLOWED_ORIGIN=$ALLOWED_ORIGIN,COGNITO_CLIENT_ID=${CLIENT_ID},$OPP_VARS}"
 
+# 환경 변수는 지금 값에 이 스크립트가 관리하는 값(ENV_VARS)만 덮어쓴다.
+# 다른 스크립트가 넣은 값(setup-social-login.sh 의 COGNITO_DOMAIN·SOCIAL_PROVIDERS 등)을 지우지 않기 위해서다
+env_json() {
+  CUR=$(aws lambda get-function-configuration --function-name "$FUNCTION_NAME" --query 'Environment.Variables' --output json 2>/dev/null || echo null)
+  echo "$CUR" | ENV_VARS="$ENV_VARS" python3 -c '
+import json, os, sys
+d = json.load(sys.stdin) or {}
+managed = os.environ["ENV_VARS"].removeprefix("Variables={").removesuffix("}")
+for pair in managed.split(","):
+    k, _, v = pair.partition("=")
+    d[k] = v
+print(json.dumps({"Variables": d}))'
+}
+
 echo "[Lambda] $FUNCTION_NAME"
 if aws lambda get-function --function-name "$FUNCTION_NAME" >/dev/null 2>&1; then
   aws lambda update-function-code --function-name "$FUNCTION_NAME" --zip-file "fileb://$ZIP" >/dev/null
   aws lambda wait function-updated --function-name "$FUNCTION_NAME"
-  aws lambda update-function-configuration --function-name "$FUNCTION_NAME" --environment "$ENV_VARS" --timeout 900 --memory-size 1024 >/dev/null
+  aws lambda update-function-configuration --function-name "$FUNCTION_NAME" --environment "$(env_json)" --timeout 900 --memory-size 1024 >/dev/null
   echo "  = 코드·설정 갱신"
 else
   aws lambda create-function --function-name "$FUNCTION_NAME" \
     --runtime python3.13 --architectures arm64 --handler app.lambda_handler \
     --role "$ROLE_ARN" --zip-file "fileb://$ZIP" \
-    --timeout 900 --memory-size 1024 --environment "$ENV_VARS" \
+    --timeout 900 --memory-size 1024 --environment "$(env_json)" \
     --tags team=$PREFIX >/dev/null
   echo "  + 생성"
 fi
