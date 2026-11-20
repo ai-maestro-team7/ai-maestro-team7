@@ -56,12 +56,24 @@ const res = await fetch(`${API_BASE}/api/v1/interview/start`, {
 | `team07-kb-source-<계정ID>` | KB 원천 문서. ZIP의 `bedrock/documents/` 13쌍을 `docs/` 아래에 |
 | `team07-career-docs-<계정ID>` | 개인 문서(이력서 등). `users/{hashedUserId}/...` |
 
+Knowledge Base `team07-career-mentor-kb`는 만들어 동기화까지 끝났다 (2026-11-20, 문서 13개 색인, 실패 0).
+
+| 항목 | 값 |
+|---|---|
+| 임베딩 | Titan Text Embeddings V2 (`amazon.titan-embed-text-v2:0`, 1024차원). 서울 리전 KB는 Cohere Embed v4를 지원하지 않는다. B 공고 인덱스의 `EMBEDDING_MODEL_ID`(Cohere)와 다르다 |
+| 벡터 저장소 | S3 Vectors `team07-kb-vectors` / `career-mentor-kb-v1` (코사인) |
+| 데이터 소스 | `team07-kb-docs`, `docs/` 경로만, 고정 300토큰·겹침 20% |
+| 서비스 역할 | `team07-kb-role` (원천 `docs/` 읽기, Titan V2 호출, 위 인덱스 읽기·쓰기만) |
+| 검색 확인 | 지식 패키지 `validation/sample_queries.jsonl` 25개 Recall@5 = 0.92 (23/25) |
+| KB ID | 저장소에 적지 않는다. `aws bedrock-agent list-knowledge-bases --region ap-northeast-2`로 확인 |
+
+다시 만들거나 문서를 바꿔 다시 동기화할 때 (지식 패키지 압축을 푼 폴더의 `bedrock/documents/`를 넘긴다):
+
 ```bash
-aws s3 cp bedrock/documents/ s3://team07-kb-source-<계정ID>/docs/ --recursive \
-  --exclude "*" --include "*.md" --include "*.md.metadata.json"
+infra/setup-kb.sh --upload <지식패키지>/bedrock/documents --sync
 ```
 
-현재 S3 Vectors 권한이 없어 KB 생성은 대기 중. 그동안은 명세 §10.3 폴백(CSV·문서 로컬 검색)으로 개발.
+KB에는 `bedrock/documents/` 13쌍만 올린다. `agent/`, `raw/`, `structured/`, 개인 문서는 올리지 않는다. Lambda 실행 역할에는 `bedrock:Retrieve`(`knowledge-base/*`)가 이미 있다.
 
 ## 4. 배포
 

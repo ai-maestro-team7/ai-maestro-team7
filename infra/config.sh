@@ -16,6 +16,15 @@ OPP_VECTOR_BUCKET=${PREFIX}-opp-vectors                  # B: S3 Vectors, 인덱
 OPP_VECTOR_INDEX=postings-v1
 CATALOG_TABLE=${PREFIX}-catalog
 
+# A: Bedrock Knowledge Base (infra/setup-kb.sh). 원천 문서는 KB_SOURCE_BUCKET 의 docs/ 13쌍
+KB_NAME=${PREFIX}-career-mentor-kb
+KB_DATA_SOURCE_NAME=${PREFIX}-kb-docs
+KB_ROLE_NAME=${PREFIX}-kb-role
+KB_VECTOR_BUCKET=${PREFIX}-kb-vectors                    # B의 OPP_VECTOR_BUCKET 과 따로 둔다 (KB마다 벡터 저장소 하나)
+KB_VECTOR_INDEX=career-mentor-kb-v1                      # 1024차원, 코사인. 바꾸면 iam/kb-role-policy.json 도 같이 바꾼다
+# 서울 리전 KB가 지원하는 임베딩은 Titan Text Embeddings V2 (Cohere v4는 KB 미지원). B의 EMBEDDING_MODEL_ID 와 다르다
+KB_EMBEDDING_MODEL_ID=amazon.titan-embed-text-v2:0
+KB_EMBEDDING_DIM=1024
 # Bedrock 모델 (docs/team-guide.md). 코드에는 환경변수로만 넣는다
 MODEL_ID=${MODEL_ID:-global.anthropic.claude-haiku-5-5}
 EMBEDDING_MODEL_ID=${EMBEDDING_MODEL_ID:-global.cohere.embed-v4:0}  # 서울 리전은 global. 프로필로만 호출 가능
