@@ -1,0 +1,23 @@
+{
+  "scoring_version": "v1.0",
+  "delivery": {
+    "time_management": {
+      "enabled": true,
+      "weight": 10
+    },
+    "speech_rate": {
+      "enabled": true,
+      "weight": 30,
+      "min_answer_sec": 15,
+      "max_non_hangul_ratio": 0.2
+    },
+    "long_pause_per_min": {
+      "enabled": true,
+      "weight": 30,
+      "full_max": 1,
+      "zero_min": 5,
+      "min_answer_sec": 15,
+      "long_pause_sec": 2
+    }
+  }
+}

@@ -168,10 +168,13 @@ def test_full_round_with_one_follow_up():
 def test_answer_record_fields():
     out, _ = step(initial_session(), answer("a-q1-1", time_limit=True), [SUFFICIENT])
     record = out["session"]["answers"][0]
+    # 단어 시간이 없으면 말한 구간이 0초 → 속도·침묵 모두 15초 미만으로 미측정
+    too_short = {"answerSec": 0.0, "speechRate": None, "speechRateReason": "TOO_SHORT", "longPauseCount": None,
+                 "longPausePerMin": None, "longPauseReason": "TOO_SHORT"}
     assert record == {"answerId": "a-q1-1", "questionId": "q1", "isFollowUp": False,
                       "question": initial_session()["questions"][0]["question"], "answerText": NORMAL_TEXT,
-                      "evaluable": True, "reason": None, "timeLimitReached": True}
-    assert "words" not in json.dumps(out["session"])  # 단어별 시간은 1차에서 Session에 넣지 않는다
+                      "evaluable": True, "reason": None, "timeLimitReached": True, "delivery": too_short}
+    assert "words" not in json.dumps(out["session"])  # 단어별 시간은 Session에 넣지 않는다 (voice 결정 5)
 
 
 def test_no_answer_moves_to_next_base_question():
@@ -316,11 +319,90 @@ def test_follow_up_prompt_uses_question_and_answer():
     assert "<job>\n데이터 분석\n</job>" in user
 
 
-def test_backend_positional_call_and_placeholder_transcript():
-    # 백엔드는 process_answer(item["session"], answer_result)로 부르고, 임시 get_transcription_result 결과를 넘긴다
+# ---------------------------------------------------------------- 전달력 (2차)
+
+
+def timed_words(seconds, step=0.5, gaps_at=()):
+    """seconds초 동안 이어 말한 단어들. gaps_at 위치의 단어 앞에는 2.5초 공백을 둔다."""
+    words, t, i = [], 0.0, 0
+    while t + step <= seconds + 1e-9:
+        if i in gaps_at:
+            t += 2.5
+        words.append({"word": "말", "start": round(t, 3), "end": round(t + step, 3)})
+        t += step
+        i += 1
+    return words
+
+
+def timed_answer(answer_id, text=NORMAL_TEXT, words=None, time_limit=False):
+    return {"answerId": answer_id, "timeLimitReached": time_limit,
+            "transcription": {"status": "COMPLETED", "text": text, "words": words or []}}
+
+
+def test_evaluable_answer_records_delivery():
+    words = timed_words(20, gaps_at=(10,))
+    out, _ = step(initial_session(), timed_answer("a-q1-1", words=words), [SUFFICIENT])
+    delivery = out["session"]["answers"][0]["delivery"]
+    span = words[-1]["end"] - words[0]["start"]
+    syllables = sum(1 for ch in NORMAL_TEXT if "\uac00" <= ch <= "\ud7a3")
+    assert delivery["answerSec"] == round(span, 1)
+    assert delivery["speechRate"] == round(syllables / span * 60, 1) and delivery["speechRateReason"] is None
+    assert delivery["longPauseCount"] == 1 and delivery["longPauseReason"] is None
+    assert "words" not in json.dumps(out["session"])
+
+
+def test_unevaluable_answers_have_no_delivery():
+    out, _ = step(initial_session(), timed_answer("a-q1-1", text="", words=timed_words(20)))
+    assert out["session"]["answers"][0]["delivery"] is None
+    out, _ = step(out["session"], answer("a-q2-1", status="FAILED"))
+    assert out["session"]["answers"][1]["delivery"] is None
+
+
+def test_time_limit_recorded_with_delivery():
+    # C §7 "2분 초과": 2차는 timeLimitReached만 기록한다 (시간 관리 점수는 3차)
+    out, _ = step(initial_session(), timed_answer("a-q1-1", words=timed_words(120), time_limit=True), [SUFFICIENT])
+    record = out["session"]["answers"][0]
+    assert record["timeLimitReached"] is True and record["delivery"]["answerSec"] == 120.0
+
+
+def test_first_stage_session_without_delivery_still_accepted():
+    out, _ = step(initial_session(), answer("a-q1-1"), [SUFFICIENT])
+    old = out["session"]
+    del old["answers"][0]["delivery"]  # 1차에서 저장된 Session 모양
+    out, _ = step(old, answer("a-q2-1"), [SUFFICIENT])
+    assert "delivery" not in json.dumps(old["answers"][0]) and out["session"]["answers"][0]["delivery"] is None
+    Session.model_validate(out["session"])
+
+
+def test_config_error_stops_before_llm(monkeypatch):
+    from interview import flow
+
+    def broken():
+        raise InterviewError(AWS_SERVICE_ERROR, "설정 오류", retryable=False)
+
+    monkeypatch.setattr(flow, "load_scoring_config", broken)
+    fake = FakeLLM([SUFFICIENT])
+    with pytest.raises(InterviewError) as exc:
+        interview.process_answer(initial_session(), answer("a-q1-1"), llm=fake)
+    assert exc.value.code == AWS_SERVICE_ERROR and exc.value.retryable is False
+    assert fake.calls == []
+
+
+def test_unevaluable_answer_does_not_read_config(monkeypatch):
+    from interview import flow
+
+    monkeypatch.setattr(flow, "load_scoring_config", lambda: pytest.fail("설정을 읽지 않아야 한다"))
+    out, _ = step(initial_session(), answer("a-q1-1", ""))
+    assert out["lastAnswer"]["reason"] == "NO_ANSWER"
+
+
+def test_backend_positional_call_with_transcribe_result():
+    # 백엔드는 process_answer(item["session"], answer_result)로 부르고, get_transcription_result 결과를 그대로 넘긴다
+    from interview import voice
+
     session = initial_session()
     result = {"answerId": "a-q1-1", "timeLimitReached": False,
-              "transcription": interview.get_transcription_result("job-1")}
+              "transcription": voice.parse_transcript(sample_json("transcribe/result_normal.json"))}
     out = interview.process_answer(session, result, llm=FakeLLM([SUFFICIENT]))
     assert out["action"] == "NEXT_QUESTION"
     assert set(out) == {"session", "action", "nextQuestion", "lastAnswer"}

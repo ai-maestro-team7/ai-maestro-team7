@@ -75,6 +75,35 @@ def test_failure_paths_have_no_raw_text(caplog):
     assert_clean(repr(exc.value))
 
 
+def test_voice_logs_have_no_raw_text(monkeypatch, caplog, capsys):
+    from fakes import FakePolly, FakeS3, FakeTranscribe, client_error
+    from interview import voice
+
+    transcript_doc = sample_text("transcribe/result_normal.json")
+    spoken = "대응표를 만들고 이름을 통일했습니다"  # 결과 파일 속 답변 문장
+    fake_t = FakeTranscribe()
+    monkeypatch.setattr(voice, "_transcribe_client", lambda: fake_t)
+    monkeypatch.setattr(voice, "_s3_client", lambda: FakeS3(default_body=transcript_doc))
+    with caplog.at_level(logging.DEBUG):
+        monkeypatch.setattr(voice, "_polly_client", lambda: FakePolly())
+        interview.synthesize_question(QUESTIONS[0]["question"])
+        monkeypatch.setattr(voice, "_polly_client", lambda: FakePolly(error=client_error("ThrottlingException")))
+        interview.synthesize_question(QUESTIONS[0]["question"])
+        job = interview.start_transcription("s3://b/uploads/a.webm", "job-1", "webm", "b", "uploads/t/a.json")
+        tr = interview.get_transcription_result(job)
+        out = interview.start_interview("iv-1", "데이터 분석", RESUME, "MIXED", True, PROFILE,
+                                        llm=FakeLLM([sample_text("llm/questions_ok.json")]))
+        interview.process_answer(out["session"], {"answerId": "a-q1-1", "transcription": tr},
+                                 llm=FakeLLM([sample_text("llm/follow_up_sufficient.json")]))
+    assert spoken in tr["text"]
+    for stage in ("synthesize_question", "start_transcription", "get_transcription_result", "process_answer"):
+        assert f"stage={stage}" in caplog.text
+    assert_clean(caplog.text)
+    assert spoken not in caplog.text and "uploads/" not in caplog.text
+    captured = capsys.readouterr()
+    assert captured.out == "" and captured.err == ""
+
+
 def test_no_print_in_package_source():
     found = []
     for path in PACKAGE_DIR.rglob("*.py"):

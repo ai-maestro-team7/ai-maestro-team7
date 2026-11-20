@@ -1,42 +1,15 @@
-import json
-
 import pytest
 
 import interview
-from fakes import FakeS3
 from interview import placeholders
 
 
-@pytest.fixture
-def fake_s3(monkeypatch):
-    s3 = FakeS3()
-    monkeypatch.setattr(placeholders, "_s3_client", lambda: s3)
-    return s3
-
-
-def test_synthesize_question_returns_none():
-    assert interview.synthesize_question("질문") is None
-
-
-def test_start_transcription_writes_fake_result(fake_s3):
-    key = "uploads/interview/iv-1/transcripts/a-q1-1.json"
-    job = interview.start_transcription("s3://bucket/uploads/interview/iv-1/answers/a-q1-1.webm", "job-1", "webm",
-                                        "test-uploads", key)
-    assert job == "job-1"
-    assert len(fake_s3.puts) == 1
-    put = fake_s3.puts[0]
-    assert put["Bucket"] == "test-uploads" and put["Key"] == key and put["ContentType"] == "application/json"
-    assert json.loads(put["Body"])["jobName"] == "job-1"
-
-
-def test_start_transcription_requires_output_location():
-    with pytest.raises(TypeError):
-        interview.start_transcription("s3://b/k", "job-1", "webm")
-
-
-def test_get_transcription_result_shape():
-    tr = interview.get_transcription_result("job-1")
-    assert tr["status"] == "COMPLETED" and tr["text"] and tr["words"][0]["word"] == "저는"
+def test_only_camera_and_report_remain():
+    # 음성 함수 3개는 2차에서 voice.py로 옮겼다 (#74)
+    for name in ("synthesize_question", "start_transcription", "get_transcription_result", "_s3_client"):
+        assert not hasattr(placeholders, name)
+    for name in ("analyze_face", "compute_baseline", "generate_report"):
+        assert getattr(interview, name) is getattr(placeholders, name)
 
 
 def test_analyze_face_empty_and_normal():

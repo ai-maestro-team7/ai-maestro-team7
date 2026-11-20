@@ -11,8 +11,8 @@ import pytest
 
 import interview
 from conftest import sample_json, sample_text
-from fakes import FakeLLM, FakeS3
-from interview import placeholders
+from fakes import FakeLLM, FakePolly, FakeS3, FakeTranscribe
+from interview import voice
 from interview.models import Session
 
 RESUME = sample_text("resume_data_analysis.txt")
@@ -44,20 +44,32 @@ def env(monkeypatch):
     monkeypatch.setenv("MODEL_ID", "test-model")
 
 
+class FakeAWS:
+    """voice.py가 쓰는 Polly·Transcribe·S3 가짜 묶음. 결과 파일은 모두 같은 정상 답변이다."""
+
+    def __init__(self, polly_error=None):
+        self.polly = FakePolly(error=polly_error)
+        self.transcribe = FakeTranscribe(pending_polls=1)  # 첫 조회는 IN_PROGRESS, 다음 조회에 완료
+        self.s3 = FakeS3(default_body=sample_text("transcribe/result_normal.json"))
+
+
 @pytest.fixture
-def fake_s3(monkeypatch):
-    s3 = FakeS3()
-    monkeypatch.setattr(placeholders, "_s3_client", lambda: s3)
-    return s3
+def aws(monkeypatch):
+    fake = FakeAWS()
+    monkeypatch.setattr(voice, "_polly_client", lambda: fake.polly)
+    monkeypatch.setattr(voice, "_transcribe_client", lambda: fake.transcribe)
+    monkeypatch.setattr(voice, "_s3_client", lambda: fake.s3)
+    return fake
 
 
-def run_interview(fake_s3, follow_up_responses, calibration_images, profile=PROFILE):
+def run_interview(aws, follow_up_responses, calibration_images, profile=PROFILE):
     iv_id = "6f1c2a9e-0000-4000-8000-0000000000aa"
 
-    # task_start (244~245행): start_interview → synthesize_question
+    # task_start → save_next_question: start_interview → synthesize_question
     result = interview.start_interview(iv_id, "데이터 분석", RESUME, "MIXED", True, profile,
                                        llm=FakeLLM([sample_text("llm/questions_ok.json")]))
-    assert interview.synthesize_question(result["nextQuestion"]["text"]) is None  # 임시 구현: 음성 없음
+    mp3 = interview.synthesize_question(result["nextQuestion"]["text"])
+    assert mp3 == aws.polly.audio  # 백엔드가 S3에 올리고 audioUrl을 만든다
     item = store({"session": result["session"], "nextQuestion": result["nextQuestion"]})
 
     # h_frame (421~425행): 보정 캡처
@@ -68,15 +80,19 @@ def run_interview(fake_s3, follow_up_responses, calibration_images, profile=PROF
     while True:
         nq = item["nextQuestion"]
         answer_id = nq["answerId"]
-        # h_answer (386~387행): 결과 위치는 백엔드가 정한다
+        # h_answer: 결과 위치는 백엔드가 정한다
         transcript_key = f"uploads/interview/{iv_id}/transcripts/{answer_id}.json"
         job_name = interview.start_transcription(f"s3://{UPLOAD_BUCKET}/uploads/interview/{iv_id}/answers/{answer_id}.webm",
                                                  f"team07-{iv_id}-{answer_id}", "webm", UPLOAD_BUCKET, transcript_key)
         # h_frame: 답변 중 캡처
         frames.append(store({"type": "ANSWER", "questionId": nq["questionId"], "answerId": answer_id,
                              "accepted": True, **interview.analyze_face(b"\xff\xd8fake")}))
-        # task_answer (248~277행)
-        tr = interview.get_transcription_result(job_name)
+        # task_answer: IN_PROGRESS가 아닐 때까지 다시 조회한다 (백엔드는 2초 간격, 240초 한도)
+        for _ in range(5):
+            tr = interview.get_transcription_result(job_name)
+            if tr["status"] != "IN_PROGRESS":
+                break
+        assert tr["status"] == "COMPLETED"
         answer_result = {"answerId": answer_id, "timeLimitReached": False, "transcription": tr}
         out = interview.process_answer(item["session"], answer_result, llm=llm)
         actions.append(out["action"])
@@ -85,7 +101,7 @@ def run_interview(fake_s3, follow_up_responses, calibration_images, profile=PROF
             break
         assert len(actions) < 10
 
-    # make_report (280~296행): 기준값 → 리포트
+    # make_report: 기준값 → 리포트
     session = item["session"]
     calib = [{k: f.get(k) for k in ("valid", "reason", "gaze", "head", "eyesOpen")}
              for f in frames if f["type"] == "CALIBRATION" and f.get("valid")]
@@ -98,15 +114,21 @@ def run_interview(fake_s3, follow_up_responses, calibration_images, profile=PROF
     return actions, session, report, answer_frames
 
 
-def test_backend_flow_with_follow_up_and_baseline(fake_s3):
+def test_backend_flow_with_follow_up_and_baseline(aws):
     responses = [sample_text("llm/follow_up_needed.json"), sample_text("llm/follow_up_sufficient.json"),
                  sample_text("llm/follow_up_sufficient.json")]
-    actions, session, report, answer_frames = run_interview(fake_s3, responses, [b"\xff\xd8a", b"\xff\xd8b", b"\xff\xd8c"])
+    actions, session, report, answer_frames = run_interview(aws, responses, [b"\xff\xd8a", b"\xff\xd8b", b"\xff\xd8c"])
 
     assert actions == ["FOLLOW_UP", "NEXT_QUESTION", "NEXT_QUESTION", "REPORT"]
-    assert len(fake_s3.puts) == 4
-    assert [p["Key"].rsplit("/", 1)[1] for p in fake_s3.puts] == ["a-q1-1.json", "a-q1-2.json", "a-q2-1.json",
-                                                                   "a-q3-1.json"]
+    # 변환 작업 4개, 결과는 백엔드가 정한 위치에. 함수는 S3에 쓰지 않고 결과만 읽는다
+    assert [s["OutputKey"].rsplit("/", 1)[1] for s in aws.transcribe.starts] == ["a-q1-1.json", "a-q1-2.json",
+                                                                                 "a-q2-1.json", "a-q3-1.json"]
+    assert all(s["OutputBucketName"] == UPLOAD_BUCKET and s["LanguageCode"] == "ko-KR" for s in aws.transcribe.starts)
+    assert aws.s3.puts == [] and len(aws.s3.gets) == 4
+    # 전달력: 정상 답변 샘플은 약 19.6초, 2초 넘는 공백 1번. DynamoDB를 거쳐도 Session 검사를 통과한다
+    deliveries = [a["delivery"] for a in session["answers"]]
+    assert all(19.5 <= d["answerSec"] <= 19.6 and d["longPauseCount"] == 1 and d["speechRate"] for d in deliveries)
+    assert "words" not in json.dumps(session)
     assert session["baseline"] == {"gaze": {"yaw": 0, "pitch": 0}, "head": {"yaw": 0, "pitch": 0}}  # 0.0 → 0
     assert session["profile"]["profileVersion"] == 2
     Session.model_validate(session)  # 저장·조회와 기준값 추가 뒤에도 Session 형식 그대로
@@ -114,9 +136,9 @@ def test_backend_flow_with_follow_up_and_baseline(fake_s3):
     assert all(f["eyesOpen"] == {"value": True, "confidence": 98.5} for f in answer_frames)
 
 
-def test_backend_flow_baseline_none_with_few_calibration_frames(fake_s3):
+def test_backend_flow_baseline_none_with_few_calibration_frames(aws):
     sufficient = sample_text("llm/follow_up_sufficient.json")
-    actions, session, report, _ = run_interview(fake_s3, [sufficient] * 3, [b"\xff\xd8a", b""], profile=None)
+    actions, session, report, _ = run_interview(aws, [sufficient] * 3, [b"\xff\xd8a", b""], profile=None)
     assert actions == ["NEXT_QUESTION", "NEXT_QUESTION", "REPORT"]
     assert session["baseline"] is None  # 유효 3장 미만 → 태도 미측정, 대체값 없음
     assert session["profile"] is None

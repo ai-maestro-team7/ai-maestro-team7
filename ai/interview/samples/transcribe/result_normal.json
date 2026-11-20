@@ -1,0 +1,41 @@
+{
+  "jobName": "team07-sample-a-q1-1",
+  "status": "COMPLETED",
+  "results": {
+    "transcripts": [
+      {"transcript": "저는 관광지 입장객 통계와 기상 자료를 합쳐서 분석했습니다. 두 자료의 관광지 이름이 달라서 대응표를 만들고 이름을 통일했습니다. 그 결과 계절별 방문객 변화를 한 표로 볼 수 있었습니다."}
+    ],
+    "items": [
+      {"type": "pronunciation", "start_time": "0.30", "end_time": "0.85", "alternatives": [{"confidence": "0.99", "content": "저는"}]},
+      {"type": "pronunciation", "start_time": "0.95", "end_time": "1.50", "alternatives": [{"confidence": "0.98", "content": "관광지"}]},
+      {"type": "pronunciation", "start_time": "1.60", "end_time": "2.15", "alternatives": [{"confidence": "0.97", "content": "입장객"}]},
+      {"type": "pronunciation", "start_time": "2.25", "end_time": "2.80", "alternatives": [{"confidence": "0.98", "content": "통계와"}]},
+      {"type": "pronunciation", "start_time": "2.90", "end_time": "3.45", "alternatives": [{"confidence": "0.99", "content": "기상"}]},
+      {"type": "pronunciation", "start_time": "3.55", "end_time": "4.10", "alternatives": [{"confidence": "0.99", "content": "자료를"}]},
+      {"type": "pronunciation", "start_time": "4.20", "end_time": "4.75", "alternatives": [{"confidence": "0.96", "content": "합쳐서"}]},
+      {"type": "pronunciation", "start_time": "4.85", "end_time": "5.40", "alternatives": [{"confidence": "0.98", "content": "분석했습니다"}]},
+      {"type": "punctuation", "alternatives": [{"confidence": "0.0", "content": "."}]},
+      {"type": "pronunciation", "start_time": "5.50", "end_time": "6.05", "alternatives": [{"confidence": "0.99", "content": "두"}]},
+      {"type": "pronunciation", "start_time": "6.15", "end_time": "6.70", "alternatives": [{"confidence": "0.99", "content": "자료의"}]},
+      {"type": "pronunciation", "start_time": "6.80", "end_time": "7.35", "alternatives": [{"confidence": "0.98", "content": "관광지"}]},
+      {"type": "pronunciation", "start_time": "7.45", "end_time": "8.00", "alternatives": [{"confidence": "0.99", "content": "이름이"}]},
+      {"type": "pronunciation", "start_time": "8.10", "end_time": "8.65", "alternatives": [{"confidence": "0.97", "content": "달라서"}]},
+      {"type": "pronunciation", "start_time": "8.75", "end_time": "9.30", "alternatives": [{"confidence": "0.95", "content": "대응표를"}]},
+      {"type": "pronunciation", "start_time": "9.40", "end_time": "9.95", "alternatives": [{"confidence": "0.99", "content": "만들고"}]},
+      {"type": "pronunciation", "start_time": "10.05", "end_time": "10.60", "alternatives": [{"confidence": "0.99", "content": "이름을"}]},
+      {"type": "pronunciation", "start_time": "10.70", "end_time": "11.25", "alternatives": [{"confidence": "0.97", "content": "통일했습니다"}]},
+      {"type": "punctuation", "alternatives": [{"confidence": "0.0", "content": "."}]},
+      {"type": "pronunciation", "start_time": "13.45", "end_time": "14.00", "alternatives": [{"confidence": "0.99", "content": "그"}]},
+      {"type": "pronunciation", "start_time": "14.10", "end_time": "14.65", "alternatives": [{"confidence": "0.99", "content": "결과"}]},
+      {"type": "pronunciation", "start_time": "14.75", "end_time": "15.30", "alternatives": [{"confidence": "0.98", "content": "계절별"}]},
+      {"type": "pronunciation", "start_time": "15.40", "end_time": "15.95", "alternatives": [{"confidence": "0.98", "content": "방문객"}]},
+      {"type": "pronunciation", "start_time": "16.05", "end_time": "16.60", "alternatives": [{"confidence": "0.99", "content": "변화를"}]},
+      {"type": "pronunciation", "start_time": "16.70", "end_time": "17.25", "alternatives": [{"confidence": "0.99", "content": "한"}]},
+      {"type": "pronunciation", "start_time": "17.35", "end_time": "17.90", "alternatives": [{"confidence": "0.98", "content": "표로"}]},
+      {"type": "pronunciation", "start_time": "18.00", "end_time": "18.55", "alternatives": [{"confidence": "0.99", "content": "볼"}]},
+      {"type": "pronunciation", "start_time": "18.65", "end_time": "19.20", "alternatives": [{"confidence": "0.99", "content": "수"}]},
+      {"type": "pronunciation", "start_time": "19.30", "end_time": "19.85", "alternatives": [{"confidence": "0.98", "content": "있었습니다"}]},
+      {"type": "punctuation", "alternatives": [{"confidence": "0.0", "content": "."}]}
+    ]
+  }
+}

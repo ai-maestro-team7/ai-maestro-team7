@@ -1,0 +1,20 @@
+{
+  "jobName": "team07-sample-short",
+  "status": "COMPLETED",
+  "results": {
+    "transcripts": [
+      {"transcript": "네. 저는 데이터 분석을 공부했습니다. 감사합니다."}
+    ],
+    "items": [
+      {"type": "pronunciation", "start_time": "0.20", "end_time": "0.60", "alternatives": [{"confidence": "0.99", "content": "네"}]},
+      {"type": "punctuation", "alternatives": [{"confidence": "0.0", "content": "."}]},
+      {"type": "pronunciation", "start_time": "1.80", "end_time": "2.30", "alternatives": [{"confidence": "0.99", "content": "저는"}]},
+      {"type": "pronunciation", "start_time": "3.50", "end_time": "4.20", "alternatives": [{"confidence": "0.98", "content": "데이터"}]},
+      {"type": "pronunciation", "start_time": "5.40", "end_time": "6.10", "alternatives": [{"confidence": "0.98", "content": "분석을"}]},
+      {"type": "pronunciation", "start_time": "7.30", "end_time": "8.40", "alternatives": [{"confidence": "0.97", "content": "공부했습니다"}]},
+      {"type": "punctuation", "alternatives": [{"confidence": "0.0", "content": "."}]},
+      {"type": "pronunciation", "start_time": "9.20", "end_time": "10.20", "alternatives": [{"confidence": "0.99", "content": "감사합니다"}]},
+      {"type": "punctuation", "alternatives": [{"confidence": "0.0", "content": "."}]}
+    ]
+  }
+}

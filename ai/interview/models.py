@@ -23,6 +23,7 @@ QuestionType = Literal["experience", "knowledge", "situation"]
 UnevaluableReason = Literal["NO_ANSWER", "TRANSCRIBE_FAILED"]
 TranscriptionStatus = Literal["COMPLETED", "FAILED", "IN_PROGRESS"]
 FollowUpReason = Literal["ABSTRACT", "INCONSISTENT", "SUFFICIENT"]
+DeliveryReason = Literal["TOO_SHORT", "NON_HANGUL_HEAVY"]
 
 INVALID_INPUT_MESSAGE = "면접 정보를 확인할 수 없어요. 입력 내용을 확인해 주세요."
 
@@ -99,6 +100,33 @@ class NextQuestion(_CamelModel):
     is_follow_up: bool
 
 
+class DeliveryMetrics(_CamelModel):
+    """답변 하나의 전달력 측정값 (voice design §7). 점수가 아니다 (점수 환산은 3차).
+
+    수치는 실수지만 백엔드가 DynamoDB를 거쳐 돌려줄 때 정수 값은 int가 된다(300.0 → 300).
+    float 필드는 엄격 모드가 아니라서 int도 받는다 (voice 결정 6).
+    """
+
+    answer_sec: float = Field(ge=0)
+    speech_rate: float | None = Field(ge=0)
+    speech_rate_reason: DeliveryReason | None
+    long_pause_count: int | None = Field(ge=0)
+    long_pause_per_min: float | None = Field(ge=0)
+    long_pause_reason: DeliveryReason | None
+
+    @model_validator(mode="after")
+    def _value_or_reason(self) -> "DeliveryMetrics":
+        # 항목마다 값과 미측정 사유 중 정확히 하나만 있다
+        if (self.speech_rate is None) == (self.speech_rate_reason is None):
+            raise ValueError("speech rate needs a value or a reason")
+        pause_missing = self.long_pause_count is None, self.long_pause_per_min is None
+        if pause_missing[0] != pause_missing[1]:
+            raise ValueError("long pause count and per minute go together")
+        if pause_missing[0] == (self.long_pause_reason is None):
+            raise ValueError("long pause needs a value or a reason")
+        return self
+
+
 class AnswerRecord(_CamelModel):
     answer_id: str
     question_id: str
@@ -108,6 +136,7 @@ class AnswerRecord(_CamelModel):
     evaluable: bool
     reason: UnevaluableReason | None
     time_limit_reached: bool
+    delivery: DeliveryMetrics | None = None  # 2차. 1차 Session에는 키가 없다
 
     @model_validator(mode="after")
     def _consistent(self) -> "AnswerRecord":
@@ -115,6 +144,8 @@ class AnswerRecord(_CamelModel):
             raise ValueError("evaluable answer needs text and no reason")
         if not self.evaluable and self.reason is None:
             raise ValueError("unevaluable answer needs a reason")
+        if not self.evaluable and self.delivery is not None:
+            raise ValueError("unevaluable answer has no delivery metrics")
         return self
 
 

@@ -1,39 +1,12 @@
-"""아직 없는 공개 함수 6개의 임시 구현 (design §9, 결정 6).
+"""아직 없는 공개 함수 3개의 임시 구현 (1차 design §9, 결정 6).
 
 backend/interview_stub.py(PR #31 반영본)와 같은 입출력이다. backend/를 import하지 않고 동작을 옮겨 적었다.
-1차 머지 뒤 배포해도 백엔드의 음성·카메라·리포트 호출에서 면접이 깨지지 않게 하려는 것이다.
+배포해도 백엔드의 카메라·리포트 호출에서 면접이 깨지지 않게 하려는 것이다.
+음성 함수 3개는 2차(voice.py)에서 실제 구현으로 바뀌었다 (#74).
 
 실제 구현과 다른 점:
-- 모두 고정 값을 돌려준다. Polly·Transcribe·Rekognition·Bedrock을 부르지 않는다.
-- start_transcription만 대역처럼 output_bucket/output_key에 가짜 결과 JSON을 쓴다 (S3 호출 하나).
-- get_transcription_result는 S3 결과 파일을 읽지 않고 고정 문장을 돌려준다.
+- 모두 고정 값을 돌려준다. Rekognition·Bedrock을 부르지 않는다.
 """
-
-import json
-
-
-def _s3_client():
-    import boto3  # 지연 import. 테스트는 이 함수를 가짜 클라이언트로 바꾼다
-
-    return boto3.client("s3")
-
-
-def synthesize_question(text):
-    """임시 구현, 2차 PR에서 Polly로 교체. 음성을 만들지 않는다 → 백엔드는 audioUrl을 null로 둔다."""
-    return None
-
-
-def start_transcription(s3_uri, job_name, media_format, output_bucket, output_key):
-    """임시 구현, 2차 PR에서 Transcribe로 교체. 백엔드가 정한 위치에 가짜 결과 JSON을 쓴다."""
-    body = json.dumps({"jobName": job_name, "results": {"transcripts": [{"transcript": "(대역)"}]}}).encode()
-    _s3_client().put_object(Bucket=output_bucket, Key=output_key, ContentType="application/json", Body=body)
-    return job_name
-
-
-def get_transcription_result(job_name):
-    """임시 구현, 2차 PR에서 교체. 결과 파일을 읽지 않고 늘 같은 문장을 돌려준다."""
-    return {"status": "COMPLETED", "text": "(대역) 저는 캡스톤 프로젝트에서 API 서버를 맡았습니다.",
-            "words": [{"word": "저는", "start": 0.4, "end": 0.7}]}
 
 
 def analyze_face(image_bytes):

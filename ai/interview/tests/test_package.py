@@ -40,6 +40,33 @@ def test_backend_call_shapes_bind(name, n_args):
     sig.bind(*range(n_args))  # TypeError면 백엔드 호출이 깨진다
 
 
+def test_voice_functions_are_real_implementations():
+    # 2차(#74): 음성 함수 3개는 voice.py, 카메라·리포트 3개는 아직 placeholders.py
+    for name in ("synthesize_question", "start_transcription", "get_transcription_result"):
+        assert getattr(interview, name).__module__ == "interview.voice"
+    for name in ("analyze_face", "compute_baseline", "generate_report"):
+        assert getattr(interview, name).__module__ == "interview.placeholders"
+
+
+def test_import_without_boto3():
+    # boto3·botocore가 없는 환경에서도 import는 된다 (음성 함수는 처음 호출할 때 boto3를 부른다)
+    code = (
+        "import sys\n"
+        "sys.modules['boto3'] = None\n"
+        "sys.modules['botocore'] = None\n"
+        "sys.modules['strands'] = None\n"
+        "import interview\n"
+        "assert interview.synthesize_question('질문입니다') is None\n"  # boto3가 없으면 음성 없이 진행
+        "print('ok')\n"
+    )
+    env = {k: v for k, v in os.environ.items() if k != "MODEL_ID"}
+    env["PYTHONPATH"] = os.pathsep.join([str(REPO_ROOT / "ai"), str(REPO_ROOT / "contracts" / "src")])
+    env["PYTHONIOENCODING"] = "utf-8"
+    result = subprocess.run([sys.executable, "-c", code], env=env, capture_output=True, text=True, timeout=60)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "ok"
+
+
 def test_start_interview_profile_is_optional():
     inspect.signature(interview.start_interview).bind(*range(5))
 
