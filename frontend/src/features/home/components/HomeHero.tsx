@@ -6,6 +6,29 @@ import { ChatPanel } from "@/features/chat/components/ChatPanel";
 const HEADLINE = "어떤 일을 찾고 있나요?";
 
 /**
+ * 제목 글자마다 기차놀이 등장 값을 정한다 (globals.css .wave-char·.wave-hop).
+ * 모두 제목 왼쪽 3em 밖에서 출발해 제자리까지 걷는다. 걷는 거리는 제자리의 대략적 가로 위치(한글 0.96em, 띄어쓰기 0.28em)로 잡고,
+ * 맨 앞 글자(?)가 먼저 출발한다. 줄 간격이 제자리 간격보다 넓어서 앞 글자부터 차례로 선다.
+ */
+type TitleChar = { char: string; dist?: number; order?: number };
+
+const TITLE_CHARS: TitleChar[] = (() => {
+  const visible = [...HEADLINE].filter((char) => char !== " ").length;
+  let index = 0;
+  let spaces = 0;
+  return [...HEADLINE].map((char): TitleChar => {
+    if (char === " ") {
+      spaces += 1;
+      return { char };
+    }
+    const dist = Number((index * 0.96 + spaces * 0.28 + 3).toFixed(2));
+    const item = { char, dist, order: visible - 1 - index };
+    index += 1;
+    return item;
+  });
+})();
+
+/**
  * 홈 첫 화면: 큰 문구와 채팅창 하나만 둔다. 공고·정책 목록은 "채용·정책" 메뉴에서 본다.
  * 배경은 커서를 따라 옅은 파란 빛과 점 무늬가 움직이고, 제목 글자는 커서가 지나가면 물결처럼 떠오른다 (globals.css).
  * 커서 위치는 렌더링 없이 CSS 변수로만 넣는다. 터치 화면에서는 가만히 있는 빛만 보인다.
@@ -55,12 +78,16 @@ export function HomeHero() {
             <span className="sr-only">{HEADLINE}</span>
             {/* 글자마다 나눠 커서 물결을 준다. 화면 읽기 프로그램은 위의 한 줄만 읽는다 */}
             <span aria-hidden className="cursor-default">
-              {[...HEADLINE].map((char, index) =>
-                char === " " ? (
+              {TITLE_CHARS.map((item, index) =>
+                item.dist === undefined || item.order === undefined ? (
                   " "
                 ) : (
-                  <span key={index} className="wave-char" style={{ "--i": index } as CSSProperties}>
-                    {char}
+                  <span
+                    key={index}
+                    className="wave-char"
+                    style={{ "--dist": item.dist, "--order": item.order } as CSSProperties}
+                  >
+                    <span className="wave-hop">{item.char}</span>
                   </span>
                 ),
               )}
