@@ -42,7 +42,7 @@ export function RecommendedJobsLoading() {
   );
 }
 
-/** 정렬 기준 문구 + "지역인재 전형 공고 보기" 줄. 불러오는 중에도 같은 줄을 그려 표가 밀리지 않는다. */
+/** 정렬 기준 문구 + "지역 혜택 공고 보기" 줄. 불러오는 중에도 같은 줄을 그려 표가 밀리지 않는다. */
 function BasisRow({ basis }: { basis: string }) {
   return (
     <div className="flex w-full flex-wrap items-center justify-between gap-2 text-small">
@@ -50,7 +50,7 @@ function BasisRow({ basis }: { basis: string }) {
         {SORT_LABELS.BUSAN_FIRST} · {basis}
       </p>
       <Link href="/jobs/?talent=1" className="font-medium text-blue-500">
-        지역인재 전형 공고 보기
+        지역 혜택 공고 보기
       </Link>
     </div>
   );

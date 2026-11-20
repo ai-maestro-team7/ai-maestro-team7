@@ -92,11 +92,12 @@ def test_regional_talent_likely_only_for_busan_school(deps, as_of):
     likely = posting_detail.get_regional_talent(deps, "demo3", w.BUSAN_FINANCE_PUBLIC, as_of=as_of)
     assert likely.regional_talent.status == RegionalTalentStatus.LIKELY
     assert likely.regional_talent.message == "부산 소재 학교 졸업 예정이라 지역인재 전형 대상일 수 있어요 · 공고문 확인"
-    for school in ("11", None):
+    # 학교가 부산이 아니면 맞지 않는다(화면에 띄우지 않음). 학교 지역을 모르면 확인 필요로 둔다
+    for school, status in (("11", RegionalTalentStatus.NOT_APPLICABLE), (None, RegionalTalentStatus.CHECK_NEEDED)):
         profile = deps.users.get_basic_profile("demo3").model_copy(update={"university_region": school})
         deps.users.profiles["demo3"] = profile
         view = posting_detail.get_regional_talent(deps, "demo3", w.BUSAN_FINANCE_PUBLIC, as_of=as_of).regional_talent
-        assert view.status == RegionalTalentStatus.CHECK_NEEDED
+        assert view.status == status
         assert "대상일 수 있어요" not in (view.message or "")
 
 

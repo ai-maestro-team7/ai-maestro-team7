@@ -65,7 +65,7 @@ export function JobRow({ job, asOf }: { job: PostingCard; asOf: string }) {
           {MATCH_LABELS[job.matchLevel]}
         </span>
         {job.regionalTalent === "LIKELY" ? (
-          <span className="truncate text-small font-medium text-blue-500">지역인재 대상일 수 있음</span>
+          <span className="truncate text-small font-medium text-blue-500">지역 혜택 대상일 수 있음</span>
         ) : (
           <span className="truncate text-small text-grey-600">{matchReason(job.facts)}</span>
         )}

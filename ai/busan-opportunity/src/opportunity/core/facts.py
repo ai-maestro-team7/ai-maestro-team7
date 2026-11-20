@@ -9,12 +9,19 @@ from datetime import datetime
 
 from ..config import OpportunityConfig
 from ..models.api import EligibilityResult, RegionalTalentView
-from ..models.enums import BadgeType, CheonggeulType, ConditionResult, OrgType, RegionalTalentStatus
-from ..models.posting import Badge, PostingLatest, Salary, WorkRegion
+from ..models.enums import (
+    BadgeType,
+    CheonggeulType,
+    ConditionResult,
+    OrgType,
+    RegionalBenefitKind,
+    RegionalTalentStatus,
+)
+from ..models.posting import Badge, PostingLatest, RegionalCondition, Salary, WorkRegion
 from ..models.profile import BasicProfile
 from ..models.region import LocalLifeData
 from . import clock, copy_rules
-from .regions import sido_name
+from .regions import same_sido, sido_name, sigungu_name
 
 SCORE_DIGITS = 4       # 응답에 싣는 점수의 소수 자리 (표시용)
 SIMILARITY_DIGITS = 2  # 사실 목록에 쓰는 유사도 자리
@@ -31,7 +38,7 @@ FACT_UNKNOWN = "확인이 필요한 조건 {count}개"
 FACT_SIMILAR = "하는 일이 비슷함 (유사도 {similarity})"
 FACT_SALARY_DISCLOSED = "급여가 공고에 적혀 있음"
 FACT_REGIONAL_TALENT = "{label} · 지역인재 전형 대상일 수 있음"
-FACT_REGIONAL_TALENT_CARD = "지역인재 전형 대상일 수 있음 · 공고문 확인"
+FACT_REGIONAL_TALENT_CARD = "지역 혜택 대상일 수 있음 · 공고문 확인"
 
 GRADUATION_LABEL = {"GRADUATING": "졸업 예정", "GRADUATED": "졸업", "ENROLLED": "재학 중"}
 GRADUATION_DEFAULT = "출신"
@@ -171,36 +178,123 @@ def compact(items: list[str | None]) -> list[str]:
     return out
 
 
-# ---------------------------------------------------------------- 지역인재
+# ---------------------------------------------------------------- 지역인재·지역 조건
+def _school_text(profile: BasicProfile, template: str, named: str) -> str:
+    status = GRADUATION_LABEL.get(profile.graduation_status or "", GRADUATION_DEFAULT)
+    school = sido_name(profile.university_region) or ""
+    name = (profile.school_name or "").strip()
+    return named.format(name=name, school=school, status=status) if name else template.format(school=school,
+                                                                                               status=status)
+
+
+def _home_text(profile: BasicProfile) -> str:
+    return " ".join(x for x in (sido_name(profile.residence_sido), sigungu_name(profile.residence_sigungu)) if x)
+
+
+def _same_sigungu(a: str, b: str) -> bool:
+    """"기장군"과 "기장", "구미시"와 "구미"를 같게 본다."""
+    trim = (lambda x: x[:-1] if len(x) > 2 and x[-1] in "시군구" else x)
+    return trim(a.strip()) == trim(b.strip())
+
+
+def _school_met(config: OpportunityConfig, profile: BasicProfile, c: RegionalCondition) -> bool | None:
+    """학교 소재지 기준. 학교 소재지를 모르거나 조건 지역을 모르면 None."""
+    school = profile.university_region
+    if c.kind == RegionalBenefitKind.NON_CAPITAL:
+        return None if school is None else not any(same_sido(school, s) for s in config.data.capital_area_sido)
+    if school is None or c.sido is None:
+        return None
+    return same_sido(school, c.sido)
+
+
+def _home_met(profile: BasicProfile, c: RegionalCondition) -> bool | None:
+    """거주지 기준. 시·군·구까지 적힌 조건은 구·군을 아는 거주지(부산)만 맞춰 본다."""
+    if profile.residence_sido is None or c.sido is None:
+        return None
+    if not same_sido(profile.residence_sido, c.sido):
+        return False
+    if not c.sigungu:
+        return True
+    home = sigungu_name(profile.residence_sigungu)
+    return None if home is None else _same_sigungu(home, c.sigungu)
+
+
+def condition_met(config: OpportunityConfig, profile: BasicProfile,
+                  c: RegionalCondition) -> tuple[bool | None, str | None]:
+    """(맞는지, 무엇으로 맞았는지 "school"·"home"). 맞는지 모르면 (None, None)."""
+    kind = c.kind
+    if kind in (RegionalBenefitKind.NON_CAPITAL, RegionalBenefitKind.SCHOOL):
+        met = _school_met(config, profile, c)
+        return met, ("school" if met else None)
+    if kind == RegionalBenefitKind.RESIDENCE:
+        met = _home_met(profile, c)
+        return met, ("home" if met else None)
+    if kind == RegionalBenefitKind.SCHOOL_OR_RESIDENCE:
+        school, home = _school_met(config, profile, c), _home_met(profile, c)
+        if school:
+            return True, "school"
+        if home:
+            return True, "home"
+        return (None if school is None or home is None else False), None
+    return None, None  # UNKNOWN
+
+
+def _met_message(profile: BasicProfile, c: RegionalCondition, via: str) -> str:
+    if via == "home":
+        return copy_rules.REGIONAL_RESIDENCE.format(home=_home_text(profile))
+    if c.kind == RegionalBenefitKind.NON_CAPITAL:
+        return _school_text(profile, copy_rules.REGIONAL_NON_CAPITAL, copy_rules.REGIONAL_NON_CAPITAL_NAMED)
+    if c.kind == RegionalBenefitKind.SCHOOL_OR_RESIDENCE:
+        return _school_text(profile, copy_rules.REGIONAL_LIMIT_SCHOOL, copy_rules.REGIONAL_LIMIT_SCHOOL_NAMED)
+    return _school_text(profile, copy_rules.REGIONAL_TALENT_LIKELY, copy_rules.REGIONAL_TALENT_LIKELY_NAMED)
+
+
+def posting_conditions(config: OpportunityConfig, posting: PostingLatest, relocated: bool) -> list[RegionalCondition]:
+    """공고의 지역 조건. 조건 목록이 없는 예전 판정(LIKELY)은 부산 이전기관이면 부산 학교, 아니면 모름으로 본다."""
+    talent = posting.regional_talent
+    if talent is None or talent.status != RegionalTalentStatus.LIKELY:
+        return []
+    if talent.conditions:
+        return list(talent.conditions)
+    if relocated:
+        return [RegionalCondition(kind=RegionalBenefitKind.SCHOOL, sido=config.data.busan_sido)]
+    return [RegionalCondition(kind=RegionalBenefitKind.UNKNOWN)]
+
+
 def regional_talent_view(config: OpportunityConfig, profile: BasicProfile, posting: PostingLatest, *,
                          company_regional_talent: bool = False) -> RegionalTalentView:
-    """지역인재 전형 해당 가능성. "대상일 수 있어요"는 학교 소재지가 부산일 때만 말한다.
+    """공고의 지역 조건(비수도권·이전지역·권역 인재, 지역 제한, 거주자 우대)이 사용자에게 맞는지.
 
-    공고 쪽 판정(LIKELY, CHECK_NEEDED)이 있어도 사용자의 학교 소재지를 모르거나 부산이 아니면
-    단정하지 않고 CHECK_NEEDED로 둔다.
+    - 학교 소재지나 거주지로 맞는 조건이 하나라도 있으면 LIKELY ("…대상일 수 있어요 · 공고문 확인")
+    - 맞는지 정할 수 없으면 CHECK_NEEDED (지역을 적지 않았거나, 사용자의 학교·거주 지역을 모름)
+    - 조건이 있지만 학교·거주 지역으로 보면 맞지 않으면 NOT_APPLICABLE. 화면에는 띄우지 않는다
+    단정하지 않는다. 문구는 늘 "공고문 확인"으로 끝난다.
     """
     talent = posting.regional_talent
     relocated = is_relocated(posting.badges) or company_regional_talent
-    if talent is None:
+    if talent is None or talent.status == RegionalTalentStatus.NOT_APPLICABLE:
         if relocated:
             return RegionalTalentView(status=RegionalTalentStatus.CHECK_NEEDED, message=copy_rules.REGIONAL_TALENT_CHECK)
-        return RegionalTalentView(status=RegionalTalentStatus.NOT_APPLICABLE)
-    if talent.status == RegionalTalentStatus.NOT_APPLICABLE:
-        return RegionalTalentView(status=RegionalTalentStatus.NOT_APPLICABLE, basis=talent.basis)
-    busan = config.data.busan_sido
-    if talent.status == RegionalTalentStatus.LIKELY and profile.university_region == busan:
-        status = GRADUATION_LABEL.get(profile.graduation_status or "", GRADUATION_DEFAULT)
-        name = (profile.school_name or "").strip()
-        message = (copy_rules.REGIONAL_TALENT_LIKELY_NAMED.format(name=name, school=sido_name(busan), status=status)
-                   if name else copy_rules.REGIONAL_TALENT_LIKELY.format(school=sido_name(busan), status=status))
-        return RegionalTalentView(status=RegionalTalentStatus.LIKELY, basis=talent.basis, message=message)
-    return RegionalTalentView(status=RegionalTalentStatus.CHECK_NEEDED, basis=talent.basis,
-                              message=copy_rules.REGIONAL_TALENT_CHECK)
+        return RegionalTalentView(status=RegionalTalentStatus.NOT_APPLICABLE, basis=talent.basis if talent else None)
+    if talent.status == RegionalTalentStatus.CHECK_NEEDED:
+        return RegionalTalentView(status=RegionalTalentStatus.CHECK_NEEDED, basis=talent.basis,
+                                  message=copy_rules.REGIONAL_TALENT_CHECK)
+    unknown = False
+    for c in posting_conditions(config, posting, relocated):
+        met, via = condition_met(config, profile, c)
+        if met:
+            return RegionalTalentView(status=RegionalTalentStatus.LIKELY, basis=talent.basis,
+                                      message=_met_message(profile, c, via))
+        unknown = unknown or met is None
+    if unknown:
+        return RegionalTalentView(status=RegionalTalentStatus.CHECK_NEEDED, basis=talent.basis,
+                                  message=copy_rules.REGIONAL_TALENT_CHECK_NOTICE)
+    return RegionalTalentView(status=RegionalTalentStatus.NOT_APPLICABLE, basis=talent.basis)
 
 
 def card_regional_talent(config: OpportunityConfig, profile: BasicProfile,
                          posting: PostingLatest) -> RegionalTalentStatus | None:
-    """피드 카드용. 지역인재 전형이 있을 수 있는 공고면 LIKELY(학교 소재지가 맞음)나 CHECK_NEEDED, 아니면 None."""
+    """피드 카드용. 지역 조건이 사용자에게 맞을 수 있으면 LIKELY, 맞는지 모르면 CHECK_NEEDED, 아니면 None."""
     view = regional_talent_view(config, profile, posting)
     return None if view.status == RegionalTalentStatus.NOT_APPLICABLE else view.status
 

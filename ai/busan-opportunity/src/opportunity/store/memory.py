@@ -19,6 +19,7 @@ class MemoryCatalog:
     def __init__(self):
         self.snapshots: dict[tuple[str, str], PostingSnapshot] = {}
         self.latest: dict[str, PostingLatest] = {}
+        self.regional_index: dict[str, str] = {}  # jobPostingId → closesAt
         self.alts: dict[str, AltCandidates] = {}
         self.policies: dict[str, Policy] = {}
         self.companies: dict[str, CompanyRecord] = {}
@@ -67,6 +68,15 @@ class MemoryCatalog:
 
     def put_latest(self, latest):
         self.latest[latest.job_posting_id] = latest
+
+    def put_regional_index(self, latest):
+        self.regional_index[latest.job_posting_id] = latest.closes_at
+
+    def delete_regional_index(self, job_posting_id):
+        self.regional_index.pop(job_posting_id, None)
+
+    def list_regional_index(self, *, closes_from):
+        return sorted(i for i, closes in self.regional_index.items() if closes >= closes_from)
 
     def put_alts(self, alts):
         self.alts[alts.job_posting_id] = alts

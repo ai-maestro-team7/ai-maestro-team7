@@ -16,7 +16,7 @@ export type FeedQuery = {
   keyword?: string;
   cursor?: string;
   limit?: number;
-  /** true면 지역인재 전형이 있을 수 있는 공고(이전 공공기관 등)만 */
+  /** true면 공고문의 지역 조건(비수도권·이전지역 인재, 지역 제한, 거주자 우대)이 학교 지역·사는 곳과 맞을 수 있는 공고만 */
   regionalTalent?: boolean;
 };
 

@@ -26,7 +26,14 @@ from ..config import require_env
 from ..core import clock
 from ..models.errors import aws_service_error, invalid_input
 from ..models.policy import Policy
-from ..models.posting import AltCandidates, CompanyRecord, PostingLatest, PostingName, PostingSnapshot
+from ..models.posting import (
+    AltCandidates,
+    CompanyRecord,
+    PostingLatest,
+    PostingName,
+    PostingSnapshot,
+    RegionalIndexEntry,
+)
 from ..models.profile import BasicProfile, OppPrefs
 from ..models.user_state import ExplanationCache, Notification, PolicyAlert, SavedItem
 from ..ports import IdemResult
@@ -233,6 +240,7 @@ class DynamoCatalog:
     META_PK, META_SK = "META#OPP", "INGEST"
     NAMES_PK = "POSTNAMES"  # 진행 중 공고의 이름 색인 (B-D08). SK는 `POSTING#{jobPostingId}`
     NAMES_CACHE_SECONDS = 60  # API Lambda 안에서 이름 색인을 다시 읽지 않고 쓰는 시간
+    REGIONAL_INDEX_PK = "INDEX#REGIONAL"
 
     def __init__(self, resource=None, table_name: str | None = None, *,
                  now: Callable[[], datetime] = clock.now_kst, sleep: Callable[[float], None] = time.sleep,
@@ -353,6 +361,20 @@ class DynamoCatalog:
         self.t.upsert(self.NAMES_PK, sk, "PostingName", PostingName(
             job_posting_id=latest.job_posting_id, organization=latest.organization, title=latest.title,
             job_name=latest.job.name, closes_at=latest.closes_at))
+
+    def put_regional_index(self, latest):
+        entry = RegionalIndexEntry(job_posting_id=latest.job_posting_id, closes_at=latest.closes_at)
+        self.t.upsert(self.REGIONAL_INDEX_PK, self._posting_pk(latest.job_posting_id), "RegionalIndex", entry)
+
+    def delete_regional_index(self, job_posting_id):
+        self.t.delete(self.REGIONAL_INDEX_PK, self._posting_pk(job_posting_id))
+
+    def list_regional_index(self, *, closes_from):
+        """한 파티션(INDEX#REGIONAL)을 Query로 읽는다. 지역 조건이 있는 공고만 있어 수백 건 안쪽이다."""
+        items = self.t.query(KeyConditionExpression="PK = :pk", FilterExpression="closesAt >= :from",
+                             ExpressionAttributeValues={":pk": self.REGIONAL_INDEX_PK, ":from": closes_from},
+                             ProjectionExpression="jobPostingId")
+        return sorted(i["jobPostingId"] for i in items)
 
     def put_alts(self, alts):
         self.t.upsert(self._posting_pk(alts.job_posting_id), "ALTS", "AltCandidates", alts)
