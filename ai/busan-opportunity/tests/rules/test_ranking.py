@@ -578,3 +578,47 @@ def test_certificates_from_basic_profile_count_for_preferred(deps):
     without = ranking.preferred_ok_value(profile, posting)
     with_cert = ranking.preferred_ok_value(profile.model_copy(update={"certificates": [posting.preferred_names[0]]}), posting)
     assert without is None and with_cert is not None and with_cert > 0
+
+
+# ---------------------------------------------------------------- 지역 후보 (2026-11-21)
+class BusanHeavyVectors:
+    """전국 상위 후보가 모두 부산 공고인 상황을 흉내 낸다. 지역(sido) 조건이 없는 질의는 부산 공고만 돌려준다."""
+
+    def __init__(self, inner):
+        self.inner = inner
+        self.filters = []
+
+    def query(self, vector, *, top_k, filter=None):
+        f = dict(filter or {})
+        self.filters.append(f)
+        if "sido" not in f:
+            f["isBusan"] = True
+        return self.inner.query(vector, top_k=top_k, filter=f)
+
+    def __getattr__(self, name):
+        return getattr(self.inner, name)
+
+
+def test_capital_feed_queries_capital_candidates(deps, as_of):
+    """지역을 고르면 그 지역만 찾는 질의를 더한다. 전국 상위 후보에서 거르기만 하면 수도권 공고가 비어 버릴 수 있다."""
+    spy = BusanHeavyVectors(deps.vectors)
+    deps.vectors = spy
+    items = feed(deps, as_of, region="CAPITAL").items
+    capital = set(deps.config.data.capital_area_sido)
+    assert items and all(c.work_region.sido in capital for c in items)
+    assert any(set((f.get("sido") or {}).get("$in", [])) == capital for f in spy.filters)
+
+
+def test_all_region_feed_adds_no_region_query(deps, as_of):
+    spy = BusanHeavyVectors(deps.vectors)
+    deps.vectors = spy
+    feed(deps, as_of, region="ALL")
+    assert len(spy.filters) == 2 and not any("sido" in f for f in spy.filters)
+
+
+def test_sido_feed_queries_that_sido(deps, as_of):
+    spy = BusanHeavyVectors(deps.vectors)
+    deps.vectors = spy
+    items = feed(deps, as_of, region="11").items
+    assert items and all(c.work_region.sido == "11" for c in items)
+    assert {"$in": ["11"]} in [f.get("sido") for f in spy.filters]
