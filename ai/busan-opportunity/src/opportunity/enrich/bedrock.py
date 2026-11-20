@@ -6,6 +6,8 @@
 
 import json
 
+from botocore.exceptions import ClientError
+
 from ..config import OpportunityConfig, get_config, require_env
 
 INPUT_TYPES = {"document": "search_document", "query": "search_query"}
@@ -27,17 +29,33 @@ class BedrockLlm:
         self.config = config or get_config()
         self.model_id = model_id or require_env("MODEL_ID")
         self.client = _client(client, self.config)
+        self._thinking_off = True
 
-    def request(self, system: str, user: str, *, max_tokens: int) -> dict:
-        return {
+    # 생각 과정(reasoning)을 끈다. 켜 두면 생각에 maxTokens를 다 써서 답 없이 끝나는 일이 생긴다
+    # (stopReason=max_tokens, 답 글 없음. 2026-11-20 배포본에서 확인). 우리 호출은 짧은 추출·설명이라 필요 없다.
+    NO_THINKING = {"thinking": {"type": "disabled"}}
+
+    def request(self, system: str, user: str, *, max_tokens: int, thinking_off: bool = True) -> dict:
+        request = {
             "modelId": self.model_id,
             "system": [{"text": system}],
             "messages": [{"role": "user", "content": [{"text": user}]}],
             "inferenceConfig": {"maxTokens": max_tokens},
         }
+        if thinking_off:
+            request["additionalModelRequestFields"] = dict(self.NO_THINKING)
+        return request
 
     def invoke(self, system: str, user: str, *, max_tokens: int = 1024) -> str:
-        response = self.client.converse(**self.request(system, user, max_tokens=max_tokens))
+        try:
+            response = self.client.converse(**self.request(system, user, max_tokens=max_tokens,
+                                                           thinking_off=self._thinking_off))
+        except ClientError as e:
+            # 이 설정을 받지 않는 모델이면 한 번만 설정 없이 다시 부르고, 그 뒤로는 넣지 않는다
+            if not (self._thinking_off and e.response.get("Error", {}).get("Code") == "ValidationException"):
+                raise
+            self._thinking_off = False
+            response = self.client.converse(**self.request(system, user, max_tokens=max_tokens, thinking_off=False))
         content = response.get("output", {}).get("message", {}).get("content", [])
         return "".join(part.get("text", "") for part in content)
 

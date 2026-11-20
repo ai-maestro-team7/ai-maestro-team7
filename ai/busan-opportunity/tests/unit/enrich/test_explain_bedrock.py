@@ -92,6 +92,29 @@ def test_bedrock_llm_request_shape(monkeypatch, config):
     assert request["system"] == [{"text": "시스템"}]
     assert request["messages"] == [{"role": "user", "content": [{"text": "사용자"}]}]
     assert request["inferenceConfig"] == {"maxTokens": 256}  # temperature는 보내지 않는다 (모델이 거절한다)
+    assert request["additionalModelRequestFields"] == {"thinking": {"type": "disabled"}}  # 생각 과정을 끈다
+
+
+def test_bedrock_llm_retries_without_thinking_field_when_model_rejects_it(monkeypatch, config):
+    from botocore.exceptions import ClientError
+
+    monkeypatch.setenv("MODEL_ID", "test-model")
+
+    class Client:
+        def __init__(self):
+            self.requests = []
+
+        def converse(self, **kwargs):
+            self.requests.append(kwargs)
+            if "additionalModelRequestFields" in kwargs:
+                raise ClientError({"Error": {"Code": "ValidationException", "Message": "unknown field"}}, "Converse")
+            return {"output": {"message": {"content": [{"reasoningContent": {}}, {"text": "답"}]}}}
+
+    client = Client()
+    llm = BedrockLlm(client, config=config)
+    assert llm.invoke("s", "u", max_tokens=10) == "답"  # 생각 블록은 버리고 글만 모은다
+    assert llm.invoke("s", "u", max_tokens=10) == "답"
+    assert ["additionalModelRequestFields" in r for r in client.requests] == [True, False, False]  # 한 번만 다시 부른다
 
 
 def test_bedrock_embedder_request_shape(monkeypatch, config):
