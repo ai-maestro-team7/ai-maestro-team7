@@ -1,4 +1,4 @@
-import { ApiError, exchangeSocialCode, startSocialLogin } from "@/lib/api";
+import { ApiError, exchangeSocialCode, getMyProfile, startSocialLogin } from "@/lib/api";
 import { safeNextPath } from "./lib";
 import { createCodeChallenge, createCodeVerifier, createState } from "./pkce";
 
@@ -63,7 +63,15 @@ async function finishSocialLogin({ code, state, error }: SocialCallbackParams): 
   } catch (e) {
     throw new SocialCallbackError(e instanceof ApiError && e.status === 401 ? "rejected" : "failed");
   }
-  return safeNextPath(pending.next);
+  const next = safeNextPath(pending.next);
+  // 처음 들어온 사용자는 기본 프로필이 없다. 추천에 필요한 값을 먼저 받는다.
+  // 확인하지 못하면(네트워크 오류 등) 로그인은 된 것이므로 원래 가려던 화면으로 보낸다.
+  try {
+    if ((await getMyProfile()) === null) return next === "/" ? "/profile/" : `/profile/?next=${encodeURIComponent(next)}`;
+  } catch {
+    // 아래로
+  }
+  return next;
 }
 
 /** 같은 응답은 한 번만 처리한다. React 개발 모드에서 effect가 두 번 돌아도 코드를 두 번 교환하지 않는다. */

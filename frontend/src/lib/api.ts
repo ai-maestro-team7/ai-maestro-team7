@@ -1,4 +1,5 @@
 import { clearSession, readSession, saveSession, type Session } from "./session";
+import type { BasicProfile, BasicProfileInput } from "@/features/profile/types";
 
 /**
  * 팀 공통 API 호출 (docs/api.md).
@@ -170,4 +171,40 @@ export async function apiGet<T>(path: string, query?: Record<string, string | nu
     throw error;
   }
   return (await response.json()) as T;
+}
+
+/** `GET /api/v1/me/profile`. 아직 프로필이 없으면(404) null. */
+export async function getMyProfile(): Promise<BasicProfile | null> {
+  try {
+    return await apiGet<BasicProfile>("/api/v1/me/profile");
+  } catch (e) {
+    if (e instanceof ApiError && e.status === 404) return null;
+    throw e;
+  }
+}
+
+/** `PUT /api/v1/me/profile`. 보낸 항목만 바뀌고 null을 보내면 그 항목이 지워진다. 401이면 한 번 갱신하고 다시 보낸다. */
+export async function saveMyProfile(profile: BasicProfileInput): Promise<BasicProfile> {
+  let session = readSession();
+  if (!session) throw new ApiError(401, AUTH_REQUIRED, "로그인이 필요해요.");
+  if (session.expiresAt - Date.now() < REFRESH_MARGIN_MS) session = (await refresh(session)) ?? session;
+
+  const call = (token: string) =>
+    fetch(`${API_BASE}/api/v1/me/profile`, {
+      method: "PUT",
+      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+      body: JSON.stringify(profile),
+    });
+
+  let response = await call(session.accessToken);
+  if (response.status === 401) {
+    const renewed = await refresh(session);
+    if (!renewed) {
+      clearSession();
+      throw new ApiError(401, AUTH_REQUIRED, "다시 로그인해 주세요.");
+    }
+    response = await call(renewed.accessToken);
+  }
+  if (!response.ok) throw await toApiError(response);
+  return (await response.json()) as BasicProfile;
 }

@@ -54,6 +54,11 @@ export function ApiErrorNotice({
         </Button>
       ) : (
         <>
+          {error.code === "PROFILE_INCOMPLETE" && (
+            <Button href={`/profile/?next=${encodeURIComponent(current)}`} size="M">
+              기본 정보 입력하기
+            </Button>
+          )}
           {error.requestId && <p className="text-small text-grey-500">요청 번호 {error.requestId}</p>}
           {error.retryable && onRetry && (
             <Button variant="line" size="M" onClick={onRetry}>
