@@ -3,7 +3,7 @@
 #  - 토큰 없이 부르는 경로: GET /api/v1/auth/social/providers, POST /api/v1/auth/social/start, POST /api/v1/auth/social/token
 #  - 제공자에게는 openid만 요청한다 (이름·이메일·전화번호를 받지 않는다)
 # 순서: setup-api.sh → setup-auth.sh → setup-web.sh → 이 스크립트
-#  - setup-api.sh는 Lambda 환경 변수를 통째로 다시 쓴다. 그 뒤에는 이 스크립트를 다시 돌려 COGNITO_DOMAIN·SOCIAL_PROVIDERS를 되살린다
+#  - setup-api.sh는 자기 값만 덮어쓰고 이 스크립트가 넣은 COGNITO_DOMAIN·SOCIAL_PROVIDERS는 그대로 둔다
 #
 # 처음 한 번:
 #  1) 비밀값 없이 실행 → 사용자 풀 도메인을 만들고 리디렉트 주소(https://{도메인}/oauth2/idpresponse)를 출력한다
