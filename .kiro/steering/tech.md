@@ -5,7 +5,7 @@ inclusion: always
 # Tech
 
 기준: 개발계획서1(A)·2(B)·3(C), 제안서 7~8장, 이전 뼈대 커밋 `4aa11cc`의 `README.md`·`team-guide.md`·`api.md`·`db-schema.md`·`backend/`·`infra/`.
-이전 뼈대는 2026-11-20 11:05 저장소 초기화로 `main`에서 빠졌다. "이전 뼈대"로 표시한 내용은 팀이 유지하는지 확인한 뒤 쓴다. "미확정" 항목은 임의로 정하지 말고 사용자에게 확인한다.
+이전 뼈대는 정리해 PR #9~#14로 다시 들어왔다. 2026-11-20 결정 기록으로 대부분 확정됐고, 확정 내용은 `docs/api.md`, `docs/db-schema.md`, 아래 "기술 결정 상태"가 기준이다. 남은 미확정 항목만 임의로 정하지 말고 사용자에게 확인한다.
 
 ## 이전 뼈대에서 정한 환경 (유지 여부 확인 필요)
 - 리전 `ap-northeast-2`는 B·C 명세에도 팀 규칙으로 적혀 있다.
@@ -42,7 +42,7 @@ inclusion: always
 | DynamoDB Streams | 새 부산 공고 매칭 (P1) | B | 없음 |
 | Textract | 스캔 PDF OCR (텍스트 레이어 우선) | A, B(P2) | 권한 있음 |
 | Transcribe, Polly, Rekognition | 답변 음성 변환, 질문 음성, 얼굴 각도 | C | 권한 있음 |
-| Cognito | 사용자 인증 | 공통 | 없음 (인증 방식 미확정) |
+| Cognito | 사용자 인증 | 공통 | 사용자 풀 `team07-users`, API JWT 검사 (D-07) |
 | Secrets Manager | 외부 API 인증키 | A·B | 권한 없음 |
 | CloudWatch, SNS, SES | 로그·지표·알람, 운영 알림, 사용자 메일(샌드박스) | 전체 | 로그 권한만 |
 | X-Ray(P1), Data Firehose + Athena(P2) | 요청 추적, 유도 지표 집계 | B | 없음 |
@@ -84,7 +84,7 @@ inclusion: always
 
 - 점수는 코드로만 계산하고 같은 입력이면 같은 값이 나와야 한다. 측정하지 못한 항목은 빼고 남은 가중치로 다시 나눈다. 합격 확률로 표현하지 않는다. 수식과 값은 각 명세와 설정 파일이 기준이다.
 
-## API (규약 미확정, 두 안이 공존)
+## API (D-01~D-05 확정: `docs/api.md`. 아래 표는 확정 전 비교 기록)
 | 항목 | 이전 뼈대 `api.md` v0.2 · `app.py` | 개발계획서 1~3 |
 |---|---|---|
 | 경로 | `/chat`, `/upload-url`, `/profile/{user_id}`, `/resume/analyze`, `/interviews`, `/jobs/{job_id}` | `/api/v1/mentoring/*`, `/api/v1/opportunities/*`, `/api/v1/interview/*` |
@@ -100,7 +100,7 @@ inclusion: always
 
 ## 저장 자원
 - DynamoDB (이전 스크립트가 생성): `team07-users`·`team07-chat`·`team07-jobs`(TTL)·`team07-interviews`·`team07-cache`(TTL), `team07-career-mentor`(PK/SK + GSI1, TTL `expiresAt`). 이전 `app.py`는 앞의 5개 이름만 참조했다.
-- 테이블 구성안 (미확정): 이전 `db-schema.md`는 `career-mentor`(사용자 데이터 전부, PK `USER#{userId}`)·`catalog`(공고 스냅샷·정책·기업)·`reference`(NCS·자격)·`cache` 4개로 통합하자고 제안한다. B 명세는 `Postings`·`Policies`·`OppUserState`·`OppIdempotency`, C 명세는 `InterviewSessions`(PK sessionId)를 따로 둔다. 합의 전에 테이블을 만들거나 키 구조를 바꾸지 않는다.
+- 테이블 구성안 (미확정): 이전 `db-schema.md`는 `career-mentor`(사용자 데이터 전부, PK `USER#{userId}`)·`catalog`(공고 스냅샷·정책·기업)·`reference`(NCS·자격)·`cache` 4개로 통합하자고 제안한다. B 명세는 `Postings`·`Policies`·`OppUserState`·`OppIdempotency`, C 명세는 `InterviewSessions`(PK sessionId)를 따로 둔다. → D-13 확정: 4개 통합 구성 (`docs/db-schema.md` v1.3, B·C 동의). 키 구조를 바꿀 때는 db-schema를 먼저 고친다.
 - 원칙 (A §7, db-schema): 사용자 데이터는 사용자 키 아래에 두고 Scan 없이 GetItem·Query로 조회한다. 400KB를 넘을 수 있는 원문은 S3에 두고 키만 저장한다. 분석 결과는 덮어쓰지 않고 버전으로 쌓는다. 사용자 문서·분석 결과에는 TTL 자동 삭제를 쓰지 않는다.
 - S3 (이전 `infra/config.sh`): `team07-uploads-<계정ID>`(업로드, `uploads/` 7일 뒤 삭제), `team07-career-docs-<계정ID>`(개인 문서, `users/{hashedUserId}/`), `team07-kb-source-<계정ID>`(KB 원천 `docs/`), `team07-web-<계정ID>`(화면, 생성 스크립트 없음). 앞의 세 버킷은 퍼블릭 액세스 차단.
 
@@ -119,8 +119,25 @@ inclusion: always
 - 외부 API: 승인 상태, 일일 한도, 응답 필드 (첫 응답을 S3에 저장한 뒤 매핑 확정). 잡알리오·국가자격 시험일정은 승인 확인 필요, 부산 청년지원프로그램·국토부 전월세는 신청 필요 (B §3.1)
 - SES 샌드박스 수신 주소 검증, AWS Budgets 알림
 
-## 기술 미확정 (합의 전 임의 결정 금지)
-아래의 api.md, db-schema, 코드, 백엔드 뼈대는 모두 이전 뼈대(`4aa11cc`) 기준이다.
+## 기술 결정 상태 (2026-11-20, 결정 기록 기준)
+| 번호 | 결정 | 결정 기록 |
+|---|---|---|
+| 1 | Cognito JWT `sub`, 아이디·비밀번호 로그인, 데모 계정 `demo1`~`demo3` | D-07 CONFIRMED |
+| 2 | 미정 (A 소유) | D-23 OPEN |
+| 3 | `docs/api.md` | D-01~D-05 CONFIRMED |
+| 4 | `career-mentor`·`catalog`·`reference`·`cache` | D-13 CONFIRMED |
+| 5 | catalog `SNAP#`·`LATEST` 스냅샷, 요건 `requirements[]{kind REQUIRED_SKILL/PREFERRED_SKILL, sourceQuote}` | D-09·D-10 CONFIRMED |
+| 6 | Part별 값 유지, 공고 자격 판정은 `backend/eligibility.py` 하나 | D-11 CONFIRMED |
+| 7 | `PROFILE#BASIC` (db-schema §2.1) | D-08 CONFIRMED |
+| 8 | C 명세 + 면접 담당 요청으로 구현·배포 | D-20 CONFIRMED |
+| 9 | 이력서 `career-docs`, 면접 녹음 `uploads` | D-14 CONFIRMED |
+| 10 | Lambda 비동기 자기 호출 | D-19 CONFIRMED |
+| 11 | S3 Vectors 1024차원 코사인, `cohere.embed-v4:0` | D-22 CONFIRMED |
+| 12 | 미정 (FRONTEND) | D-24 OPEN |
+| 13 | Python 3.13, AWS CLI 스크립트 | D-15·D-16 CONFIRMED |
+| 14 | 정리해 재사용 (PR #9~#14) | D-25 CONFIRMED |
+
+확정 전 비교 기록 (참고):
 1. 사용자 식별·인증: 로그인 없는 UUID(api.md) / Cognito JWT(A·B·제안서) / MVP 무인증(C)
 2. 통합 Agent 프레임워크: Bedrock Agents + Action Group(A·B) / Strands(백엔드 뼈대)
 3. API 규약: 위 API 표

@@ -88,11 +88,10 @@ frontend/               프론트엔드 화면
 - `tech.md`·`product.md`의 미확정 항목에 걸리는 부분은 결정 전까지 인터페이스로 분리하거나 사용자에게 확인한다.
 - 파트 경계를 넘는 변경은 계약 문서를 먼저 고치고 리뷰를 요청한다.
 
-## 구조 미확정
-- `backend/` Lambda가 `ai/` 아래 파트 코드를 import·패키징하는 방식 (경로 설정, 파트별 의존성 파일)
-- B 명세의 `infra/`(CDK)를 `ai/busan-opportunity/` 안에 둘지, 인프라를 `backend/`로 모을지
-- Lambda 분리와 패키징 방식 (이전 뼈대는 `team07-api` 하나)
-- 이전 뼈대(`4aa11cc`)의 코드·문서를 다시 가져올지
-- B가 계획한 `AGENTS.md`를 둘지, Kiro steering으로 대신할지
-- AI·데이터·인프라 작업의 영역 라벨 (CONTRIBUTING에는 `fe`·`be`·`common`만 있다)
-- `CONTRIBUTING.md` 위치 (지금은 `docs/` 아래이고 루트에는 없다)
+## 구조 결정 (2026-11-20, 결정 기록 기준)
+- `backend/` 단일 Lambda `team07-api`가 `ai/interview/`를 `interview` 패키지로 묶어 import한다 (`infra/package.sh`). A·B 코드도 같은 방식: 하이픈 없는 패키지 이름, 파트별 `requirements.txt` (D-17)
+- 인프라는 루트 `infra/`(AWS CLI 스크립트). B의 CDK는 CloudFormation 권한이 없어 쓰지 않는다 (D-16, D-28)
+- 이전 뼈대는 PR #9~#14로 정리해 다시 들어왔다 (D-25)
+- B `AGENTS.md`는 두지 않고 루트 `AGENTS.md`·steering으로 대신한다 (D-28)
+- AI·데이터·인프라 작업의 영역 라벨은 `be` (D-26)
+- `CONTRIBUTING.md`는 `docs/`에 둔다 (D-28)
