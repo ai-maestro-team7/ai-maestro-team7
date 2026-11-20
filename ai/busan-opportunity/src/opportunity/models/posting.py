@@ -21,6 +21,7 @@ from .enums import (
     MoneyUnit,
     OrgType,
     PostingSource,
+    RegionalBenefitKind,
     RegionalTalentStatus,
     RemoteWork,
     RequirementKind,
@@ -94,9 +95,25 @@ class EligibilityRule(OppModel):
     source_quote: str | None = None
 
 
+class RegionalCondition(OppModel):
+    """공고문에서 읽은 지역 조건 하나. 지역이 여럿이면 지역마다 하나씩 둔다.
+
+    sido는 시·도 코드, sigungu는 시·군·구 이름("김해시", "기장군")이다. NON_CAPITAL과 UNKNOWN은 지역이 없다.
+    """
+
+    kind: RegionalBenefitKind
+    sido: str | None = None
+    sigungu: str | None = None
+    label: str | None = None  # 원문 표기 ("비수도권 지역인재", "경상남도 김해시")
+
+
 class RegionalTalent(OppModel):
+    """공고 쪽 지역 조건. status는 공고에 지역 조건이 있는지(LIKELY), 부산 이전기관인데 공고문에서 못 찾았는지
+    (CHECK_NEEDED), 없는지(NOT_APPLICABLE)다. 사용자에게 맞는지는 `core.facts.regional_talent_view`가 본다."""
+
     status: RegionalTalentStatus
     basis: str | None = None
+    conditions: list[RegionalCondition] = Field(default_factory=list)
 
 
 class PostingSnapshot(OppModel):
@@ -196,6 +213,14 @@ class CompanyRecord(OppModel):
     as_of: str
 
 
+class RegionalIndexEntry(OppModel):
+    """지역 조건이 있는 공고 색인 한 줄 (`INDEX#REGIONAL` / `POSTING#{id}`). 피드의 지역 혜택 거르기가 벡터 상위 후보
+    밖의 공고까지 찾으려고 읽는다. 수집·보강이 LATEST를 쓸 때 함께 쓰고 지운다."""
+
+    job_posting_id: str
+    closes_at: str
+
+
 class VectorMeta(OppModel):
     """S3 Vectors 메타데이터. title만 필터 불가 값이다."""
 
@@ -208,9 +233,10 @@ class VectorMeta(OppModel):
 
 
 class PostingName(OppModel):
-    """검색어·회사 이름 검색용 이름 색인 한 줄 (B-D08). 진행 중 공고만 둔다.
+    """공고 이름 색인 한 줄 (B-D08). 진행 중 공고만 둔다. 만드는 곳은 `core/name_index.name_row` 하나다.
 
     `team07-catalog`의 `POSTNAMES` / `POSTING#{jobPostingId}`. LATEST를 쓸 때 같이 쓰고, 마감 처리하면 지운다.
+    검색어·회사 이름 검색과, 로그인 없이 보는 공고 목록의 분류(B-D10)에 쓴다.
     """
 
     job_posting_id: str
@@ -218,6 +244,12 @@ class PostingName(OppModel):
     title: str
     job_name: str | None = None
     closes_at: str
+    # 분류 (B-D10). 이 칸이 생기기 전에 쓴 줄은 기본값이라 다시 채워야 한다
+    org_type: OrgType = OrgType.PRIVATE
+    sido: str | None = None  # 해외·근무지 미상이면 없음
+    is_overseas: bool = False
+    career_type: CareerType = CareerType.UNKNOWN
+    employment_type: EmploymentType = EmploymentType.UNKNOWN
 
 
 def latest_from_snapshot(snap: PostingSnapshot, *, busan_sido: str, capital_sido: list[str],

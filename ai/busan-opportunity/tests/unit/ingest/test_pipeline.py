@@ -3,7 +3,13 @@
 from pathlib import Path
 
 from opportunity.ingest.http import as_list, parse_body, walk
-from opportunity.ingest.normalize import normalize_gangso, normalize_work24, normalize_youthcenter
+from opportunity.ingest.normalize import (
+    compute_content_hash,
+    normalize_gangso,
+    normalize_work24,
+    normalize_youthcenter,
+    snapshot_id_for,
+)
 from opportunity.ingest.pipeline import expire_postings, upsert_companies, upsert_policies, upsert_postings
 from opportunity.models import (
     Badge,
@@ -85,7 +91,9 @@ def test_unchanged_posting_keeps_enriched_values(config, catalog):
     result = upsert_postings(config, catalog, snapshots(DAY2), as_of=DAY2)
     assert result["needsEnrich"] == []
     kept = catalog.get_snapshot("wk24-K000000001", enriched.snapshot_id)
-    assert kept == enriched  # 지우거나 다시 쓰지 않았다
+    # 요건·배지·추출 상태는 그대로다. 지역 조건만 지금 규칙으로 공고문을 다시 읽는다 (이 공고문에는 지역 조건이 없다)
+    assert kept.model_copy(update={"regional_talent": enriched.regional_talent}) == enriched
+    assert kept.regional_talent.status == RegionalTalentStatus.NOT_APPLICABLE
 
 
 def test_changed_posting_inherits_company_badges_but_not_requirements(config, catalog):
@@ -222,3 +230,56 @@ def test_company_badges_from_other_sources_are_kept(catalog):
     assert [b.type for b in merged.highlights] == [BadgeType.CHEONGKKEUL, BadgeType.GANGSO]
     assert merged.source == "청끌기업 시드" and merged.as_of == "2026-06-30"  # 먼저 넣은 출처를 따른다
     assert upsert_companies(catalog, gangso())["unchanged"] == 3
+
+
+# ---------------------------------------------------------------- 지역 조건 다시 읽기·색인 (2026-11-21)
+def _with_mention(as_of, text="우대 대상: 장애인, 비수도권 지역인재"):
+    snaps = snapshots(as_of)
+    changed = snaps[0].model_copy(update={"job_description": text})
+    digest = compute_content_hash(changed)
+    snaps[0] = changed.model_copy(update={"content_hash": digest, "snapshot_id": snapshot_id_for(as_of, digest)})
+    return snaps
+
+
+def test_unchanged_posting_is_rejudged_and_indexed(config, catalog):
+    """규칙이 바뀌기 전에 넣은 공고도 다음 수집에서 지역 조건을 다시 읽고 색인에 들어간다."""
+    upsert_postings(config, catalog, _with_mention(DAY1), as_of=DAY1)
+    pid = "wk24-K000000001"
+    latest = catalog.get_latest(pid)
+    assert latest.regional_talent.status == RegionalTalentStatus.LIKELY and pid in catalog.regional_index
+    # 예전 규칙으로 넣어 둔 상태로 되돌린다
+    snap = catalog.get_snapshot(pid, latest.snapshot_id)
+    catalog.put_snapshot(snap.model_copy(update={"regional_talent": None}))
+    catalog.put_latest(latest.model_copy(update={"regional_talent": None}))
+    catalog.delete_regional_index(pid)
+
+    result = upsert_postings(config, catalog, _with_mention(DAY2), as_of=DAY2)
+    assert result["unchanged"] == len(records()) and result["needsEnrich"] == []
+    again = catalog.get_latest(pid)
+    assert [c.kind.value for c in again.regional_talent.conditions] == ["NON_CAPITAL"]
+    assert catalog.get_snapshot(pid, again.snapshot_id).regional_talent == again.regional_talent
+    assert catalog.list_regional_index(closes_from="2026-11-22") == [pid]
+
+
+def test_regional_index_drops_removed_and_expired(config, catalog):
+    upsert_postings(config, catalog, _with_mention(DAY1), as_of=DAY1)
+    pid = "wk24-K000000001"
+    upsert_postings(config, catalog, snapshots(DAY2), as_of=DAY2)  # 공고문이 바뀌어 지역 조건이 없어졌다
+    assert pid not in catalog.regional_index
+    upsert_postings(config, catalog, _with_mention(DAY2), as_of=DAY2)
+    assert pid in catalog.regional_index
+    closes = catalog.get_latest(pid).closes_at
+    expire_postings(config, catalog, as_of=f"{closes}T23:59:59+09:00", job_posting_ids=[pid])
+    expire_postings(config, catalog, as_of="2099-01-01T00:00:00+09:00", job_posting_ids=[pid])
+    assert pid not in catalog.regional_index
+
+
+def test_manual_regional_talent_is_not_rejudged(config, catalog):
+    upsert_postings(config, catalog, snapshots(DAY1), as_of=DAY1)
+    pid = "wk24-K000000001"
+    snap = catalog.get_snapshot(pid, catalog.get_latest(pid).snapshot_id)
+    manual = RegionalTalent(status=RegionalTalentStatus.LIKELY, basis="사람이 확인")
+    catalog.put_snapshot(snap.model_copy(update={"regional_talent": manual,
+                                                 "extracted_by": {**snap.extracted_by, "regionalTalent": "MANUAL"}}))
+    upsert_postings(config, catalog, snapshots(DAY2), as_of=DAY2)
+    assert catalog.get_snapshot(pid, snap.snapshot_id).regional_talent == manual

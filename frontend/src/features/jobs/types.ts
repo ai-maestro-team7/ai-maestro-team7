@@ -15,6 +15,11 @@ export type MoneyUnit = "MANWON_YEAR" | "MANWON_MONTH" | "MANWON" | "WON";
 export type JobSort = "BUSAN_FIRST" | "DEADLINE";
 /** 피드 지역 필터 (B `region`) */
 export type JobRegion = "ALL" | "BUSAN" | "CAPITAL" | "OVERSEAS";
+/** 기관 구분 필터 (B `sector`): 공기업 = 공공기관·지방공공기관, 사기업 = 민간 기업 */
+export type JobSector = "ALL" | "PUBLIC" | "PRIVATE";
+/** 경력 필터. 신입·경력 무관 공고는 둘 다에 보인다 */
+export type CareerFilter = "ALL" | "NEW" | "EXPERIENCED";
+export type EmploymentFilter = "ALL" | "FULL_TIME" | "CONTRACT" | "INTERN";
 
 export type WorkRegion = {
   sido?: string;
@@ -73,7 +78,7 @@ export type PostingCard = {
   facts: string[];
   /** 수도권 공고에만 */
   busanAlternativesCount?: number;
-  /** 지역인재 전형: LIKELY(학교 소재지가 맞아 대상일 수 있음), CHECK_NEEDED(공고문 확인). 해당 없으면 없음 */
+  /** 지역 조건: LIKELY(학교 지역·사는 곳이 맞아 대상일 수 있음), CHECK_NEEDED(맞는지 공고문 확인). 해당 없으면 없음 */
   regionalTalent?: "LIKELY" | "CHECK_NEEDED";
   isSample: boolean;
 };
@@ -151,3 +156,32 @@ export type PostingDetailResponse = {
   facts: string[];
   dataAsOf?: string;
 };
+
+/** 로그인 없이 보는 공고 한 줄 (`PublicPostingCard`). 적합도·자격 판정 같은 개인 값이 없다. */
+export type PublicPostingCard = {
+  jobPostingId: string;
+  title: string;
+  organization: string;
+  orgType: OrgType;
+  workRegion: WorkRegion;
+  isBusan: boolean;
+  isOverseas: boolean;
+  job: JobInfo;
+  closesAt: string;
+  rolling: boolean;
+  salary?: Salary;
+  careerType: CareerType;
+  employmentType: EmploymentType;
+  badges: Badge[];
+  isSample: boolean;
+};
+
+/** `GET /api/v1/opportunities/public/postings`. total은 분류·검색어에 맞는 진행 중 공고 수(모든 쪽 합)다. */
+export type PublicPostingList = {
+  items: PublicPostingCard[];
+  total: number;
+  nextCursor?: string;
+  dataAsOf?: string;
+  stale: boolean;
+};
+

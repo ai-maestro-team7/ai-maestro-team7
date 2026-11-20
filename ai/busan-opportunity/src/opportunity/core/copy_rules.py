@@ -32,6 +32,13 @@ WHY_SHOWN_BY_REASON = {
 REGIONAL_TALENT_LIKELY = "{school} 소재 학교 {status}이라 지역인재 전형 대상일 수 있어요 · 공고문 확인"
 REGIONAL_TALENT_LIKELY_NAMED = "{name}({school}) {status}이라 지역인재 전형 대상일 수 있어요 · 공고문 확인"
 REGIONAL_TALENT_CHECK = "이전 공공기관 공고예요. 지역인재 전형이 있는지 공고문에서 확인해 주세요"
+# 공고문에 지역 조건이 있는데 사용자에게 맞는지 정하지 못할 때 (지역을 적지 않았거나, 학교·거주 지역을 모름)
+REGIONAL_TALENT_CHECK_NOTICE = "지역 조건이 있는 공고예요. 대상인지 공고문에서 확인해 주세요"
+REGIONAL_NON_CAPITAL = "{school} 소재 학교 {status}이라 비수도권 지역인재 우대 대상일 수 있어요 · 공고문 확인"
+REGIONAL_NON_CAPITAL_NAMED = "{name}({school}) {status}이라 비수도권 지역인재 우대 대상일 수 있어요 · 공고문 확인"
+REGIONAL_LIMIT_SCHOOL = "{school} 소재 학교 {status}이라 이 공고의 지역 조건에 맞을 수 있어요 · 공고문 확인"
+REGIONAL_LIMIT_SCHOOL_NAMED = "{name}({school}) {status}이라 이 공고의 지역 조건에 맞을 수 있어요 · 공고문 확인"
+REGIONAL_RESIDENCE = "{home}에 살고 있어 이 공고의 지역 조건에 맞을 수 있어요 · 공고문 확인"
 
 EMPTY_BUSAN = "부산에는 아직 이 직무 공고가 적어요. 비슷한 직무를 함께 보여드려요 · 새 공고 알림 받기"
 NOT_IN_POSTING = "공고에 없음"

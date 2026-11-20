@@ -1,6 +1,7 @@
 /** 채팅 Agent 응답 (`/api/v1/agent/chat`, docs/개발계획서4.md §7). */
 
-export type MessageStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+/** CANCELLED: 사용자가 답을 만드는 중에 멈췄다 */
+export type MessageStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED" | "CANCELLED";
 
 /** B Agent 공고 (숫자 점수 없이 3단계 말로만) */
 export type ChatPosting = {
@@ -77,7 +78,19 @@ export type ChatMessage = {
 
 export type StartResponse = { sessionId: string; messageId: string; userMessageId: string; status: MessageStatus };
 
-export type ChatSessionView = { sessionId: string; title: string; messages: ChatMessage[] };
+/** 대화 목록 한 줄 (`GET /api/v1/agent/chat`). 고정한 대화가 먼저, 그 안과 밖은 최근에 말한 순서로 온다 */
+export type ChatSessionSummary = {
+  sessionId: string;
+  title: string;
+  pinned: boolean;
+  messageCount: number;
+  createdAt: string;
+  lastMessageAt: string;
+  /** 답을 만드는 중이면 그 답의 ID */
+  pendingMessageId?: string;
+};
+
+export type ChatSessionView = ChatSessionSummary & { messages: ChatMessage[] };
 
 /** 채팅 → 면접 화면 인계 (sessionStorage, 개발계획서4 §10). 자소서 원문은 주소에 넣지 않는다. */
 export type InterviewHandoff = {

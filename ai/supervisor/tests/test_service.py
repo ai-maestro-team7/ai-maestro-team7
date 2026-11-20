@@ -390,3 +390,141 @@ def test_missing_claimed_message_releases_session_lock(monkeypatch):
     out = service.run_turn(deps, deps.dispatcher.events[-1]["agentTask"])
     assert out["status"] == "SKIPPED" and deps.runner.runs == []
     assert deps.store.get_session("demo1", started["sessionId"]).pending_message_id is None
+
+
+# ---------------------------------------------------------------- 채팅 화면: 멈추기, 대화 목록·고정·삭제
+def start_only(deps, message="부산 데이터 분석 신입 공고 찾아줘", user="demo1"):
+    """턴을 시작만 하고 실행 이벤트는 돌리지 않는다 (답을 만드는 중인 상태)."""
+    started = service.start_turn(deps, user, {"message": message})
+    return started, deps.dispatcher.events[-1]["agentTask"]
+
+
+def test_cancel_pending_answer_releases_lock_and_task_skips():
+    deps = build_deps(ScriptedRunner(lambda tools: reply()))
+    started, task = start_only(deps)
+    sid, mid = started["sessionId"], started["messageId"]
+    assert service.cancel_message(deps, "demo1", sid, mid)["status"] == "CANCELLED"
+    deps.clock["now"] += timedelta(seconds=1)  # stale(180초)보다 훨씬 짧다
+    # 잠금이 풀려 기다리지 않고 바로 다음 말을 보낼 수 있다
+    assert service.start_turn(deps, "demo1", {"sessionId": sid, "message": "다시 찾아줘"})["status"] == "PENDING"
+    assert service.run_turn(deps, task)["status"] == "SKIPPED"  # 멈춘 답은 실행하지 않는다
+    assert service.get_message(deps, "demo1", sid, mid)["status"] == "CANCELLED"
+
+
+def test_cancel_while_model_runs_drops_late_result():
+    ids = {}
+
+    def script(tools):
+        ids["view"] = service.cancel_message(deps, "demo1", ids["sid"], ids["mid"])  # 모델이 도는 중에 멈춘다
+        return reply()
+
+    deps = build_deps(ScriptedRunner(script))
+    started, task = start_only(deps)
+    ids.update(sid=started["sessionId"], mid=started["messageId"])
+    assert ids.get("view") is None
+    result = service.run_turn(deps, task)
+    assert ids["view"]["status"] == "CANCELLED"
+    assert result == {"messageId": ids["mid"], "status": "SKIPPED", "reason": "CANCELLED"}
+    message = service.get_message(deps, "demo1", ids["sid"], ids["mid"])
+    assert message["status"] == "CANCELLED" and message["reply"] == "" and message["cards"] == []
+    assert deps.store.get_session("demo1", ids["sid"]).pending_message_id is None
+
+
+def test_cancel_finished_answer_returns_it_unchanged():
+    deps = build_deps(ScriptedRunner(search_and_policies(job_name="데이터 분석", region="부산")))
+    started, _, message = ask(deps)
+    assert service.cancel_message(deps, "demo1", started["sessionId"], started["messageId"]) == message
+
+
+def test_cancel_checks_owner_and_role():
+    deps = build_deps(ScriptedRunner(lambda tools: reply()))
+    started, _ = start_only(deps)
+    for user, mid in (("demo2", started["messageId"]), ("demo1", started["userMessageId"]), ("demo1", "nope")):
+        with pytest.raises(SupervisorError) as error:
+            service.cancel_message(deps, user, started["sessionId"], mid)
+        assert error.value.status == 404
+
+
+def test_cancelled_answer_is_not_history_and_previous_cards_stay_recent():
+    def script(tools):
+        tools["search_job_postings"](job_name="데이터 분석", region="부산")
+        return reply("부산 데이터 분석 공고 1개를 찾았어요.")
+
+    runner = ScriptedRunner(script)
+    deps = build_deps(runner)
+    first, _, _ = ask(deps)
+    sid = first["sessionId"]
+    deps.clock["now"] += timedelta(seconds=10)  # 메시지 ID가 시각순이라 턴마다 시간을 옮긴다
+    second = service.start_turn(deps, "demo1", {"sessionId": sid, "message": "서울도 찾아줘"})
+    service.cancel_message(deps, "demo1", sid, second["messageId"])
+    deps.clock["now"] += timedelta(seconds=10)
+    third = service.start_turn(deps, "demo1", {"sessionId": sid, "message": "이 공고 더 알려줘"})
+    service.run_turn(deps, deps.dispatcher.events[-1]["agentTask"])
+    assert service.get_message(deps, "demo1", sid, third["messageId"])["status"] == "COMPLETED"
+    history = [h["text"] for h in runner.runs[-1]["history"]]
+    assert "서울도 찾아줘" not in history and history[0] == "부산 데이터 분석 신입 공고 찾아줘"
+    assert "demo-busan-data" in runner.runs[-1]["message"]  # 멈춘 답을 건너뛰고 그 앞 답의 공고를 가리킨다
+
+
+def test_sessions_list_pinned_first_then_recent():
+    deps = build_deps(ScriptedRunner(lambda tools: reply()))
+    first, _, _ = ask(deps, "첫 대화")
+    deps.clock["now"] += timedelta(minutes=5)
+    second, _, _ = ask(deps, "둘째 대화")
+    ask(deps, "남의 대화", user="demo2")
+    titles = [s["title"] for s in service.list_sessions(deps, "demo1")["sessions"]]
+    assert titles == ["둘째 대화", "첫 대화"]
+
+    assert service.update_session(deps, "demo1", first["sessionId"], {"pinned": True})["pinned"] is True
+    listed = service.list_sessions(deps, "demo1")["sessions"]
+    assert [s["sessionId"] for s in listed] == [first["sessionId"], second["sessionId"]]
+    assert all("messages" not in s and "ownerUserId" not in s for s in listed)
+    service.update_session(deps, "demo1", first["sessionId"], {"pinned": False})
+    assert [s["title"] for s in service.list_sessions(deps, "demo1")["sessions"]] == ["둘째 대화", "첫 대화"]
+
+
+@pytest.mark.parametrize("body", [{}, {"pinned": "true"}, {"pinned": 1}, {"pinned": True, "title": "x"}, []])
+def test_update_session_accepts_only_pinned_bool(body):
+    deps = build_deps(ScriptedRunner(lambda tools: reply()))
+    started, _, _ = ask(deps)
+    with pytest.raises(SupervisorError) as error:
+        service.update_session(deps, "demo1", started["sessionId"], body)
+    assert error.value.status == 400
+
+
+def test_pin_and_delete_check_owner():
+    deps = build_deps(ScriptedRunner(lambda tools: reply()))
+    started, _, _ = ask(deps)
+    for call in (lambda: service.update_session(deps, "demo2", started["sessionId"], {"pinned": True}),
+                 lambda: service.delete_session(deps, "demo2", started["sessionId"]),
+                 lambda: service.delete_session(deps, "demo1", "chat-none")):
+        with pytest.raises(SupervisorError) as error:
+            call()
+        assert error.value.status == 404
+    assert service.get_session(deps, "demo1", started["sessionId"])["pinned"] is False
+
+
+def test_delete_session_removes_messages():
+    deps = build_deps(ScriptedRunner(lambda tools: reply()))
+    started, _, _ = ask(deps)
+    keep, _, _ = ask(deps, "다른 대화")
+    sid = started["sessionId"]
+    assert service.delete_session(deps, "demo1", sid) == {"sessionId": sid, "deleted": True}
+    assert deps.store.list_messages("demo1", sid, 100) == []
+    with pytest.raises(SupervisorError):
+        service.get_session(deps, "demo1", sid)
+    assert [s["sessionId"] for s in service.list_sessions(deps, "demo1")["sessions"]] == [keep["sessionId"]]
+
+
+def test_delete_while_answer_runs_drops_late_result():
+    ids = {}
+
+    def script(tools):
+        service.delete_session(deps, "demo1", ids["sid"])  # 답을 만드는 중에 대화를 지운다
+        return reply()
+
+    deps = build_deps(ScriptedRunner(script))
+    started, task = start_only(deps)
+    ids["sid"] = started["sessionId"]
+    assert service.run_turn(deps, task)["reason"] == "CANCELLED"
+    assert deps.store.list_messages("demo1", ids["sid"], 100) == []  # 지운 대화에 답이 다시 생기지 않는다

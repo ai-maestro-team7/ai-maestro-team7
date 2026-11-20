@@ -6,14 +6,16 @@
 from datetime import date, datetime
 
 from ..core import clock
+from ..core.facts import is_relocated
 from ..deps import Deps
+from ..ingest.pipeline import sync_regional_index
 from ..models.enums import ExtractStatus
 from ..models.posting import PostingLatest, PostingSnapshot, latest_from_snapshot
 from .badges import build_badges, find_company
 from .embed import embed_posting
 from .extract import KEEP_OWNERS, extract_requirements, source_text
 from .precompute_alternatives import precompute_alternatives
-from .regional_talent import judge_regional_talent
+from .regional_talent import judge_posting_regional_talent
 
 
 def _is_expired(existing: PostingLatest | None, snapshot: PostingSnapshot, as_of: datetime) -> bool:
@@ -40,7 +42,10 @@ def enrich_one(deps: Deps, snapshot: PostingSnapshot, as_of: datetime, *,
     company = find_company(deps, snapshot)
     update: dict = {"badges": build_badges(deps, snapshot, company)}
     if snapshot.extracted_by.get("regionalTalent") not in KEEP_OWNERS:
-        update["regional_talent"] = judge_regional_talent(company, source_text(snapshot, raw_text))
+        relocated = bool(company and company.regional_talent) or is_relocated(update["badges"])
+        update["regional_talent"] = judge_posting_regional_talent(
+            deps.config, snapshot, source_text(snapshot, raw_text), relocated=relocated,
+            relocated_sido=company.sido if company and company.regional_talent else None)
     if company is not None and not snapshot.company_id:
         update["company_id"] = company.company_id
     return snapshot.model_copy(update=update)
@@ -74,6 +79,7 @@ def enrich_postings(deps: Deps, job_posting_ids: list[str], *,
         latest = latest.model_copy(update={"is_sample": latest.is_sample or existing.is_sample})
         deps.catalog.put_snapshot(snapshot)
         deps.catalog.put_latest(latest)
+        sync_regional_index(deps.catalog, existing, latest)
         embed_posting(deps, snapshot, latest)
         enriched += 1
         failed += snapshot.extract_status == ExtractStatus.FAILED

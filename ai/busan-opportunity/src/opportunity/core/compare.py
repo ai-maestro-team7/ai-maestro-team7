@@ -7,12 +7,12 @@ from datetime import date, datetime
 
 from ..deps import Deps
 from ..models.api import CompareResponse, CompareRow, CompareSide, CostAdjusted
-from ..models.enums import BadgeType, CompareKey, LeaveReason, MoneyUnit
+from ..models.enums import BadgeType, CompareKey, LeaveReason, MoneyUnit, RegionalTalentStatus
 from ..models.errors import posting_not_found
 from ..models.posting import PostingLatest
 from ..models.profile import BasicProfile
 from ..models.region import CommuteStat, RentStat
-from . import clock, copy_rules, policies, regions
+from . import clock, copy_rules, facts, policies, regions
 from .context import load_context
 
 MONTHS_PER_YEAR = 12
@@ -31,6 +31,7 @@ POLICY_SOURCE = "온통청년"
 TALENT_MAYBE = "대상일 수 있음"
 TALENT_CHECK = "학교 소재지 확인 필요"
 TALENT_NONE = "해당 없음"
+TALENT_NOTICE = "공고문 확인 필요"
 NO_BADGE = "-"
 FAMILY_HOUSING = "가족과 거주"
 SAMPLE_FALLBACK_NOTE = "{gu} 표본이 적어 {sido} 전체 값으로 보여드려요"
@@ -167,16 +168,15 @@ def _policy_row(deps: Deps, ctx, base_sido: str, alt_sido: str) -> CompareRow | 
 
 
 # ---------------------------------------------------------------- 지역인재·인증
-def _talent(posting: PostingLatest, profile: BasicProfile) -> str:
-    """이전기관 공고일 때만 학교 소재지로 본다. 확정하지 않고 '대상일 수 있음'까지만 쓴다."""
-    relocated = posting.regional_talent is not None or any(
-        b.type == BadgeType.RELOCATED_INSTITUTION for b in posting.badges)
-    sido = _known_sido(posting)
-    if not relocated or sido is None:
-        return TALENT_NONE
-    if profile.university_region is None:
-        return TALENT_CHECK
-    return TALENT_MAYBE if profile.university_region == sido else TALENT_NONE
+def _talent(config, posting: PostingLatest, profile: BasicProfile) -> str:
+    """공고문의 지역 조건을 학교 소재지·거주지로 본 결과. 상세 화면과 같은 규칙(`facts.regional_talent_view`)이다.
+    확정하지 않고 '대상일 수 있음'까지만 쓴다."""
+    status = facts.regional_talent_view(config, profile, posting).status
+    if status == RegionalTalentStatus.LIKELY:
+        return TALENT_MAYBE
+    if status == RegionalTalentStatus.CHECK_NEEDED:
+        return TALENT_CHECK if profile.university_region is None else TALENT_NOTICE
+    return TALENT_NONE
 
 
 def _verified(posting: PostingLatest) -> str:
@@ -211,7 +211,7 @@ def compare_postings(deps: Deps, user_id: str, base_job_posting_id: str, alt_job
         rows += [r for r in (housing, _commute_row(deps, base, alt),
                              _policy_row(deps, ctx, base_sido, alt_sido)) if r is not None]
     rows.append(CompareRow(key=CompareKey.REGIONAL_TALENT, label=LABEL[CompareKey.REGIONAL_TALENT],
-                           base=_talent(base, ctx.profile), alt=_talent(alt, ctx.profile)))
+                           base=_talent(deps.config, base, ctx.profile), alt=_talent(deps.config, alt, ctx.profile)))
     rows.append(CompareRow(key=CompareKey.VERIFIED, label=LABEL[CompareKey.VERIFIED],
                            base=_verified(base), alt=_verified(alt)))
 

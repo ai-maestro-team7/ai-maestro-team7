@@ -49,6 +49,7 @@ class SupervisorConfig(_Model):
     max_policies: int = Field(gt=0)
     stale_seconds: int = Field(gt=0)
     title_max_chars: int = Field(gt=0)
+    max_sessions_listed: int = Field(gt=0)  # 대화 목록에 보여 줄 대화 수 (고정한 대화가 먼저)
     reply: ReplyLimits
     cover_letter: CoverLetterLimits
     interview_job_max_chars: int = Field(gt=0)

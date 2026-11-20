@@ -19,7 +19,7 @@ export default function HomePage() {
 
       {/* 공고·정책은 로그인한 사용자 프로필로 B API에서 읽는다. 오류 안내가 주소(?q=)를 읽어 Suspense 안에 둔다 */}
       <section aria-labelledby="home-jobs" className="flex w-full flex-col gap-3">
-        <SectionHeader id="home-jobs" title="나와 맞는 부산 공고" href="/jobs" />
+        <SectionHeader id="home-jobs" title="나와 맞는 부산 공고" href="/jobs/recommended/" />
         {/* 대체 화면은 불러오는 중 화면과 같아 바뀔 때 밀리지 않는다 */}
         <Suspense fallback={<RecommendedJobsLoading />}>
           <RecommendedJobs />
