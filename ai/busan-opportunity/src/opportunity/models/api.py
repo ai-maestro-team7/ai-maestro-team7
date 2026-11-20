@@ -364,3 +364,56 @@ class RegionalTalentResponse(OppModel):
     job_posting_id: str
     organization: str
     regional_talent: RegionalTalentView
+
+
+# ---------------------------------------------------------------- 질문하기 (RAG)
+class AskRequest(OppModel):
+    question: str
+
+
+class AskSource(OppModel):
+    """답의 근거. quote는 원문에 실제로 있는 문장이어야 한다."""
+
+    kind: str  # POLICY, POSTING
+    id: str
+    title: str
+    quote: str | None = None
+    url: str | None = None
+    as_of: str | None = None
+
+
+class AskResponse(OppModel):
+    """정책·공고 원문을 근거로 한 답. 근거를 못 찾았거나 검증에 실패하면 answered=false이고 answer는 없다."""
+
+    question: str
+    answered: bool
+    answer: str | None = None
+    sources: list[AskSource] = Field(default_factory=list)
+    related_policies: list[PolicyBrief] = Field(default_factory=list)  # 검색된 정책과 규칙 판정 결과
+    manual_checks: list[str] = Field(default_factory=list)             # 직접 확인할 조건
+    notice: str | None = None
+    data_as_of: str | None = None
+
+
+# ---------------------------------------------------------------- 부산 기업 둘러보기 (B-D01)
+class CompanyCard(OppModel):
+    """회사 정보만 보여 준다. 채용 여부·직무·급여를 지어내지 않는다 (DECISIONS.md B-D01)."""
+
+    company_id: str
+    name: str
+    industry: str | None = None
+    size: str | None = None
+    district: str | None = None        # 소재 구·군 (원문)
+    main_product: str | None = None
+    badges: list[Badge] = Field(default_factory=list)  # 출처·기준일이 있는 것만
+    open_postings: int = 0             # 지금 우리 데이터에 있는 이 회사의 진행 중 공고 수
+    facts: list[str] = Field(default_factory=list)
+    source: str
+    as_of: str
+
+
+class CompaniesResponse(OppModel):
+    items: list[CompanyCard] = Field(default_factory=list)
+    basis: str          # 어떤 기준으로 골랐는지 (화면에 보여 준다)
+    notice: str | None = None  # "채용 여부는 회사 채용 페이지에서 확인하세요"
+    data_as_of: str | None = None

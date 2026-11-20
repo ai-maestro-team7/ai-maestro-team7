@@ -11,6 +11,8 @@ from opportunity.api import agent_handler
 from opportunity.models import (
     AlternativeItem,
     AlternativesResponse,
+    AskResponse,
+    AskSource,
     CompareResponse,
     CompareRow,
     CompareSide,
@@ -31,6 +33,7 @@ from opportunity.models import (
     posting_not_found,
 )
 from opportunity.seeds import demo_world as w
+from opportunity.store.memory import MemoryRetriever, ScriptedLlm
 
 PATHS = {
     "postings": "/agent/postings",
@@ -38,6 +41,7 @@ PATHS = {
     "compare": "/agent/compare",
     "policies": "/agent/policies",
     "talent": "/agent/postings/{jobPostingId}/regional-talent",
+    "policySearch": "/agent/policies/search",
 }
 
 
@@ -227,6 +231,43 @@ def test_not_implemented_dependency_is_501(deps, monkeypatch):
     status, body = call(deps, PATHS["postings"])
     assert status == 500 and body["error"]["code"] == "INTERNAL_ERROR" and body["error"]["retryable"] is True
     assert "secret-detail" not in json.dumps(body)
+
+
+def test_policy_search_passes_question_and_session_user(deps, monkeypatch, seen):
+    def fake(deps_, user_id, question, **kwargs):
+        seen.update(user_id=user_id, question=question)
+        return AskResponse(question=question, answered=True, answer="부산청년플랫폼에서 온라인으로 신청해요.",
+                           sources=[AskSource(kind="POLICY", id=w.P_BUSAN_RENT, title="[데모] 부산 청년 월세 지원",
+                                              quote="부산청년플랫폼에서 온라인으로 신청합니다.", as_of="2026-11-21")])
+
+    monkeypatch.setattr(agent_handler, "ask_policies", fake)
+    status, body = call(deps, PATHS["policySearch"], {"question": "월세 신청 방법", "userId": "demo3"})
+    assert status == 200 and seen == {"user_id": "demo1", "question": "월세 신청 방법"}
+    assert body["answered"] is True and body["sources"][0]["quote"] == "부산청년플랫폼에서 온라인으로 신청합니다."
+
+
+def test_policy_search_end_to_end(deps):
+    deps.retriever = MemoryRetriever({w.P_BUSAN_RENT: (
+        "# [데모] 부산 청년 월세 지원\n부산청년플랫폼에서 온라인으로 신청합니다.", {"policyId": w.P_BUSAN_RENT})})
+    deps.llm = ScriptedLlm([json.dumps({"answer": "부산청년플랫폼에서 온라인으로 신청해요.", "citations": [
+        {"policyId": w.P_BUSAN_RENT, "quote": "부산청년플랫폼에서 온라인으로 신청합니다."}], "notFound": False},
+        ensure_ascii=False)])
+    status, body = call(deps, PATHS["policySearch"], {"question": "월세 신청"})
+    assert status == 200 and body["answered"] is True and body["relatedPolicies"][0]["policyId"] == w.P_BUSAN_RENT
+    assert deps.events.events[-1] == ("ASK", {"kind": "POLICIES", "answered": True})
+
+
+def test_policy_search_needs_question(deps):
+    status, body = call(deps, PATHS["policySearch"])
+    assert status == 400 and body["error"]["code"] == "INVALID_INPUT"
+    status, body = call(deps, PATHS["policySearch"], {"question": "  "})
+    assert status == 400 and body["error"]["code"] == "INVALID_INPUT"
+
+
+def test_policy_search_description():
+    op = agent_handler.build_schema()["paths"][PATHS["policySearch"]]["get"]
+    assert "청년정책의 내용·자격·신청 방법을 묻는 질문에 쓴다. 원문 근거와 함께 답한다" in op["description"]
+    assert [p["name"] for p in op["parameters"]] == ["question"]
 
 
 # ---------------------------------------------------------------- 스키마

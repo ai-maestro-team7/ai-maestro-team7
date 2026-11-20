@@ -190,6 +190,8 @@ class CompanyRecord(OppModel):
     size: str | None = None
     highlights: list[Badge] = Field(default_factory=list)
     regional_talent: bool = False  # 이전기관이면 지역인재 채용 대상
+    district: str | None = None      # 소재 구·군 (원문)
+    main_product: str | None = None  # 주력 제품 (원문)
     source: str
     as_of: str
 

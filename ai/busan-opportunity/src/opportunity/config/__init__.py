@@ -167,6 +167,18 @@ class LocalLifeConfig(OppModel):
     transit_max: int = 3
 
 
+class AskConfig(OppModel):
+    top_k: int = 5            # LLM에 넘길 정책 문서 수
+    candidate_k: int = 20     # 검색에서 먼저 가져올 수
+    max_doc_chars: int = 2000  # 문서 하나에서 LLM에 넘길 글자 수
+    max_tokens: int = 700
+    max_question_chars: int = 300
+
+
+class CompaniesConfig(OppModel):
+    limit: int = 12
+
+
 class BatchConfig(OppModel):
     daily_sources: list[str] = Field(default_factory=lambda: ["alio", "klid", "worldjob", "youthcenter"])
     weekly_sources: list[str] = Field(default_factory=lambda: ["work24_gangso"])  # 강소기업은 자주 바뀌지 않는다
@@ -194,6 +206,8 @@ class OpportunityConfig(OppModel):
     explanation: ExplanationConfig = Field(default_factory=ExplanationConfig)
     agent: AgentConfig = Field(default_factory=AgentConfig)
     local_life: LocalLifeConfig = Field(default_factory=LocalLifeConfig)
+    ask: AskConfig = Field(default_factory=AskConfig)
+    companies: CompaniesConfig = Field(default_factory=CompaniesConfig)
     batch: BatchConfig = Field(default_factory=BatchConfig)
     data: DataConfig
 

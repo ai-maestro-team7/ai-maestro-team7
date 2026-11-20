@@ -16,6 +16,7 @@ from pydantic import Field, ValidationError
 
 from ..core import clock
 from ..core.alternatives import find_busan_alternatives
+from ..core.companies import list_busan_companies
 from ..core.compare import compare_postings
 from ..core.policies import get_policy, match_policies
 from ..core.posting_detail import get_posting
@@ -23,10 +24,11 @@ from ..core.preferences import get_preferences, set_preferences
 from ..core.ranking import search_postings
 from ..core.saved import add_target_posting, list_saved
 from ..deps import Deps
+from ..enrich.ask import ask_policies, ask_policy, ask_posting
 from ..enrich.explain import explain_posting
-from ..models.api import DemoClockRequest, PreferencesUpdate, SaveRequest, TrackRequest
+from ..models.api import AskRequest, DemoClockRequest, PreferencesUpdate, SaveRequest, TrackRequest
 from ..models.base import OppModel
-from ..models.enums import LeaveReason, PolicyStage, Sort, TrackEvent
+from ..models.enums import CheonggeulType, LeaveReason, PolicyStage, Sort, TrackEvent
 from ..models.errors import OppError, invalid_input
 from ..notify.notifier import advance_demo_clock, check_new_opportunities, mark_read
 from ..notify.scheduler import subscribe_policy_alert
@@ -69,6 +71,11 @@ class CompareQuery(OppModel):
 
 class PoliciesQuery(OppModel):
     stage: PolicyStage | None = None
+
+
+class CompaniesQuery(OppModel):
+    category: CheonggeulType | None = None
+    limit: int | None = Field(default=None, ge=1, le=50)
 
 
 class NotificationsQuery(OppModel):
@@ -150,6 +157,12 @@ def rest_explain_posting(job_posting_id: str):
     return explain_posting(_deps(), _user_id(), _id(job_posting_id, "jobPostingId")).to_api()
 
 
+@app.post(f"{PREFIX}/postings/<job_posting_id>/ask")
+def rest_ask_posting(job_posting_id: str):
+    request = _body(AskRequest)
+    return ask_posting(_deps(), _user_id(), _id(job_posting_id, "jobPostingId"), request.question).to_api()
+
+
 @app.get(f"{PREFIX}/postings/<job_posting_id>/alternatives")
 def rest_alternatives(job_posting_id: str):
     q = _query(AlternativesQuery)
@@ -166,10 +179,28 @@ def rest_compare():
 
 
 # ---------------------------------------------------------------- 정책
+@app.get(f"{PREFIX}/companies")
+def rest_list_companies():
+    """부산 기업 둘러보기. 청끌기업을 회사 정보로만 보여 준다 (DECISIONS.md B-D01)."""
+    q = _query(CompaniesQuery)
+    return list_busan_companies(_deps(), _user_id(), category=q.category, limit=q.limit).to_api()
+
+
 @app.get(f"{PREFIX}/policies")
 def rest_match_policies():
     q = _query(PoliciesQuery)
     return match_policies(_deps(), _user_id(), stage=q.stage).to_api()
+
+
+@app.post(f"{PREFIX}/policies/ask")
+def rest_ask_policies():
+    return ask_policies(_deps(), _user_id(), _body(AskRequest).question).to_api()
+
+
+@app.post(f"{PREFIX}/policies/<policy_id>/ask")
+def rest_ask_policy(policy_id: str):
+    request = _body(AskRequest)
+    return ask_policy(_deps(), _user_id(), _id(policy_id, "policyId"), request.question).to_api()
 
 
 @app.get(f"{PREFIX}/policies/<policy_id>")
