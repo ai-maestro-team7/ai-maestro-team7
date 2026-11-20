@@ -302,7 +302,7 @@
 5. FOR ALL 커밋 대상 파일(Git이 추적하거나 스테이징된 텍스트 파일, `.gitignore` 대상 제외), THE Secret_Scanner SHALL 다음 형태의 문자열을 찾는다. (a) AWS 계정 ID 형태: 앞뒤가 숫자가 아닌 연속 12자리 숫자. ARN 안의 12자리 숫자와 버킷 이름 끝의 12자리 숫자를 포함한다. (b) AWS 액세스 키 ID 형태: `AKIA` 또는 `ASIA` 뒤에 영문 대문자나 숫자 16자가 이어지는 20자 문자열. 찾은 문자열마다 파일 경로와 줄 번호를 보고하고, 찾은 값 전체는 출력하지 않는다.
 6. WHEN Secret_Scanner가 `<계정ID>`처럼 꺾쇠괄호로 감싼 자리표시자를 만나면, THE Secret_Scanner SHALL 그 자리표시자를 보고 대상에서 제외한다.
 7. IF Secret_Scanner가 하나 이상을 보고하면, THEN THE Local_Check SHALL 실패 상태로 끝나고 보고 건수를 출력한다. 파일은 수정하거나 지우지 않는다.
-8. FOR ALL `ai/`와 `backend/` 아래 소스 파일(테스트 파일 포함, Criterion 2의 표에 적힌 설정 파일 제외), THE Local_Check SHALL Bedrock 모델 ID 형태의 문자열 리터럴을 찾아 파일 경로와 줄 번호를 보고하고, 하나라도 있으면 실패 상태로 끝난다 (AGENTS.md "모델 ID ... 설정 파일이나 환경변수에서 읽는다"). Bedrock 모델 ID 형태는 선택적인 `global.` 접두사 뒤에 Resource_Naming_Convention에 적힌 모델 제공자 접두사가 오는 문자열이다. 제공자 접두사 목록은 최소 `anthropic.`, `cohere.`, `amazon.titan-`을 포함한다 (tech.md 예: `global.anthropic.claude-haiku-5-5`, `cohere.embed-v4:0`, `amazon.titan-embed-text-v2:0`).
+8. FOR ALL `ai/`와 `backend/` 아래 소스 파일(테스트 파일 포함, Criterion 2의 표에 적힌 설정 파일 제외), THE Local_Check SHALL Bedrock 모델 ID 형태의 문자열 리터럴을 찾아 파일 경로와 줄 번호를 보고하고, 하나라도 있으면 실패 상태로 끝난다 (AGENTS.md "모델 ID ... 설정 파일이나 환경변수에서 읽는다"). Bedrock 모델 ID 형태는 선택적인 `global.` 접두사 뒤에 Resource_Naming_Convention에 적힌 모델 제공자 접두사가 오는 문자열이다. 제공자 접두사 목록은 최소 `anthropic.`, `cohere.`, `amazon.titan-`을 포함한다 (tech.md 예: `global.anthropic.claude-haiku-5-5`, `global.cohere.embed-v4:0`, `amazon.titan-embed-text-v2:0`).
 9. THE Resource_Naming_Convention SHALL 다음 규칙을 적는다. 자원 이름이 `team07-`로 시작하지 않거나 `team=team07` 태그가 없는 AWS 자원은 바꾸거나 지우지 않는다. 자원 생성·삭제·권한 변경은 실행 전에 사용자에게 먼저 확인한다 (AGENTS.md "환경·보안", tech.md "이전 뼈대에서 정한 환경").
 
 ### Requirement 14: 결정 기록
@@ -350,7 +350,7 @@
 | D-19 | 비동기 처리 방식 | SQS + DLQ (A) / `/jobs` 폴링 / 상태 조회 때 진행 (C) | Lambda 비동기 자기 호출 (면접에서 동작). SQS 권한이 생겨 필요하면 전환, 함수 입출력은 그대로 | BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 |
 | D-20 | 모의면접 API·저장 | 이전 api.md / C 명세 | C 명세 + 면접 담당 요청 (`docs/db-schema.md` §2.4, `backend/interview_api.py`) | C + BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 (C 동의) |
 | D-21 | 자원 접두사·태그 | `team07-`, `team=team07` | `team07-`, `team=team07`, 리전 `ap-northeast-2` | BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 |
-| D-22 | 벡터 저장소·임베딩 모델 | S3 Vectors / OpenSearch, Cohere v4 / Titan v2 | S3 Vectors (`team07-opp-vectors`/`postings-v1`, 1024차원, 코사인), 임베딩 `cohere.embed-v4:0` (한국어, 1024) | A + B | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-22 | 벡터 저장소·임베딩 모델 | S3 Vectors / OpenSearch, Cohere v4 / Titan v2 | S3 Vectors (`team07-opp-vectors`/`postings-v1`, 1024차원, 코사인), 임베딩 `global.cohere.embed-v4:0` (한국어, 1024) | A + B | CONFIRMED · 2026-11-20 · BACKEND 담당 |
 | D-23 | 통합 Agent 프레임워크 | Bedrock Agents + Action Group (A F-06, B §5.9) / Strands | 없음. 이유: A 소유 (mentoring-agent-quality) | A | OPEN |
 | D-24 | 프론트엔드 프레임워크 | 문서에 없음 | 없음. 이유: FRONTEND 소유 (frontend-app) | FRONTEND | OPEN |
 | D-25 | 이전 뼈대(`4aa11cc`) 재사용 | 재사용 / 미사용 | 정리해 재사용 (PR #9~#14) | 팀 리더 | CONFIRMED · 2026-11-20 · BACKEND 담당 |
