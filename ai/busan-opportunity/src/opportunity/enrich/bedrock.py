@@ -20,7 +20,8 @@ def _client(client, config: OpportunityConfig):
 
 
 class BedrockLlm:
-    """Converse API. temperature 0으로 같은 입력에 같은 답이 나오게 한다."""
+    """Converse API. temperature는 보내지 않는다: 서울 리전의 Claude 5.5는 이 값을 받지 않는다
+    (`temperature` is deprecated for this model, 2026-11-20 확인). 답의 흔들림은 코드 검증으로 막는다."""
 
     def __init__(self, client=None, *, config: OpportunityConfig | None = None, model_id: str | None = None):
         self.config = config or get_config()
@@ -32,7 +33,7 @@ class BedrockLlm:
             "modelId": self.model_id,
             "system": [{"text": system}],
             "messages": [{"role": "user", "content": [{"text": user}]}],
-            "inferenceConfig": {"maxTokens": max_tokens, "temperature": 0},
+            "inferenceConfig": {"maxTokens": max_tokens},
         }
 
     def invoke(self, system: str, user: str, *, max_tokens: int = 1024) -> str:
