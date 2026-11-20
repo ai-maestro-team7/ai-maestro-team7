@@ -94,8 +94,10 @@
  * 홈 첫 화면 (HomeHero). 색은 위 토큰만 쓴다.
  * - 커서를 따라 움직이는 옅은 파란 빛(.hero-glow)과, 커서 둘레에만 비치는 점 무늬(.hero-dots).
  *   위치는 화면 코드가 --hero-x, --hero-y로 넣는다.
- * - 제목 글자 물결(.wave-char): 커서가 지나가는 글자가 파랗게 떠오르고 양옆 글자가 따라 뜬다. 처음엔 차례로 올라온다.
- * 움직임 줄이기 설정이면 글자는 움직이지 않고 색만 바뀐다.
+ * - 제목 글자 물결(.wave-char): 커서가 지나가는 글자가 파랗게 떠오르고 양옆 글자가 따라 뜬다.
+ * - 제목 등장(기차놀이): 맨 앞 글자(?)부터 왼쪽에서 줄지어 걸어 들어온다. 걸음마다 통통 뛰며 뒤뚱거리고(.wave-hop),
+ *   제자리에 오면 꾹 눌렸다 튀어 오르며 선다. 글자마다 --dist(걸어올 거리, em)와 --order(출발 순서)를 화면 코드가 넣는다.
+ * 움직임 줄이기 설정이면 글자는 바로 보이고 움직이지 않으며, 커서를 올리면 색만 바뀐다.
  */
 @layer components {
   .hero-glow {
@@ -118,9 +120,17 @@
     transition:
       transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
       color 0.2s ease;
-    /* backwards: 등장이 끝나면 애니메이션 값이 남지 않아 커서 효과가 그대로 먹는다 */
-    animation: hero-rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
-    animation-delay: calc(var(--i, 0) * 35ms);
+    /* 걷는 속도는 같게(1em에 80ms), 출발은 120ms 간격. backwards라 등장이 끝나면 값이 남지 않아 커서 효과가 그대로 먹는다 */
+    animation: hero-walk calc(var(--dist, 3) * 80ms) cubic-bezier(0.3, 0.5, 0.5, 1) calc(var(--order, 0) * 120ms) backwards;
+  }
+
+  /* 걸음마다 통통 뛰고 좌우로 뒤뚱거린 뒤, 도착하면 눌렸다 튀어 오른다 */
+  .wave-hop {
+    display: inline-block;
+    transform-origin: 50% 100%;
+    animation:
+      hero-hop 140ms ease-in-out calc(var(--order, 0) * 120ms) calc(var(--dist, 3) * 80 / 140) alternate,
+      hero-land 420ms cubic-bezier(0.3, 1.5, 0.5, 1) calc(var(--order, 0) * 120ms + var(--dist, 3) * 80ms) backwards;
   }
 
   .wave-char:hover {
@@ -139,6 +149,10 @@
       transition: color 0.2s ease;
     }
 
+    .wave-hop {
+      animation: none;
+    }
+
     .wave-char:hover,
     .wave-char:hover + .wave-char,
     .wave-char:has(+ .wave-char:hover) {
@@ -147,13 +161,40 @@
   }
 }
 
-@keyframes hero-rise {
+@keyframes hero-walk {
   from {
     opacity: 0;
-    transform: translateY(14px);
+    transform: translateX(calc(var(--dist, 3) * -1em));
+  }
+  8% {
+    opacity: 1;
   }
   to {
     opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes hero-hop {
+  from {
+    transform: translateY(0) rotate(-6deg);
+  }
+  to {
+    transform: translateY(-7px) rotate(6deg);
+  }
+}
+
+@keyframes hero-land {
+  0% {
+    transform: scale(1.14, 0.84);
+  }
+  45% {
+    transform: translateY(-3px) scale(0.94, 1.08);
+  }
+  75% {
+    transform: scale(1.03, 0.97);
+  }
+  100% {
     transform: none;
   }
 }
