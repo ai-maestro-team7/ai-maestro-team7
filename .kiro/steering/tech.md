@@ -52,6 +52,7 @@ inclusion: always
 
 ## AI Agent 구조
 - 방향 (제안서 7.3): 통합 멘토링 Agent 하나와 기능별 도구·워크플로를 조합한다. 기능마다 독립 Agent를 만들지 않는다.
+- 지금 (D-38, `docs/개발계획서4.md`): 통합 Agent는 Strands로 `team07-api` 안에서 돈다. 패키지 `ai/supervisor/`, 입구 `POST /api/v1/agent/chat`(202 + 조회). 도구 5개(내 상태, 공고 검색, 정책 매칭, 정책 질문, 면접 준비). 아래 Bedrock Agents·Action Group 설명은 이전 계획이며 B Action Group 경로는 남아 있다.
 - A F-06: `CareerMentoringAgent` + Action Group. 상위 지침 `CAREER_MENTOR_AGENT_PROMPT.md`와 라우터 `00_PROMPT_ROUTER.md`가 요청마다 primary_intent 1개와 기능 프롬프트(01~07) 1개만 적용한다 (프롬프트는 지식 패키지 ZIP에 있음).
 - B §5.9: `BusanOpportunity` Action Group. REST와 같은 비즈니스 함수를 입구만 달리해 노출하고, 사실 목록만 돌려준다 (공고 최대 5개). 저장 동작은 사용자 확인 후 실행한다 (P1).
 - C: Strands Agents SDK 면접관 에이전트 (질문 생성, 꼬리질문 판단, 내용 평가, 피드백). AWS 호출·측정·점수 계산은 에이전트 툴이 아닌 일반 코드로 한다. 통합 Agent와는 페이지 이동으로만 연결한다.
@@ -124,7 +125,8 @@ inclusion: always
 | 번호 | 결정 | 결정 기록 |
 |---|---|---|
 | 1 | Cognito JWT `sub`, 아이디·비밀번호 로그인, 데모 계정 `demo1`~`demo3` | D-07 CONFIRMED |
-| 2 | Bedrock Agents 단일 Agent + Action Group (A `CareerMentoring`, B `BusanOpportunity`) | D-23 CONFIRMED |
+| 2 | Strands Agents를 `team07-api` 안에서 (`ai/supervisor/`, `/api/v1/agent/chat`). D-23(Bedrock Agents) 대체 | D-38 CONFIRMED |
+| 2-1 | 홈은 채팅 입구, 조건 저장은 사용자에게 묻기 | D-39·D-40 CONFIRMED |
 | 3 | `docs/api.md` | D-01~D-05 CONFIRMED |
 | 4 | `career-mentor`·`catalog`·`reference`·`cache` | D-13 CONFIRMED |
 | 5 | catalog `SNAP#`·`LATEST` 스냅샷, 요건 `requirements[]{kind REQUIRED_SKILL/PREFERRED_SKILL, sourceQuote}` | D-09·D-10 CONFIRMED |

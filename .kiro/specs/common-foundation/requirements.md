@@ -7,7 +7,7 @@
 근거와 전제:
 - B §9와 C §9는 해커톤 0~2시간에 계약을 합의하고 API 명세와 가짜 응답을 프론트·백엔드에 넘기도록 계획한다. 공통 기반은 이 시간 안에 끝낼 수 있는 크기로 유지한다.
 - 최상위 폴더는 PR #1·#2로 정했고, 백엔드·인프라·공통 문서는 PR #9~#14로 들어왔다 (이전 뼈대 `4aa11cc`를 정리해 다시 넣음, D-25).
-- 결정 상태 (2026-11-20): 확정 담당이 정한 항목은 `CONFIRMED`이고 이 스펙의 기준은 그 결정을 따른다. 결정 내용과 구현은 "결정 기록" 표, `docs/api.md`(공통 API 규칙), `docs/db-schema.md`(v1.3), `backend/`·`infra/`(PR #9~#14, 배포됨)가 기준이다. 결정이 없는 항목(D-27 MVP 우선순위 등. D-23은 Bedrock Agents, D-24는 Next.js로 나중에 확정)만 `OPEN`으로 남기고, 그 항목은 인터페이스 뒤에 두거나 담당이 정할 때까지 임의로 정하지 않는다.
+- 결정 상태 (2026-11-20): 확정 담당이 정한 항목은 `CONFIRMED`이고 이 스펙의 기준은 그 결정을 따른다. 결정 내용과 구현은 "결정 기록" 표, `docs/api.md`(공통 API 규칙), `docs/db-schema.md`(v1.3), `backend/`·`infra/`(PR #9~#14, 배포됨)가 기준이다. 결정이 없는 항목(D-27 MVP 우선순위 등. D-23은 Bedrock Agents로 정했다가 D-38(Strands)로 바뀜, D-24는 Next.js로 나중에 확정)만 `OPEN`으로 남기고, 그 항목은 인터페이스 뒤에 두거나 담당이 정할 때까지 임의로 정하지 않는다.
 - 아래 각 Requirement의 기준 중 결정과 이름·형식이 다른 곳은 Requirement 첫머리의 "결정 반영" 문단이 우선한다.
 - 문서 표기: A = `docs/개발계획서1.md`, B = `docs/개발계획서2.md`, C = `docs/개발계획서3.md`, 제안서 = `docs/프로젝트_제안서.md`.
 
@@ -351,7 +351,7 @@
 | D-20 | 모의면접 API·저장 | 이전 api.md / C 명세 | C 명세 + 면접 담당 요청 (`docs/db-schema.md` §2.4, `backend/interview_api.py`) | C + BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 (C 동의) |
 | D-21 | 자원 접두사·태그 | `team07-`, `team=team07` | `team07-`, `team=team07`, 리전 `ap-northeast-2` | BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 |
 | D-22 | 벡터 저장소·임베딩 모델 | S3 Vectors / OpenSearch, Cohere v4 / Titan v2 | S3 Vectors (`team07-opp-vectors`/`postings-v1`, 1024차원, 코사인), 임베딩 `global.cohere.embed-v4:0` (한국어, 1024) | A + B | CONFIRMED · 2026-11-20 · BACKEND 담당 |
-| D-23 | 통합 Agent 프레임워크 | Bedrock Agents + Action Group (A F-06, B §5.9) / Strands | Bedrock Agents 단일 Agent + Action Group (A `CareerMentoring`, B `BusanOpportunity`). Action Group은 `team07-api`가 받는다. C 면접관은 Strands 그대로, 페이지 이동으로 연결 | A | CONFIRMED · 2026-11-20 · A 담당 (#110) |
+| D-23 | 통합 Agent 프레임워크 | Bedrock Agents + Action Group (A F-06, B §5.9) / Strands | Bedrock Agents 단일 Agent + Action Group (A `CareerMentoring`, B `BusanOpportunity`). Action Group은 `team07-api`가 받는다. C 면접관은 Strands 그대로, 페이지 이동으로 연결 | A | SUPERSEDED · 2026-11-20 · D-38로 바뀜 (#122) |
 | D-24 | 프론트엔드 프레임워크 | 문서에 없음 | Next.js 16 App Router + React + TypeScript + Tailwind CSS v4, `output: "export"` 정적 내보내기 (`.kiro/specs/frontend-ui/`) | FRONTEND | CONFIRMED · 2026-11-20 · FRONTEND 담당 |
 | D-25 | 이전 뼈대(`4aa11cc`) 재사용 | 재사용 / 미사용 | 정리해 재사용 (PR #9~#14) | 팀 리더 | CONFIRMED · 2026-11-20 · BACKEND 담당 |
 | D-26 | AI·데이터 작업 영역 라벨 | `fe`·`be`·`common`만 | AI·데이터·인프라 작업은 `be` | 팀 리더 | CONFIRMED · 2026-11-20 · BACKEND 담당 |
@@ -366,3 +366,6 @@
 | D-35 | 개발용 사용자 헤더·배포 설정 값 이름 | 이름 미정 | `X-User-Id`, `ALLOW_DEV_USER_HEADER=1`(로컬 테스트만, 배포 Lambda에는 없음) | BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 |
 | D-36 | 공고별 워크스페이스·문서 버전 담당 (product.md "범위 관련 미확정") | 담당 미정 | 워크스페이스 BACKEND (`backend/workspace.py`, `/api/v1/me/workspaces`), 지원 상태는 워크스페이스에만. 문서 버전 저장 구조는 `docs/db-schema.md` §2.1 | BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 |
 | D-37 | 통합 데모 페르소나·직무 (product.md "범위 관련 미확정") | C 백엔드 개발 / B 페르소나 ① 데이터 분석 / A NCS 11개 직무 | 페르소나 ① 데이터 분석 (NCS 20010105), 데모 계정 `demo1`~`demo3` | 팀 리더 | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-38 | 통합 Agent 프레임워크 (D-23 대체) | Bedrock Agents + Action Group (D-23) / Strands | Strands Agents를 `team07-api` 안에서 돌린다. 패키지 `ai/supervisor/` → `supervisor`, 입구 `POST /api/v1/agent/chat` (202 + 조회). 도구는 B `agent_feed`·`agent_policies`·`ask_policies`와 A 문서·프로필을 포트로 부른다. B `BusanOpportunity` Action Group 경로는 그대로 둔다. 새 AWS 자원·권한 없음 (`docs/개발계획서4.md` §3) | 팀 | CONFIRMED · 2026-11-20 · 팀 합의 (#122) |
+| D-39 | 서비스 입구 | 기능 화면별 입구 (제안서 4장) / 채팅 하나 | 홈을 채팅 Agent로 바꾼다. 채팅 조건·이력서로 채용공고와 청년정책을 함께 찾고, 모의면접(지금 C 면접 그대로)을 체험으로 제안한다. 자소서가 없으면 채팅에서 받는다. 기능 화면은 상세로 남긴다 (`docs/개발계획서4.md` §1·§2) | 팀 | CONFIRMED · 2026-11-20 · 팀 합의 (#122) |
+| D-40 | 채팅 조건 저장 | 저장 안 함 / 자동 저장 / 사용자에게 묻기 | 사용자에게 묻는다. 화면 버튼을 누를 때만 `PUT /api/v1/me/profile`로 쓴다. `PROFILE#BASIC`에 `desiredSalaryMin`(만 원/년), `desiredCareerType`(`NEW`/`EXPERIENCED`/`ANY`) 추가. 직급은 공고에 필드가 없어 `careerType`(신입/경력)으로 대신한다 | 팀 | CONFIRMED · 2026-11-20 · 팀 합의 (#122) |
