@@ -13,12 +13,13 @@
     - _Requirements: 2.1~2.7, 3.1~3.5, 6.1~6.2, 7.1~7.2_
   - 커밋: `feat: 면접 카메라 얼굴 분석을 Rekognition으로 구현` (묶음 A 509 passed 4 skipped)
 
-- [ ] 2. 태도 점수와 리포트 (묶음 B)
-  - [ ] 2.1 `attitude.py` `measure_attitude` (design §6.2), `models.py` `AttitudeResult`·`QuestionFrontal`·`AreaReason`
-  - [ ] 2.2 `scoring.py`·`report.py` 연결 (design §7)
-  - [ ] 2.3 `test_attitude.py`, `test_scoring.py`·`test_report.py`·`test_feedback.py`·`test_backend_flow.py` 수정
+- [x] 2. 태도 점수와 리포트 (묶음 B)
+  - [x] 2.1 `attitude.py` `measure_attitude` (design §6.2), `models.py` `AttitudeResult`·`QuestionFrontal`·`AreaReason`
+  - [x] 2.2 `scoring.py`·`report.py` 연결 (design §7)
+  - [x] 2.3 `test_attitude.py`, `test_scoring.py`·`test_report.py`·`test_feedback.py`·`test_backend_flow.py` 수정
+    - `test_backend_flow.py`: 답변마다 정면 3·눈만 내림 1·빈 이미지 1 + 제출 뒤 도착 1장 → 정면 12/16 = 75% → 태도 88, 50/25/25
     - _Requirements: 4.1~4.8, 5.1~5.6, 8.1~8.5_
-  - 커밋: `feat: 면접 태도 점수 계산과 리포트 연결`
+  - 커밋: `feat: 면접 태도 점수 계산과 리포트 연결` (묶음 B 570 passed 4 skipped)
 
 - [ ] 3. 수동 확인 (실제 Rekognition, 사람이 실행)
   - [ ] 3.1 `test_camera_manual.py` (`RUN_AWS_CAMERA=1`, `CAMERA_TEST_DIR`)

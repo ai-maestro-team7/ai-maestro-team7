@@ -51,7 +51,7 @@ def test_get_confirmed_scores():
     tools, _ = tools_for(ctx)
     out = tools["get_confirmed_scores"]("q1")
     assert out["contentScore"] == 80 and len(out["contentItems"]) == 4
-    assert out["areas"]["attitude"]["notMeasuredReason"] == "ATTITUDE_NOT_READY"
+    assert out["areas"]["attitude"]["notMeasuredReason"] == "CALIBRATION_FAILED"  # 기준값 없는 Session
     assert out["deliveryScore"] == ctx.score.bundles[0].delivery_score
 
 

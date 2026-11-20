@@ -5,7 +5,7 @@ import pytest
 from interview import scoring
 from interview.config import load_scoring_config
 from interview.models import AnswerRecord, ScoreResult
-from scoring_helpers import all_evaluations, answer, delivery, evaluation, session
+from scoring_helpers import BASELINE, all_evaluations, answer, delivery, evaluation, frames, session
 
 CFG = load_scoring_config()
 D = CFG.delivery
@@ -67,19 +67,51 @@ def test_answer_without_speech_measures_is_excluded(metrics):
 # ---------------------------------------------------------------- 영역·종합
 
 
-def test_all_measured_no_attitude_weights():
-    r = calc(full_session())
+def test_calibration_failed_uses_no_attitude_weights():
+    # C §7 "정면 보정 실패(유효 3장 미만) → 태도 미측정, 내용 70% + 전달력 30%"
+    r = calc(full_session())  # baseline None
     assert r.areas.content.score == 80 and r.areas.delivery.score == 100
-    assert r.areas.attitude.score is None and r.areas.attitude.not_measured_reason == "ATTITUDE_NOT_READY"
+    assert r.areas.attitude.score is None and r.areas.attitude.not_measured_reason == "CALIBRATION_FAILED"
     assert r.total_score == 86 and r.grade == "양호"  # 80×0.7 + 100×0.3
     assert r.weight_basis == "내용 70% · 전달력 30% 기준"
-    assert r.not_measured_messages == ("카메라 분석은 다음 단계에서 제공돼 태도는 제외했어요.",)
-    assert r.evaluated_base_questions == 3
+    assert r.not_measured_messages == ("정면 보정이 되지 않아 태도는 제외했어요.",)
+    assert r.evaluated_base_questions == 3 and r.frontal_ratios == ()
+
+
+def _with_baseline(answers=None, camera=True, **kw):
+    return session(answers or [answer("q1", **kw), answer("q2", **kw), answer("q3", **kw)],
+                   camera=camera, baseline=BASELINE)
+
+
+def test_all_three_areas_50_25_25():
+    # C §7 "정상 진행 → 3개 영역 점수": 정면 6/10 → 60% → 태도 50
+    r = scoring.calculate_interview_scores(_with_baseline(), frames(6, 4), CFG, all_evaluations())
+    assert (r.areas.content.score, r.areas.delivery.score, r.areas.attitude.score) == (80, 100, 50)
+    assert r.total_score == 78  # 80×0.5 + 100×0.25 + 50×0.25 = 77.5 → 78
+    assert r.weight_basis == "내용 50% · 전달력 25% · 태도 25% 기준"
+    assert r.not_measured_messages == ()
+    assert [(f.question_id, f.frontal_ratio) for f in r.frontal_ratios] == [("q1", 60.0)]
+
+
+def test_delivery_unmeasured_attitude_measured_75_25():
+    s = _with_baseline(metrics=delivery(rate=None, per_min=None))
+    r = scoring.calculate_interview_scores(s, frames(10), CFG, all_evaluations())
+    assert r.areas.delivery.score is None and r.areas.attitude.score == 100
+    assert r.total_score == 85 and r.weight_basis == "내용 75% · 태도 25% 기준"  # 80×0.75 + 100×0.25
+
+
+def test_not_enough_frames_message():
+    r = scoring.calculate_interview_scores(_with_baseline(), frames(9), CFG, all_evaluations())
+    assert r.areas.attitude.not_measured_reason == "NOT_ENOUGH_FRAMES"
+    assert r.not_measured_messages == ("얼굴이 확인된 캡처가 적어 태도는 제외했어요.",)
+    assert r.weight_basis == "내용 70% · 전달력 30% 기준"
 
 
 def test_camera_not_used_reason():
-    s = session([answer("q1"), answer("q2"), answer("q3")], camera=False)
-    r = calc(s)
+    # C §7 "카메라 미동의 → 태도 미측정, 내용 70% + 전달력 30%". 캡처·기준값이 있어도 쓰지 않는다
+    s = _with_baseline(camera=False)
+    r = scoring.calculate_interview_scores(s, frames(10), CFG, all_evaluations())
+    assert r.weight_basis == "내용 70% · 전달력 30% 기준"
     assert r.areas.attitude.not_measured_reason == "CAMERA_NOT_USED"
     assert r.not_measured_messages == ("카메라를 사용하지 않아 태도는 제외했어요.",)
 
@@ -158,6 +190,9 @@ def test_content_must_match_evaluable_bundles():
         calc(full_session(), all_evaluations(("q1", "q2")))
 
 
-def test_frames_are_ignored_in_third_stage():
-    frames = [{"type": "ANSWER", "answerId": "a-q1-1", "accepted": True, "valid": True}] * 20
-    assert scoring.calculate_interview_scores(full_session(), frames, CFG, all_evaluations()) == calc(full_session())
+def test_same_frames_same_result():
+    items = frames(7, 3) + frames(3, 0, answer_id="a-q2-1")
+    a = scoring.calculate_interview_scores(_with_baseline(), items, CFG, all_evaluations())
+    b = scoring.calculate_interview_scores(_with_baseline(), list(items), CFG, all_evaluations())
+    assert a == b
+    assert ScoreResult.model_validate(a.model_dump(by_alias=True, mode="json")) == a

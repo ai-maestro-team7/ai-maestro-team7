@@ -324,7 +324,37 @@ class FollowUpOutput(_LLMOutputModel):
 # ---------------------------------------------------------------- 채점 (3차, report design §4·§5)
 
 EvidenceType = Literal["quote", "missing"]
-AreaReason = Literal["CAMERA_NOT_USED", "ATTITUDE_NOT_READY", "NOT_ENOUGH_SPEECH"]
+# 태도 미측정 사유 (camera 결정 3). 3차의 ATTITUDE_NOT_READY는 4차에서 없앴다
+AttitudeReason = Literal["CAMERA_NOT_USED", "CALIBRATION_FAILED", "NOT_ENOUGH_FRAMES"]
+AreaReason = Literal["CAMERA_NOT_USED", "CALIBRATION_FAILED", "NOT_ENOUGH_FRAMES", "NOT_ENOUGH_SPEECH"]
+
+
+class QuestionFrontal(_CamelModel):
+    """묶음(기본 질문 ID) 하나의 정면 응시 비율(%). 표시할 때 정수로 반올림한다."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid", frozen=True)
+
+    question_id: str
+    frontal_ratio: float = Field(ge=0, le=100)
+
+
+class AttitudeResult(_CamelModel):
+    """measure_attitude 결과 (camera design §6). score가 있으면 reason이 없고, 없으면 reason이 있다."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid", frozen=True)
+
+    score: float | None = Field(ge=0, le=100)
+    reason: AttitudeReason | None
+    frontal_ratio: float | None = Field(ge=0, le=100)  # 모든 문항을 합친 비율
+    used_frames: int = Field(ge=0)
+    frontal_frames: int = Field(ge=0)
+    by_question: tuple[QuestionFrontal, ...] = ()
+
+    @model_validator(mode="after")
+    def _one(self) -> "AttitudeResult":
+        if (self.score is None) == (self.reason is None):
+            raise ValueError("attitude needs a score or a reason")
+        return self
 
 
 class ContentItem(_CamelModel):
@@ -395,6 +425,7 @@ class ScoreResult(_CamelModel):
     not_measured_messages: tuple[str, ...]
     evaluated_base_questions: int = Field(ge=1)
     bundles: tuple[BundleScore, ...]
+    frontal_ratios: tuple[QuestionFrontal, ...] = ()  # 태도를 측정했을 때만. 리포트 metrics.frontalRatio용
 
 
 # ---------------------------------------------------------------- 변환

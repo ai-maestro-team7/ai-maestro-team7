@@ -11,7 +11,7 @@ import pytest
 
 import interview
 from conftest import sample_json, sample_text
-from fakes import FakeLLM, FakePolly, FakeRekognition, FakeS3, FakeToolLLM, FakeTranscribe
+from fakes import FakeLLM, FakePolly, FakeRekognition, FakeS3, FakeToolLLM, FakeTranscribe, face_detail
 from interview import camera, voice
 from interview import llm as interview_llm
 from interview.content import RUBRIC_KEYS
@@ -20,6 +20,9 @@ from interview.models import Session
 RESUME = sample_text("resume_data_analysis.txt")
 PROFILE = sample_json("profile_data_analysis.json")
 UPLOAD_BUCKET = "test-uploads"
+
+FRONT, DOWN = b"\xff\xd8front", b"\xff\xd8down"
+ANSWER_IMAGES = (FRONT, FRONT, DOWN, FRONT, b"")
 
 
 def to_dynamo(value):
@@ -56,7 +59,8 @@ class FakeAWS:
         self.polly = FakePolly(error=polly_error)
         self.transcribe = FakeTranscribe(pending_polls=1)  # 첫 조회는 IN_PROGRESS, 다음 조회에 완료
         self.s3 = FakeS3(default_body=sample_text("transcribe/result_normal.json"))
-        self.rekognition = FakeRekognition()
+        # 눈만 내려 메모를 볼 때 (C §11 사전 테스트): 위아래 약 10° 차이, 눈 감음 확신도 57%
+        self.rekognition = FakeRekognition(by_image={DOWN: [face_detail(gaze=(0.0, -20.0), eyes_open=(False, 57.0))]})
 
 
 @pytest.fixture
@@ -107,9 +111,11 @@ def run_interview(aws, follow_up_responses, calibration_images, profile=PROFILE)
         transcript_key = f"uploads/interview/{iv_id}/transcripts/{answer_id}.json"
         job_name = interview.start_transcription(f"s3://{UPLOAD_BUCKET}/uploads/interview/{iv_id}/answers/{answer_id}.webm",
                                                  f"team07-{iv_id}-{answer_id}", "webm", UPLOAD_BUCKET, transcript_key)
-        # h_frame: 답변 중 캡처
-        frames.append(store({"type": "ANSWER", "questionId": nq["questionId"], "answerId": answer_id,
-                             "accepted": True, **interview.analyze_face(b"\xff\xd8fake")}))
+        # h_frame (2초 간격): 정면 3장, 눈만 내려 메모 보기 1장, 얼굴이 안 잡힌 빈 이미지 1장
+        for n, img in enumerate(ANSWER_IMAGES):
+            frames.append(store({"type": "ANSWER", "questionId": nq["questionId"], "answerId": answer_id,
+                                 "capturedAt": f"2026-11-21T10:00:{n * 2:02d}+09:00", "accepted": True,
+                                 **interview.analyze_face(img)}))
         # task_answer: IN_PROGRESS가 아닐 때까지 다시 조회한다 (백엔드는 2초 간격, 240초 한도)
         for _ in range(5):
             tr = interview.get_transcription_result(job_name)
@@ -119,6 +125,10 @@ def run_interview(aws, follow_up_responses, calibration_images, profile=PROFILE)
         answer_result = {"answerId": answer_id, "timeLimitReached": False, "transcription": tr}
         out = interview.process_answer(item["session"], answer_result, llm=llm)
         actions.append(out["action"])
+        # 답변 제출 뒤 도착한 캡처: 백엔드가 accepted=false로 저장한다 → 점수에서 제외
+        frames.append(store({"type": "ANSWER", "questionId": nq["questionId"], "answerId": answer_id,
+                             "capturedAt": "2026-11-21T10:01:59+09:00", "accepted": False,
+                             **interview.analyze_face(FRONT)}))
         item = store({"session": out["session"], "nextQuestion": out["nextQuestion"], "lastAnswer": out["lastAnswer"]})
         if out["action"] == "REPORT":
             break
@@ -157,15 +167,21 @@ def test_backend_flow_with_follow_up_and_baseline(aws, report_llm):
     assert session["baseline"] == {"gaze": {"yaw": 0, "pitch": -10}, "head": {"yaw": 0, "pitch": 5}}  # 0.0 → 0
     assert session["profile"]["profileVersion"] == 2
     Session.model_validate(session)  # 저장·조회와 기준값 추가 뒤에도 Session 형식 그대로
-    assert len(answer_frames) == 4
-    assert all(f["eyesOpen"] == {"value": True, "confidence": 98} for f in answer_frames)
-    # 이미지는 bytes로만 넘기고 S3에 올리지 않는다
+    assert len(answer_frames) == 4 * (len(ANSWER_IMAGES) + 1)  # 답변 4개 × (캡처 5 + 늦게 온 1)
+    down = [f for f in answer_frames if f["valid"] and f["gaze"]["pitch"] == -20]
+    assert len(down) == 4 and all(f["eyesOpen"] == {"value": False, "confidence": 57} for f in down)  # 분석 제외 아님
+    assert all("reason" not in f for f in answer_frames)  # make_report는 reason을 넘기지 않는다 (점수에 필요 없음)
+    assert sum(1 for f in answer_frames if not f["valid"]) == 4  # 빈 이미지 → valid false (감점 아님)
+    # 이미지는 bytes로만 넘기고 S3에 올리지 않는다. 빈 이미지는 Rekognition을 부르지 않는다
     assert all(set(c["Image"]) == {"Bytes"} for c in aws.rekognition.calls) and aws.s3.puts == []
-    # 리포트: 기준값이 있어도 3차는 태도 미측정 (임시 카메라 값으로 점수를 만들지 않는다)
+    assert len(aws.rekognition.calls) == 3 + 4 * 5  # 보정 3 + 답변마다 (정면 3 + 내림 1 + 늦게 온 1)
+    # 리포트: 3개 영역. 쓰는 캡처는 답변마다 정면 3 + 내림 1 → 정면 12/16 = 75% → 태도 (75-40)/40×100 = 87.5 → 88
     assert report["evaluatedBaseQuestions"] == 3 and report["interviewDate"] == "2026-11-21"
-    assert report["areas"]["attitude"] == {"score": None, "notMeasuredReason": "ATTITUDE_NOT_READY"}
+    assert report["areas"]["attitude"] == {"score": 88, "notMeasuredReason": None}
     assert report["areas"]["content"]["score"] == 80 and isinstance(report["totalScore"], int)
-    assert report["weightBasis"] == "내용 70% · 전달력 30% 기준"
+    assert report["weightBasis"] == "내용 50% · 전달력 25% · 태도 25% 기준"
+    assert report["notMeasuredMessages"] == []
+    assert [q["metrics"]["frontalRatio"] for q in report["questions"]] == [75, 75, 75]  # q1은 기본+꼬리 8장 중 6장
     assert report["questions"][0]["followUp"]["question"]  # 꼬리질문 묶음
     assert [q["contentScore"] for q in report["questions"]] == [80, 80, 80]
     assert len(report_llm.calls) == 3 and len(report_llm.runs) == 1  # C-1 묶음 3개 + C-2 에이전트 1번
@@ -178,5 +194,9 @@ def test_backend_flow_baseline_none_with_few_calibration_frames(aws, report_llm)
     assert session["baseline"] is None  # 유효 3장 미만 → 태도 미측정, 대체값 없음
     assert session["profile"] is None
     Session.model_validate(session)
-    assert report["areas"]["attitude"]["notMeasuredReason"] == "ATTITUDE_NOT_READY"
+    # C §7 "정면 보정 실패(유효 3장 미만) → 태도 미측정, 내용 70% + 전달력 30%". 답변 중 캡처는 충분해도 쓰지 않는다
+    assert report["areas"]["attitude"] == {"score": None, "notMeasuredReason": "CALIBRATION_FAILED"}
+    assert report["weightBasis"] == "내용 70% · 전달력 30% 기준"
+    assert report["notMeasuredMessages"] == ["정면 보정이 되지 않아 태도는 제외했어요."]
+    assert all(q["metrics"]["frontalRatio"] is None for q in report["questions"])
     assert report["questions"][0]["followUp"] is None

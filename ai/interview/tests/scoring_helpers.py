@@ -35,14 +35,33 @@ def answer(qid, text="저는 자료를 비교하고 대응표를 만들었습니
     return record
 
 
-def session(answers, camera=True):
+BASELINE = {"gaze": {"yaw": 0.0, "pitch": -10.0}, "head": {"yaw": 0.0, "pitch": 5.0}}  # 노트북 카메라 정면 (C §2.3)
+
+
+def frame(answer_id="a-q1-1", gaze=(0.0, -10.0), head=(0.0, 5.0), eyes=(True, 98.0), accepted=True, valid=True,
+          ftype="ANSWER"):
+    """백엔드가 저장한 캡처 한 장 (make_report가 generate_report에 넘기는 키). gaze·head는 (yaw, pitch)."""
+    qid = answer_id.split("-")[1] + ("-f" if answer_id.endswith("-2") else "")
+    return {"type": ftype, "questionId": qid, "answerId": answer_id, "capturedAt": "2026-11-21T10:00:00+09:00",
+            "accepted": accepted, "valid": valid,
+            "gaze": {"yaw": gaze[0], "pitch": gaze[1]} if valid else None,
+            "head": {"yaw": head[0], "pitch": head[1]} if valid else None,
+            "eyesOpen": {"value": eyes[0], "confidence": eyes[1]} if valid and eyes is not None else None}
+
+
+def frames(n_frontal, n_away=0, answer_id="a-q1-1"):
+    """정면 n_frontal장 + 고개 돌림 n_away장."""
+    return [frame(answer_id)] * n_frontal + [frame(answer_id, head=(35.0, 5.0))] * n_away
+
+
+def session(answers, camera=True, baseline=None):
     questions = [{"questionId": f"q{i}", "questionType": t, "question": f"q{i} 질문입니다."}
                  for i, t in enumerate(QUESTION_TYPES, start=1)]
     return Session.model_validate({
         "sessionId": "iv-score", "job": "데이터 분석", "interviewType": "MIXED", "cameraConsent": camera,
         "resumeText": "가" * 60, "profile": None, "scoringVersion": "v1.0", "modelId": "test-model",
         "promptVersion": "A-v2/B-v1", "questions": questions, "currentIndex": 3, "followUpUsed": False,
-        "currentQuestion": None, "answers": answers, "baseline": None,
+        "currentQuestion": None, "answers": answers, "baseline": baseline,
     })
 
 

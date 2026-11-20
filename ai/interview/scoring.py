@@ -4,7 +4,7 @@
 미측정은 0점으로 넣지 않고 뺀다. 기준값은 모두 설정 파일(config/scoring_v1.json)에서 읽는다.
 
 내용 항목 점수(1~5)는 C-1이 매기고 여기서는 환산·평균만 한다.
-태도는 3차에서 늘 미측정이다 (requirements 결정 1). frames는 받기만 한다.
+태도는 4차(#108)부터 measure_attitude(정면 응시 비율)로 계산한다. 미측정이면 종합 비율에서 뺀다.
 """
 
 import logging
@@ -13,6 +13,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from statistics import fmean
 
 from . import settings
+from .attitude import measure_attitude
 from .bundles import Bundle, make_bundles
 from .config import AREAS, LongPauseConfig, ScoringConfig, SpeechRateConfig, TimeManagementConfig
 from .models import AnswerRecord, Areas, AreaScore, BundleScore, ContentEvaluation, DeliveryMetrics, ScoreResult, Session
@@ -26,7 +27,8 @@ AREA_LABELS = {"content": "내용", "delivery": "전달력", "attitude": "태도
 # 미측정 사유 → 리포트 안내 문장 (코드가 정한 틀, report design §5)
 NOT_MEASURED_MESSAGES = {
     "CAMERA_NOT_USED": "카메라를 사용하지 않아 태도는 제외했어요.",
-    "ATTITUDE_NOT_READY": "카메라 분석은 다음 단계에서 제공돼 태도는 제외했어요.",
+    "CALIBRATION_FAILED": "정면 보정이 되지 않아 태도는 제외했어요.",
+    "NOT_ENOUGH_FRAMES": "얼굴이 확인된 캡처가 적어 태도는 제외했어요.",
     "NOT_ENOUGH_SPEECH": "말한 시간이 짧거나 숫자·영어가 많아 전달력은 제외했어요.",
 }
 
@@ -149,8 +151,11 @@ def calculate_interview_scores(session: Session, frames: list, config: ScoringCo
         raw["delivery"] = fmean(delivery_scores)
     else:
         reasons["delivery"] = "NOT_ENOUGH_SPEECH"
-    # 태도: 3차는 늘 미측정 (임시 analyze_face 값으로 가짜 점수를 만들지 않는다)
-    reasons["attitude"] = "ATTITUDE_NOT_READY" if session.camera_consent else "CAMERA_NOT_USED"
+    attitude = measure_attitude(session, frames, config)
+    if attitude.score is not None:
+        raw["attitude"] = attitude.score
+    else:
+        reasons["attitude"] = attitude.reason
 
     weights = config.total_weights.for_areas(set(raw))
     total = sum(raw[a] * weights[a] for a in raw) / 100
@@ -166,6 +171,7 @@ def calculate_interview_scores(session: Session, frames: list, config: ScoringCo
         not_measured_messages=tuple(NOT_MEASURED_MESSAGES[reasons[a]] for a in AREAS if a in reasons),
         evaluated_base_questions=len(bundles),
         bundles=tuple(bundle_scores),
+        frontal_ratios=attitude.by_question,
     )
     logger.info("stage=%s bundles=%d measured=%s durationMs=%d", STAGE, len(bundles),
                 ",".join(sorted(raw)), int((time.monotonic() - started) * 1000))
