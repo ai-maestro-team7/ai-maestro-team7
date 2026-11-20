@@ -55,6 +55,7 @@ frontend/               프론트엔드 화면
   - `models/`는 Pydantic 계약, `config/`는 `opportunity_config.json`, `core/`는 순수 규칙(LLM 호출 금지), `enrich/`는 LLM 추출·설명·임베딩, `api/`는 REST 입구와 Agent 입구가 같은 함수를 부른다.
 - C (개발계획서3): `ai/interview/` 폴더 (`config/scoring_v1.json`, `samples/`). 백엔드가 import해서 부른다. 함수는 DB·API를 직접 부르지 않고 Bedrock·Polly·Transcribe·Rekognition만 부른다. 단계별 PR로 전달한다.
 - A (개발계획서1): 위치는 `ai/mentoring/`. 내부 폴더 구조는 명세에 없다. 구성 단위는 멘토링 API, 분석 워커(Extract → Validate → Profile → Retrieve → Calculate → Save 순서 고정), 공식 데이터 어댑터 `OfficialDataPort`, 지식 패키지의 수집 스크립트 재사용이다.
+- FRONTEND (D-24, `.kiro/specs/frontend-ui/`): `frontend/` Next.js 앱. `src/app/`은 라우트와 화면 조립, `src/components/ui`·`layout`은 공통 컴포넌트, `src/features/<기능>/`은 `components/`·`data.ts`(Mock)·`types.ts`·`lib.ts`. 디자인 토큰은 `src/app/globals.css` 한 곳에 둔다. 화면 데이터는 API 연결 전까지 Mock이며 데모 페르소나 ①(데이터 분석, D-37)에 맞춘다.
 - 이전 뼈대는 `backend/app.py` 단일 Lambda에 `ROUTES` 표로 경로를 붙이는 방식이었고, `infra/package.sh`가 `backend/` 바로 아래의 `.py`만 묶었다. 지금 백엔드 폴더도 이름이 `backend/`로 같다. 이 방식을 그대로 다시 쓰면 `ai/` 아래 코드는 패키징에 포함되지 않으므로 백엔드 담당과 맞춘다.
 - `busan-opportunity`처럼 하이픈이 든 폴더 이름은 Python 패키지로 바로 import할 수 없다. B 명세처럼 그 아래 `src/opportunity/`에 패키지를 둔다.
 
