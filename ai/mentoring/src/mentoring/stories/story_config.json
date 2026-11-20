@@ -1,0 +1,8 @@
+{
+  "configVersion": "story-v1",
+  "promptVersion": "story-v1",
+  "rawExperienceMinChars": 10,
+  "rawExperienceMaxChars": 10000,
+  "maxQuestions": 3,
+  "maxLlmTokens": 2048
+}
