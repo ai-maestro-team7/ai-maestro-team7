@@ -25,6 +25,7 @@ def org_pay_for(index: dict[str, OrgPay], posting: PostingLatest) -> OrgPay | No
     return index.get(name_key(posting.organization)) if index else None
 
 
-def label(average: int, year: int) -> str:
-    """"기관 직원 평균 연 9,118만 원 (2025년 결산 · 알리오 경영공시, 신입 초봉 아님)"."""
-    return f"기관 직원 평균 연 {average:,}만 원 ({year}년 결산 · 알리오 경영공시, 신입 초봉 아님)"
+def label(average: int, year: int, source: str, year_note: str = "결산") -> str:
+    """"기관 직원 평균 연 9,118만 원 (2025년 결산 · 알리오 경영공시, 신입 초봉 아님)". 출처는 " · " 앞부분만 쓴다."""
+    when = f"{year}년" + (f" {year_note}" if year_note else "")
+    return f"기관 직원 평균 연 {average:,}만 원 ({when} · {source.split(' · ')[0]}, 신입 초봉 아님)"

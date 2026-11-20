@@ -59,8 +59,9 @@ class EligibilityResult(OppModel):
 class OrgPayBrief(OppModel):
     """카드용 기관 직원 평균보수 (B-D11). 직원 전체 평균이라 신입 초봉이 아니다. 화면에는 "기관 평균"으로 쓴다."""
 
-    average: int                  # 최근 결산 연도 1인당 평균 보수액
+    average: int                  # 최근 연도 1인당 평균 보수액
     year: int
+    year_note: str = "결산"
     unit: MoneyUnit = MoneyUnit.MANWON_YEAR
     source: str
     as_of: str
@@ -68,8 +69,8 @@ class OrgPayBrief(OppModel):
 
     @classmethod
     def of(cls, pay: OrgPay) -> "OrgPayBrief":
-        return cls(average=pay.latest_average, year=pay.latest_year, source=pay.source, as_of=pay.as_of,
-                   source_url=pay.source_url)
+        return cls(average=pay.latest_average, year=pay.latest_year, year_note=pay.year_note, source=pay.source,
+                   as_of=pay.as_of, source_url=pay.source_url)
 
 
 class PostingCard(OppModel):

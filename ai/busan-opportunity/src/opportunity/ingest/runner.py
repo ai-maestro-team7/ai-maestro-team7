@@ -15,7 +15,7 @@ from ..config import OpportunityConfig
 from ..core import clock
 from ..models.posting import PostingSnapshot
 from ..ports import CatalogRepo, RawStore, Secrets
-from . import alio, alio_pay, klid, work24, worldjob, youthcenter
+from . import alio, alio_pay, klid, klid_pay, work24, worldjob, youthcenter
 from .field_maps import DETAIL_MAX_PER_RUN, HTTP_TIMEOUT_SECONDS
 from .http import FetchError, HttpGet, HttpPostJson, KeyCache, default_http_get, default_http_post_json
 from .normalize import (
@@ -46,7 +46,7 @@ POSTING_SOURCES = {
     "worldjob": (worldjob, normalize_worldjob),
 }
 REHASH_ON_COLLISION = {"klid"}  # 공고 번호가 겹치면 내용 해시 ID로 바꾸는 출처
-ALL_SOURCES = ("work24", "alio", "klid", "worldjob", "youthcenter", "work24_gangso", "alio_pay")
+ALL_SOURCES = ("work24", "alio", "klid", "worldjob", "youthcenter", "work24_gangso", "alio_pay", "klid_pay")
 
 
 def _load_seed_json(raw_store: RawStore, key: str) -> dict:
@@ -188,6 +188,14 @@ def _run_org_pays(catalog, raw_store, *, when, day, http_get, http_post, sleep) 
     return {"status": status, "normalized": len(pays), **stats}
 
 
+def _run_klid_pays(catalog) -> dict:
+    """지방출자·출연기관 직원평균임금 (B-D11). 저장소 시드를 `ORGPAY`에 쓴다. 외부 호출이 없다."""
+    pays = klid_pay.load_seed()
+    for pay in pays:
+        catalog.put_org_pay(pay)
+    return {"status": "OK" if pays else "EMPTY", "listed": len(pays), "normalized": len(pays)}
+
+
 def run_ingest(config: OpportunityConfig, catalog: CatalogRepo, raw_store: RawStore, secrets: Secrets, *,
                sources: Sequence[str], as_of: str | date | datetime | None = None,
                http_get: HttpGet | None = None, sleep: Callable[[float], None] | None = None,
@@ -215,6 +223,8 @@ def run_ingest(config: OpportunityConfig, catalog: CatalogRepo, raw_store: RawSt
             elif name == "alio_pay":
                 result = _run_org_pays(catalog, raw_store, when=when, day=day, http_get=fetch,
                                        http_post=http_post or default_http_post_json, sleep=sleep)
+            elif name == "klid_pay":
+                result = _run_klid_pays(catalog)
             elif name == "work24_gangso":
                 result = _run_companies(config, catalog, raw_store, keys, when=when, day=day, http_get=fetch,
                                         sleep=sleep)

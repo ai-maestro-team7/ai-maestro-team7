@@ -77,3 +77,10 @@ def test_public_list_shows_org_average(paid, as_of):
     items = {c.job_posting_id: c for c in list_public_postings(paid, limit=50, as_of=as_of).items}
     assert items[FINANCE].org_pay.average == 9118 and not items[FINANCE].salary.disclosed
     assert items[OCEAN].org_pay is None
+
+
+def test_label_follows_source_and_year_note():
+    assert org_pay.label(5301, 2025, "클린아이 경영공시 · 지방출자출연기관 직원평균임금 (행정안전부)", "") == (
+        "기관 직원 평균 연 5,301만 원 (2025년 · 클린아이 경영공시, 신입 초봉 아님)")
+    assert org_pay.label(9118, 2025, "알리오 경영공시 · 직원 평균보수 (일반정규직)") == (
+        "기관 직원 평균 연 9,118만 원 (2025년 결산 · 알리오 경영공시, 신입 초봉 아님)")

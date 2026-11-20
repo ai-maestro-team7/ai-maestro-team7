@@ -106,7 +106,8 @@
     ],
     "weeklySources": [
       "work24_gangso",
-      "alio_pay"
+      "alio_pay",
+      "klid_pay"
     ],
     "enrichChunk": 100
   },

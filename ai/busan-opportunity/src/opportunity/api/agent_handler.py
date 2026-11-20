@@ -159,7 +159,8 @@ def _posting(card: PostingCard, as_of) -> AgentPosting:
         work_region=card.work_region.label, is_busan=card.is_busan, is_capital_area=card.is_capital_area,
         closes_at=card.closes_at, deadline=_deadline(card.closes_at, as_of),
         salary=salary_label(card.salary.disclosed, card.salary.min, card.salary.max),
-        org_pay=org_pay_label(card.org_pay.average, card.org_pay.year) if card.org_pay else None,
+        org_pay=(org_pay_label(card.org_pay.average, card.org_pay.year, card.org_pay.source, card.org_pay.year_note)
+                 if card.org_pay else None),
         career=career_label(card.career_type), match_level=MATCH_LEVEL_LABEL[card.match_level],
         eligibility=str(card.eligibility.status) if card.eligibility else None,
         badges=_badges(card.badges), facts=card.facts, busan_alternatives_count=card.busan_alternatives_count,

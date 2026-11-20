@@ -128,6 +128,23 @@ ALIO_PAY = {
 }
 ALIO_PAY_SOURCE = "알리오 경영공시 · 직원 평균보수 (일반정규직)"
 
+# 지방출자·출연기관 직원평균임금 (행정안전부 공공데이터 파일, 2026-11-21 받음). 클린아이 공시를 정리한 연도별 시트(2023~2025)다.
+# 지방공사·공단은 이 파일에 없고 클린아이 누리집은 자동 수집을 막아 두었다(robots.txt Disallow: /). 이용허락 제한 없음.
+# 파일은 한 번 만든 자료라 저장소 시드(`seeds/klid_org_pay.json`)로 두고, 다시 만들 때는 `python -m opportunity.ingest.klid_pay`.
+KLID_PAY = {
+    "source": "klid_pay",
+    "seed": "klid_org_pay.json",
+    "page_url": "https://www.data.go.kr/data/15169932/fileData.do",
+    "as_of": "2025-12-31",  # 파일 이름의 기준일 (_20251231)
+    # 이보다 낮은 해(만 원/년)는 뺀다. 2025년 최저임금 연 환산이 약 2,500만 원이라, 이 아래는 일부 기간만 일했거나 잘못
+    # 적은 값이다 (파일에 96만·300만 원 같은 값이 있다). 단시간 근로가 섞인 기관을 생각해 여유를 둔다
+    "min_plausible": 2000,
+    "skip_name_words": ("테스트",),  # 파일에 "통합테스트출자출연" 같은 시험용 줄이 있다
+    "columns": {"founder": "설립지자체", "kind": "기관유형", "name": "기관명", "average": "1인당 평균임금",
+                "tenure_years": "평균근수년", "tenure_months": "평균근속월"},
+}
+KLID_PAY_SOURCE = "클린아이 경영공시 · 지방출자출연기관 직원평균임금 (행정안전부)"
+
 # 고용 형태 이름 → EmploymentType (2026-11-20 응답의 값 5종이 전부다). 여러 개가 섞이면 UNKNOWN이다.
 ALIO_EMPLOYMENT = {
     "정규직": EmploymentType.FULL_TIME,
