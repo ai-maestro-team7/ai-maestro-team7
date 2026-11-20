@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Noto_Sans_KR } from "next/font/google";
-import { Footer } from "@/components/layout/Footer";
 import { Gnb } from "@/components/layout/Gnb";
 import "./globals.css";
 
@@ -31,7 +30,6 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         </a>
         <Gnb />
         {children}
-        <Footer />
       </body>
     </html>
   );
