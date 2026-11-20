@@ -20,7 +20,7 @@ import boto3
 
 from ..config import OpportunityConfig, get_config, require_env
 from ..deps import Deps
-from ..models.region import RegionStats
+from ..models.region import LocalLifeData, RegionStats
 from ..ports import EligibilityFn, WorkspacePort
 from .dynamo import DynamoCatalog, DynamoUsers
 from .events import EmfEvents
@@ -40,6 +40,9 @@ def _client(service: str, region: str):
 @lru_cache(maxsize=None)
 def _dynamodb(region: str):
     return boto3.resource("dynamodb", region_name=region)
+
+
+LOCAL_LIFE_SEED_KEY = "seed/local_life.json"
 
 
 def build_aws_deps(*, eligibility: EligibilityFn, workspaces: WorkspacePort,
@@ -75,8 +78,22 @@ def build_aws_deps(*, eligibility: EligibilityFn, workspaces: WorkspacePort,
         events=EmfEvents(),
         llm=BedrockLlm(client=bedrock, config=config, model_id=require_env("MODEL_ID")),
         mailer=mailer,
+        local_life=_load_local_life(region),
         region_stats=RegionStats(),  # 주거비·통근 통계는 비워 둔다. 값이 없으면 비교 패널이 해당 행을 숨긴다
     )
+
+
+def _load_local_life(region: str) -> LocalLifeData:
+    """부산 근무지 주변 생활 정보 시드 (`seed/local_life.json`). 없거나 못 읽으면 비워 둔다 (그러면 묶음을 보여 주지 않는다)."""
+    bucket = os.environ.get("OPP_DATA_BUCKET")
+    if not bucket:
+        return LocalLifeData()
+    try:
+        from ..ingest.local_data import load_local_life
+
+        return load_local_life(S3RawStore(_client("s3", region), bucket).get(LOCAL_LIFE_SEED_KEY) or b"{}")
+    except Exception:  # noqa: BLE001 — 시드 문제로 추천 API 전체가 멈추면 안 된다
+        return LocalLifeData()
 
 
 def build_raw_store(config: OpportunityConfig | None = None) -> S3RawStore:
