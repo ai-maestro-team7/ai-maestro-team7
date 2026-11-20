@@ -3,7 +3,8 @@
 frontend-ui는 `frontend/`에 Next.js 화면을 만드는 FRONTEND 파트의 첫 스펙이다. Figma 파일 `orxq9z9EWqrYDNVviAG1aW`의 "v2 · AI 티 걷어낸 버전" 페이지(노드 `27:1331`)에 있는 화면 16개와 공통 컴포넌트를 그대로 옮기고, 화면 데이터는 로컬 Mock 데이터로 채운다. 백엔드 API는 이번 단계에서 연결하지 않는다.
 
 근거와 전제:
-- 프론트엔드 프레임워크는 D-24 OPEN이었다. 프론트 담당(사용자)이 이 스펙에서 Next.js App Router · React · TypeScript · Tailwind CSS · Lucide React로 정했다 (2026-11-20 요청). `tech.md` 결정 표의 12번 반영은 별도 문서 PR로 한다.
+- 프론트엔드 프레임워크(D-24)는 프론트 담당이 이 스펙에서 Next.js App Router · React · TypeScript · Tailwind CSS · Lucide React로 정했다 (2026-11-20, CONFIRMED). `tech.md` 결정 표 12번, `AGENTS.md`, common-foundation 결정 기록에 반영했다.
+- 화면 데이터는 통합 데모 페르소나 ①(부산 소재 대학 4학년, 통계학 전공, 희망 직무 데이터 분석, NCS 20010105)에 맞춘다 (D-37, `docs/architecture.md` §5.3, `docs/api.md` §6.2). Figma 예시 문구의 "백엔드 개발자"는 화면 틀로만 쓴다. 공고는 B 데모 데이터(`ai/busan-opportunity/src/opportunity/seeds/demo_world.py`)의 부산 공고와 이름·근무지·마감·요건을 맞춘다.
 - 화면 배포 계획은 S3 `team07-web-<계정ID>` + CloudFront다 (이전 `api.md`, AGENTS.md "녹음과 카메라는 HTTPS에서만 돌아서 화면은 CloudFront로 배포"). 그래서 서버 없이 정적 파일로 내보낼 수 있어야 한다.
 - 문구는 B §4.7 문구 규칙과 제품 원칙(product.md)을 따른다. 점수 표시는 `docs/api.md` §6.3을 따른다.
 - 문서 표기: 제안서 = `docs/프로젝트_제안서.md`, B = `docs/개발계획서2.md`, C = `docs/개발계획서3.md`, 구조 = `docs/architecture.md`.
@@ -18,7 +19,7 @@ frontend-ui는 `frontend/`에 Next.js 화면을 만드는 FRONTEND 파트의 첫
 - **Figma_V2**: Figma 페이지 `27:1331`. 화면 16개와 `Components v2` 섹션(Button, Steps, JobRow, PolicyRow, Footer, GNB)을 담는다
 - **Design_Token**: Figma_V2 변수에서 가져온 색·글꼴·간격·모서리 값
 - **Mock_Data**: `features/*/data/`에 두는 화면용 예시 데이터. 모든 값은 가상이다
-- **GNB**: 상단 공통 메뉴. 로고, 검색, 저장한 공고, 알림, 사용자 표시, 메뉴 탭 6개
+- **GNB**: 상단 공통 메뉴. 로고, 검색, 저장한 공고, 사용자 표시, 메뉴 탭 6개. Figma의 "알림"은 프론트 담당 결정으로 뺀다
 - **Interview_Flow**: 모의면접 4단계 (설정 → 장비 점검 → 면접 → 리포트)
 
 ## Requirements
@@ -147,7 +148,7 @@ frontend-ui는 `frontend/`에 Next.js 화면을 만드는 FRONTEND 파트의 첫
 3. THE App SHALL 아이콘만 있는 버튼에 `aria-label`을, 장식 아이콘에 `aria-hidden`을 붙인다.
 4. THE App SHALL 표 형태 목록을 표 의미(`role="table"` 또는 `<table>`)로 읽히게 한다.
 
-## 열린 항목 (팀 확인 필요)
-- 데모 직무: Figma와 이 스펙의 Mock_Data는 "백엔드 개발자"다. `docs/architecture.md` §5.3과 `docs/api.md` §6.2는 통합 데모 직무를 "데이터 분석"으로 정했다 (D-37). Mock_Data만 바꾸면 되도록 분리해 두고, 바꿀지는 프론트 담당이 정한다.
-- GNB의 "저장한 공고"·"알림"은 Figma에 이동할 화면이 없어 이번에는 동작하지 않는 표시로 둔다.
-- 첨삭 "이력서" 탭, 진단 "직접 입력" 탭, 면접 질문 2·3과 추가 질문, 공고·정책 상세 2·3번째 항목은 Figma에 화면 내용이 없어 같은 틀에 예시 데이터를 채운다.
+## 결정 기록 (프론트 담당, 2026-11-20)
+- 데모 직무: Mock_Data를 Figma의 "백엔드 개발자" 대신 통합 데모 직무 "데이터 분석"으로 쓴다 (D-37).
+- GNB "알림"은 뺀다. "저장한 공고"는 Figma에 이동할 화면이 없어 동작하지 않는 표시로 둔다.
+- 첨삭 "이력서" 탭, 진단 "직접 입력" 탭, 면접 질문 2·3과 추가 질문, 공고·정책 상세 2·3번째 항목은 Figma에 내용이 없어 같은 틀에 데모 직무에 맞춘 예시 데이터를 채운다.

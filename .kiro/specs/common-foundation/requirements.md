@@ -352,7 +352,7 @@
 | D-21 | 자원 접두사·태그 | `team07-`, `team=team07` | `team07-`, `team=team07`, 리전 `ap-northeast-2` | BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 |
 | D-22 | 벡터 저장소·임베딩 모델 | S3 Vectors / OpenSearch, Cohere v4 / Titan v2 | S3 Vectors (`team07-opp-vectors`/`postings-v1`, 1024차원, 코사인), 임베딩 `global.cohere.embed-v4:0` (한국어, 1024) | A + B | CONFIRMED · 2026-11-20 · BACKEND 담당 |
 | D-23 | 통합 Agent 프레임워크 | Bedrock Agents + Action Group (A F-06, B §5.9) / Strands | 없음. 이유: A 소유 (mentoring-agent-quality) | A | OPEN |
-| D-24 | 프론트엔드 프레임워크 | 문서에 없음 | 없음. 이유: FRONTEND 소유 (frontend-app) | FRONTEND | OPEN |
+| D-24 | 프론트엔드 프레임워크 | 문서에 없음 | Next.js 16 App Router + React + TypeScript + Tailwind CSS v4, `output: "export"` 정적 내보내기 (`.kiro/specs/frontend-ui/`) | FRONTEND | CONFIRMED · 2026-11-20 · FRONTEND 담당 |
 | D-25 | 이전 뼈대(`4aa11cc`) 재사용 | 재사용 / 미사용 | 정리해 재사용 (PR #9~#14) | 팀 리더 | CONFIRMED · 2026-11-20 · BACKEND 담당 |
 | D-26 | AI·데이터 작업 영역 라벨 | `fe`·`be`·`common`만 | AI·데이터·인프라 작업은 `be` | 팀 리더 | CONFIRMED · 2026-11-20 · BACKEND 담당 |
 | D-27 | MVP 우선순위·담당 없는 기능 | 제안서 9.2 / 파트 명세 | 없음. 이유: 범위 결정은 팀 리더. 워크스페이스·문서 버전은 D-36으로 분리해 확정 | 팀 리더 | OPEN |

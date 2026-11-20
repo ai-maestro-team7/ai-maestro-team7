@@ -5,7 +5,7 @@
 ## 기술 결정
 | 항목 | 결정 | 이유 |
 |---|---|---|
-| 프레임워크 | Next.js(App Router, 최신 안정판) + React + TypeScript strict | 사용자 지정. D-24 OPEN을 이 스펙에서 정함 |
+| 프레임워크 | Next.js(App Router, 최신 안정판) + React + TypeScript strict | 사용자 지정. D-24 CONFIRMED (2026-11-20) |
 | 스타일 | Tailwind CSS v4, 토큰은 `globals.css`의 `@theme` | create-next-app 기본. 설정 파일 없이 CSS 한 곳에 토큰을 둔다 |
 | 아이콘 | `lucide-react` | Figma 아이콘(bell, bookmark, chevron-right, search, check, user, file-text, external-link, arrow-right)의 SVG 경로가 Lucide와 같다. SVG를 따로 내려받아 관리할 필요가 없다 |
 | 글꼴 | `next/font/google`의 Noto Sans KR (400·500·700) | Figma 글꼴. 빌드 때 받아 정적 파일로 넣는다 |
@@ -112,7 +112,7 @@ frontend/
 - 로드맵: `Roadmap { target, order[], weeks[{week, title, description, deliverable, gap}] }`
 - 면접: `InterviewQuestion { id, topic, question, hint, followUp{question, hint, sampleAnswer, reason} }`, `InterviewReport { stats[], feedback[{id, topic, comment, speakingSeconds, frontGazeRate, gazeNeedsAttention}], next{title, description} }`, `InterviewMode = "camera" | "voice" | "text"`
 - 멘토: `MentorReply { prompt, answer, recommendation?{title, meta, actionLabel, href} }`, `ContinueItem { title, description, href }`
-- 날짜 기준: Mock 기준일 `2026-11-20`(`features/jobs/data`의 `DATA_AS_OF`). D-day는 `lib/format.ts`가 기준일로 계산한다. 화면 코드에서 `new Date()`를 쓰지 않아 빌드 시각과 관계없이 같은 값이 나온다.
+- 날짜 기준: Mock 기준일 `2026-11-21`(`features/jobs/data`의 `DATA_AS_OF`, B 데모 데이터 기준일과 같음). D-day는 `lib/format.ts`가 기준일로 계산한다. 화면 코드에서 `new Date()`를 쓰지 않아 빌드 시각과 관계없이 같은 값이 나온다.
 
 ## 상호작용 설계
 - 홈 멘토(`MentorPanel`): 상태 `messages: {question, reply}[]`. 보내기·Chip → 질문 문자열로 Mock 답변 찾기(일치하는 Chip 답변, 없으면 기본 답변). "새 질문" → 초기 상태. 대화 화면 입력칸으로 이어서 물을 수 있다.

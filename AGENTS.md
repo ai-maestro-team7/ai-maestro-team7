@@ -129,8 +129,8 @@ C 기능 정리 페이지 (노션 "AI 모의면접 에이전트 기능")
 
 ## 결정 상태
 결정 기록은 `.kiro/specs/common-foundation/requirements.md` "결정 기록"이 기준이다 (2026-11-20 확정). 자세한 규칙은 `docs/api.md`, `docs/db-schema.md`.
-- 확정: 인증 Cognito JWT(로그인 `/api/v1/auth/login`, 데모 계정) · API `/api/v1/{part}`, 카멜, 오류 `error{code, message, requestId, retryable}` · DB `team07-career-mentor`·`catalog`·`reference`·`cache` · 공고 스냅샷 보존(`SNAP#`·`LATEST`) · 자격 판정 `backend/eligibility.py` 하나 · 공통 프로필 `PROFILE#BASIC` · 워크스페이스 BACKEND · Python 3.13 · AWS CLI 스크립트 · 단일 Lambda + `ai/interview` 패키징 · 비동기는 Lambda 자기 호출 · S3 Vectors + Cohere v4 · 데모 직무 데이터 분석
-- 미확정 (임의 결정 금지): 통합 Agent 프레임워크 (D-23, A) · 프론트엔드 프레임워크 (D-24) · MVP 우선순위와 진로 설문·캘린더·기업 관계 그래프 담당 (D-27, 팀 리더)
+- 확정: 인증 Cognito JWT(로그인 `/api/v1/auth/login`, 데모 계정) · API `/api/v1/{part}`, 카멜, 오류 `error{code, message, requestId, retryable}` · DB `team07-career-mentor`·`catalog`·`reference`·`cache` · 공고 스냅샷 보존(`SNAP#`·`LATEST`) · 자격 판정 `backend/eligibility.py` 하나 · 공통 프로필 `PROFILE#BASIC` · 워크스페이스 BACKEND · 프론트 Next.js 정적 내보내기 (D-24) · Python 3.13 · AWS CLI 스크립트 · 단일 Lambda + `ai/interview` 패키징 · 비동기는 Lambda 자기 호출 · S3 Vectors + Cohere v4 · 데모 직무 데이터 분석
+- 미확정 (임의 결정 금지): 통합 Agent 프레임워크 (D-23, A) · MVP 우선순위와 진로 설문·캘린더·기업 관계 그래프 담당 (D-27, 팀 리더)
 
 ## B 작업 기준 (`ai/busan-opportunity/`)
 B(부산 채용공고·청년정책 맞춤 추천) 코드를 짤 때는 이 절부터 본다. 근거는 `docs/개발계획서2.md`(rev 55), `docs/db-schema.md` v1.3, 결정 기록이다. 코드 구조와 함께 쓰는 파일은 `ai/busan-opportunity/README.md`에 있다. 이 절은 steering보다 나중에 정리했다. B 내용이 steering과 다르면 이 절과 `docs/db-schema.md`를 따른다.

@@ -22,7 +22,7 @@ inclusion: always
 ## 라이브러리 (명세 기준)
 - boto3, Pydantic v2(입출력·LLM 출력 검사), pytest
 - C: `strands-agents`. B: AWS Lambda Powertools (`APIGatewayRestResolver`, `BedrockAgentResolver`, 멱등 유틸, EMF 지표)
-- 프론트엔드 프레임워크는 어느 문서에도 없다. 화면은 S3 `team07-web-<계정ID>` + CloudFront로 배포할 계획이었다 (이전 api.md).
+- 프론트엔드 (D-24 CONFIRMED, 프론트 담당 2026-11-20): Next.js 16 App Router, React 19, TypeScript strict, Tailwind CSS v4, lucide-react, 글꼴 Noto Sans KR. `output: "export"` 정적 내보내기(`frontend/out/`)를 S3 `team07-web-<계정ID>` + CloudFront로 배포한다 (이전 api.md). 정적 내보내기와 함께 쓸 수 없어 `cacheComponents`(PPR)는 끈다. 명령은 `frontend/`에서 `npm run lint`, `npm run typecheck`, `npm run build`. 설계는 `.kiro/specs/frontend-ui/`
 
 ## AWS 서비스
 | 서비스 | 용도 | 파트 | 이전 뼈대 현황 (스크립트·IAM 정책 기준) |
@@ -133,7 +133,7 @@ inclusion: always
 | 9 | 이력서 `career-docs`, 면접 녹음 `uploads` | D-14 CONFIRMED |
 | 10 | Lambda 비동기 자기 호출 | D-19 CONFIRMED |
 | 11 | S3 Vectors 1024차원 코사인, `global.cohere.embed-v4:0` | D-22 CONFIRMED |
-| 12 | 미정 (FRONTEND) | D-24 OPEN |
+| 12 | Next.js 16 App Router + TypeScript + Tailwind CSS v4, 정적 내보내기 (`frontend/`) | D-24 CONFIRMED |
 | 13 | Python 3.13, AWS CLI 스크립트 | D-15·D-16 CONFIRMED |
 | 14 | 정리해 재사용 (PR #9~#14) | D-25 CONFIRMED |
 
