@@ -22,7 +22,25 @@ AWS와 네트워크를 부르지 않는다. 메모리 저장소(`store/memory.py
 | `mentoring.api.task_handler.handle(event, deps)` | 이벤트에 `mentoringTask` 키가 있을 때 | Lambda 비동기 자기 호출 (D-19, BE-2) |
 | `mentoring.core.summary.to_career_profile_summary(profile_item)` | 면접 시작 때 | 저장된 역량 프로필 항목 → `CareerProfileSummary` dict 또는 None (BE-5) |
 
-`Deps`(`deps.py`)는 입구를 부르는 쪽이 만든다. AWS 구현과 `build_aws_deps()`는 다음 작업이다.
+`Deps`(`deps.py`)는 입구를 부르는 쪽이 만든다. AWS 구현과 `build_aws_deps()`는 #61이다.
+PDF 업로드를 받으려면 `Deps.extractor`에 `core.pdf_extractor.PdfExtractor(ocr=TextractOcr(textract 클라이언트),
+bucket=개인 문서 버킷)`을 넣는다. 없으면 업로드 완료가 501이다.
+
+## PDF 업로드 흐름
+
+1. `POST /documents/upload-url` `{fileName, contentType, sizeBytes, documentType}` → 201 `{documentId, uploadUrl, expiresInSeconds, status: PENDING}`
+2. 브라우저가 `uploadUrl`로 바로 PUT. `Content-Type` 헤더를 요청 때와 같게 보낸다 (서명에 들어 있다)
+3. `POST /documents/{id}/complete` → 202. 서버가 S3 객체의 크기·형식을 발급 때 값과 비교한다
+4. DOCUMENT_EXTRACT 작업: 텍스트 레이어(pypdf) 먼저, 부족하면 Textract OCR → 정규화 텍스트 저장 → PROFILE_EXTRACT 작업을 이어서 보낸다
+5. 화면은 `GET /documents/{id}`의 `extractionStatus`를 2초마다 본다: `UPLOADED → EXTRACTING → EXTRACTED → ANALYZING → COMPLETED`
+   (`REQUIRES_USER_REVIEW` 사유 `TOO_LITTLE_TEXT`이면 텍스트 직접 입력을 안내, `FAILED`는 `errorCode`·`retryable`로 안내)
+
+presigned URL은 응답에만 넣고 DB·멱등 결과·로그에 남기지 않는다. 같은 `Idempotency-Key`로 다시 요청하면 같은 문서에 URL을 새로 서명한다.
+
+## 지표
+
+`core/metrics.py`가 CloudWatch EMF 형식 JSON 한 줄을 stdout에 쓴다 (PutMetricData 권한 불필요). 네임스페이스는 설정 `metrics.namespace`,
+차원은 `feature`. `DocumentParseFailure`, `LLMSchemaFailure`, `EvidenceValidationFailure`, `AnalysisLatency`(ms).
 
 ## 구조
 

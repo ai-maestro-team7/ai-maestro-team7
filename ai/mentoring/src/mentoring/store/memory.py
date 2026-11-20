@@ -1,7 +1,9 @@
 """메모리 구현. DynamoDB 키 구조(db-schema §2.1·§2.5)를 그대로 흉내 내서, AWS 구현과 같은 조건을 테스트한다.
 값은 저장할 때와 읽을 때 모두 복사해 호출한 쪽이 저장된 값을 몰래 바꾸지 못하게 한다.
 """
+import hashlib
 from collections import deque
+from dataclasses import dataclass
 
 from ..models import CareerProfile, DocumentLatest, DocumentVersion, ProfilePointer, Task, TaskStatus
 from ..ports import AlreadyExists, IdemResult, VersionConflict
@@ -101,15 +103,47 @@ class MemoryUserRepo:
         self._put(user_id, f"IDEM#{key}", stored)
 
 
+@dataclass
+class MemoryObjectInfo:
+    size_bytes: int
+    content_type: str | None
+
+
 class MemoryObjectStore:
+    """텍스트는 `objects`, 업로드 파일은 `files`에 둔다. 테스트는 `upload()`로 브라우저 업로드를 흉내 낸다."""
+
     def __init__(self):
         self.objects: dict[str, str] = {}
+        self.files: dict[str, tuple[bytes, str | None]] = {}
+        self.presigned: list[dict] = []
 
     def put_text(self, key: str, text: str) -> None:
         self.objects[key] = text
 
     def get_text(self, key: str) -> str | None:
         return self.objects.get(key)
+
+    def get_bytes(self, key: str) -> bytes | None:
+        found = self.files.get(key)
+        return found[0] if found else None
+
+    def presign_put(self, key: str, *, content_type: str, size_bytes: int, expires_in: int) -> str:
+        token = hashlib.sha256(f"{key}|{content_type}|{size_bytes}".encode()).hexdigest()[:16]
+        self.presigned.append({"key": key, "contentType": content_type, "sizeBytes": size_bytes,
+                               "expiresIn": expires_in})
+        return f"https://upload.invalid/{token}?expires={expires_in}"
+
+    def head(self, key: str) -> MemoryObjectInfo | None:
+        found = self.files.get(key)
+        return MemoryObjectInfo(len(found[0]), found[1]) if found else None
+
+    def delete(self, key: str) -> None:
+        self.objects.pop(key, None)
+        self.files.pop(key, None)
+
+    def upload(self, key: str, data: bytes, content_type: str | None) -> None:
+        """테스트용: 브라우저가 presigned URL로 올린 것처럼 넣는다."""
+        self.files[key] = (data, content_type)
 
 
 class QueueDispatcher:

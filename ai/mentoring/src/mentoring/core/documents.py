@@ -21,7 +21,8 @@ def text_key(deps, user_id: str, document_id: str, version: int) -> str:
     return f"users/{deps.hash_user_id(user_id)}/documents/{document_id}/v{version}/extracted.txt"
 
 
-def _check_id(value: str | None, field: str) -> None:
+def check_id(value: str | None, field: str) -> None:
+    """ID에 `#`이 들어가면 400 (docs/api.md §2)."""
     if value is not None and (not value.strip() or "#" in value or len(value) > 200):
         raise invalid_input("ID 형식이 올바르지 않아요.", field=field)
 
@@ -30,7 +31,7 @@ def create_text_document(deps, user_id: str, request: TextDocumentRequest, idemp
     """텍스트로 받은 이력서를 저장하고 역량 추출 작업을 보낸다. 202 응답 본문을 돌려준다.
     텍스트 입력은 추출 단계를 건너뛰어 EXTRACTED에서 시작한다 (A F-01 "상태 전이")."""
     limits = deps.config.document
-    _check_id(request.workspace_id, "workspaceId")
+    check_id(request.workspace_id, "workspaceId")
     if request.title is not None and len(request.title) > limits.title_max_chars:
         raise invalid_input("제목이 너무 길어요.", field="title", maxChars=limits.title_max_chars)
     normalized = deps.text.normalize(request.text)
@@ -69,7 +70,7 @@ def create_text_document(deps, user_id: str, request: TextDocumentRequest, idemp
 
 
 def get_document(deps, user_id: str, document_id: str) -> DocumentView:
-    _check_id(document_id, "documentId")
+    check_id(document_id, "documentId")
     latest = deps.users.get_document_latest(user_id, document_id)
     if latest is None or latest.owner_user_id != user_id:
         raise document_not_found()

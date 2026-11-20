@@ -47,12 +47,27 @@ class IdempotencyConfig(_ConfigModel):
     key_max_chars: int = Field(ge=1)
 
 
+class UploadConfig(_ConfigModel):
+    """PDF 업로드 한도. 개발계획서1 F-01의 10MB·20페이지는 예시 값이다 (Requirement 3 기준 2)."""
+    allowed_content_types: list[str] = Field(min_length=1)
+    max_bytes: int = Field(ge=1)
+    max_pages: int = Field(ge=1)
+    presign_expires_seconds: int = Field(ge=30, le=3600)
+    file_name_max_chars: int = Field(ge=1)
+
+
+class MetricsConfig(_ConfigModel):
+    namespace: str = Field(min_length=1)
+
+
 class MentoringConfig(_ConfigModel):
     config_version: str
     document: DocumentConfig
     extraction: ExtractionConfig
     confirmation: ConfirmationConfig
     idempotency: IdempotencyConfig
+    upload: UploadConfig
+    metrics: MetricsConfig
 
 
 def load_config(path: Path | str | None = None, *, data: dict | None = None) -> MentoringConfig:
