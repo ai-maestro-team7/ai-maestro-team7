@@ -1,8 +1,17 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
-import { TwoColumn } from "@/components/layout/PageContainer";
+import {
+  createContext,
+  type ReactNode,
+  type RefObject,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 import { Button } from "@/components/ui/Button";
 import { Panel } from "@/components/ui/Panel";
 import { ProgressBar } from "@/components/ui/ProgressBar";
@@ -25,6 +34,8 @@ import { Recorder } from "./Recorder";
  * 모의면접 3단계: 면접. 질문은 서버가 하나씩 준다 (`/status` 2초 조회).
  * 질문 음성 재생 → 녹음(최대 2분)과 2초 간격 캡처 → 답변 제출 → 꼬리질문 또는 다음 질문 → 리포트.
  * 순서와 꼬리질문 여부는 서버가 정하고, 화면은 받은 질문에 답을 보내기만 한다.
+ *
+ * 배치: 가운데 큰 카메라 영상, 그 위에 질문 카드, 아래에 답변 카드. 녹음 중에는 스페이스바로 답변을 마친다.
  */
 export function InterviewSession() {
   const params = useSearchParams();
@@ -41,6 +52,22 @@ export function InterviewSession() {
     );
   }
   return <ActiveSession key={sessionId} sessionId={sessionId} job={job} requestedMode={mode} />;
+}
+
+/**
+ * 영상 위·아래 자리. 질문·답변 카드는 상태마다 다른 컴포넌트가 그리지만, 카메라 영상은 한자리에 계속 둬야
+ * 질문이 바뀔 때 영상이 다시 붙지 않는다. 그래서 카드는 포털로 이 두 자리에 넣는다.
+ */
+const SlotContext = createContext<{ top: HTMLElement | null; bottom: HTMLElement | null }>({ top: null, bottom: null });
+
+function AboveStage({ children }: { children: ReactNode }) {
+  const { top } = useContext(SlotContext);
+  return top ? createPortal(children, top) : null;
+}
+
+function BelowStage({ children }: { children: ReactNode }) {
+  const { bottom } = useContext(SlotContext);
+  return bottom ? createPortal(children, bottom) : null;
 }
 
 function ActiveSession({ sessionId, job, requestedMode }: { sessionId: string; job: string; requestedMode: InterviewMode }) {
@@ -75,81 +102,114 @@ function ActiveSession({ sessionId, job, requestedMode }: { sessionId: string; j
   const micBlocked = needsMic && (media.status === "denied" || media.status === "unsupported" || (media.status === "ready" && !canRecord()));
   const lastAnswer = status?.lastAnswer;
 
+  const [top, setTop] = useState<HTMLDivElement | null>(null);
+  const [bottom, setBottom] = useState<HTMLDivElement | null>(null);
+
+  let content: ReactNode;
+  if (failed) {
+    content = (
+      <AboveStage>
+        <Notice
+          title={status?.error?.message ?? error?.message ?? "면접을 이어 갈 수 없어요."}
+          description="처음부터 다시 시작해 주세요."
+          action={
+            <Button href={`/interview?${interviewQuery({ job, mode: requestedMode })}`} size="M">
+              면접 설정으로
+            </Button>
+          }
+        />
+      </AboveStage>
+    );
+  } else if (question && micBlocked) {
+    content = (
+      <>
+        <AboveStage>
+          <QuestionCard question={question} />
+        </AboveStage>
+        <BelowStage>
+          <Notice
+            title="마이크를 쓸 수 없어요"
+            description="브라우저에서 마이크 권한을 허용한 뒤 새로고침하거나, 글로 답할 수 있어요."
+            action={
+              <Button size="M" onClick={() => setTyping(true)}>
+                글로 답하기
+              </Button>
+            }
+          />
+        </BelowStage>
+      </>
+    );
+  } else if (question && needsMic && media.status !== "ready") {
+    content = (
+      <AboveStage>
+        <Waiting label="마이크를 준비하는 중" />
+      </AboveStage>
+    );
+  } else if (question) {
+    content = (
+      <>
+        {lastAnswer && !lastAnswer.evaluable && (
+          <AboveStage>
+            <p role="status" className="text-small text-grey-600">
+              {unevaluableMessage(lastAnswer.reason)}
+            </p>
+          </AboveStage>
+        )}
+        <QuestionRound
+          key={question.answerId}
+          sessionId={sessionId}
+          question={question}
+          mode={mode}
+          stream={media.stream}
+          videoRef={videoRef}
+          onSubmitted={onSubmitted}
+        />
+      </>
+    );
+  } else {
+    content = (
+      <AboveStage>
+        <Waiting label={completed ? "리포트로 이동하는 중" : stageMessage(status?.stage)} />
+      </AboveStage>
+    );
+  }
+
   return (
     <>
       <InterviewHeader title="AI 모의면접" step={3} description={`${job} · ${modeLabel(mode)}`} />
-      <TwoColumn
-        main={
-          <div className="flex flex-col gap-7">
-            <ProgressBar label={progressLabel} value={Math.min(number, total) / total} />
-            {failed ? (
-              <Notice
-                title={status?.error?.message ?? error?.message ?? "면접을 이어 갈 수 없어요."}
-                description="처음부터 다시 시작해 주세요."
-                action={
-                  <Button href={`/interview?${interviewQuery({ job, mode: requestedMode })}`} size="M">
-                    면접 설정으로
-                  </Button>
-                }
-              />
-            ) : question ? (
-              micBlocked ? (
-                <>
-                  <QuestionText question={question} />
-                  <Notice
-                    title="마이크를 쓸 수 없어요"
-                    description="브라우저에서 마이크 권한을 허용한 뒤 새로고침하거나, 글로 답할 수 있어요."
-                    action={
-                      <Button size="M" onClick={() => setTyping(true)}>
-                        글로 답하기
-                      </Button>
-                    }
-                  />
-                </>
-              ) : needsMic && media.status !== "ready" ? (
-                <Waiting label="마이크를 준비하는 중" />
-              ) : (
-                <>
-                  {lastAnswer && !lastAnswer.evaluable && (
-                    <p role="status" className="text-small text-grey-600">
-                      {unevaluableMessage(lastAnswer.reason)}
-                    </p>
-                  )}
-                  <QuestionRound
-                    key={question.answerId}
-                    sessionId={sessionId}
-                    question={question}
-                    mode={mode}
-                    stream={media.stream}
-                    videoRef={videoRef}
-                    onSubmitted={onSubmitted}
-                  />
-                </>
-              )
-            ) : (
-              <Waiting label={completed ? "리포트로 이동하는 중" : stageMessage(status?.stage)} />
-            )}
-            <div>
-              <Button href={`/interview?${interviewQuery({ job, mode: requestedMode })}`} variant="textMuted">
-                면접 종료
-              </Button>
-            </div>
-          </div>
-        }
-        rail={<SessionRail mode={mode} stream={needsCamera && media.status === "ready" ? media.stream : null} videoRef={videoRef} cameraFailed={needsCamera && media.status !== "ready" && media.status !== "pending"} />}
-      />
+      <div className="mx-auto flex w-full max-w-main flex-col gap-5">
+        <ProgressBar label={progressLabel} value={Math.min(number, total) / total} />
+        {/* 질문 카드 자리 → 카메라 영상 → 답변 카드 자리. 빈 자리는 숨겨 간격이 생기지 않게 한다 */}
+        <div ref={setTop} className="flex flex-col gap-3 empty:hidden" />
+        <SessionStage
+          mode={mode}
+          stream={needsCamera && media.status === "ready" ? media.stream : null}
+          videoRef={videoRef}
+          cameraFailed={needsCamera && media.status !== "ready" && media.status !== "pending"}
+        />
+        <div ref={setBottom} className="flex flex-col gap-3 empty:hidden" />
+        {mode === "text" && <AnswerGuide />}
+        <div>
+          <Button href={`/interview?${interviewQuery({ job, mode: requestedMode })}`} variant="textMuted">
+            면접 종료
+          </Button>
+        </div>
+      </div>
+      <SlotContext value={{ top, bottom }}>{content}</SlotContext>
     </>
   );
 }
 
-function QuestionText({ question }: { question: NextQuestion }) {
+/** 영상 위 질문 카드. 질문 음성을 읽는 중이면 그 안내와 [바로 답변 시작]을 아래에 붙인다. */
+function QuestionCard({ question, footer }: { question: NextQuestion; footer?: ReactNode }) {
   return (
-    <section aria-labelledby="interview-question" aria-live="polite" className="flex flex-col gap-2.5">
+    <Panel as="section" aria-labelledby="interview-question" aria-live="polite" className="flex flex-col gap-2.5 p-5">
       <p className="text-small font-bold text-grey-600">AI 면접관{question.isFollowUp ? " · 추가 질문" : ""}</p>
-      <h2 id="interview-question" className="text-question font-bold text-grey-900">
+      <h2 id="interview-question" className="text-h2 font-bold text-grey-900">
         {question.text}
       </h2>
-    </section>
+      {footer}
+    </Panel>
   );
 }
 
@@ -163,7 +223,7 @@ function Waiting({ label }: { label: string }) {
   );
 }
 
-function Notice({ title, description, action }: { title: string; description: string; action?: React.ReactNode }) {
+function Notice({ title, description, action }: { title: string; description: string; action?: ReactNode }) {
   return (
     <div role="alert" className="flex flex-col items-center gap-3 border-t border-b border-t-grey-800 border-b-grey-200 py-12 text-center">
       <p className="text-body font-bold text-grey-900">{title}</p>
@@ -313,6 +373,20 @@ function VoiceRound({ sessionId, question, mode, stream, videoRef, onSubmitted }
     [stopTimers],
   );
 
+  // 녹음 중에는 스페이스바로 답변을 마친다. 글을 쓰거나 다른 버튼·링크에 초점이 있으면 그 동작을 그대로 둔다
+  useEffect(() => {
+    if (phase !== "recording") return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.code !== "Space" || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest("input, textarea, select, button, a, [contenteditable='true']")) return;
+      event.preventDefault(); // 화면이 아래로 내려가지 않게 한다
+      void finish(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [phase, finish]);
+
   const remaining = RULES.answerLimitSec - elapsed;
   // 30초, 10초 전부터 남은 시간을 알린다
   const notice =
@@ -320,40 +394,64 @@ function VoiceRound({ sessionId, question, mode, stream, videoRef, onSubmitted }
 
   return (
     <>
-      <QuestionText question={question} />
-      {phase === "listening" && (
-        <Panel tone="muted" className="flex items-center justify-between gap-4 px-4.5 py-4">
-          <p className="text-body text-grey-900">질문을 읽어 드리고 있어요. 끝나면 녹음을 시작해요.</p>
-          <Button variant="line" size="M" onClick={begin}>
-            바로 답변 시작
-          </Button>
+      <AboveStage>
+        <QuestionCard
+          question={question}
+          footer={
+            phase === "listening" && (
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-grey-200 pt-3.5">
+                <p className="text-small text-grey-600">질문을 읽어 드리고 있어요. 끝나면 녹음을 시작해요.</p>
+                <Button variant="line" size="M" onClick={begin}>
+                  바로 답변 시작
+                </Button>
+              </div>
+            )
+          }
+        />
+      </AboveStage>
+      <BelowStage>
+        <Panel className="flex flex-col gap-4 p-5">
+          {phase === "listening" || phase === "idle" ? (
+            <p className="text-body text-grey-900">
+              {phase === "idle"
+                ? `준비되면 답변을 시작해 주세요. ${RULES.answerLimitSec / 60}분까지 답할 수 있어요.`
+                : "질문이 끝나면 바로 녹음이 시작돼요."}
+            </p>
+          ) : (
+            <Recorder elapsed={Math.min(elapsed, RULES.answerLimitSec)} limit={RULES.answerLimitSec} levels={levels} notice={notice} />
+          )}
+          {failure && (
+            <p role="alert" className="text-small text-red-500">
+              {failure}
+            </p>
+          )}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-grey-200 pt-4">
+            <p className="text-small text-grey-600">
+              {phase === "recording" ? (
+                <>
+                  <kbd className="rounded-check border border-grey-300 bg-grey-50 px-1.5 py-0.5 font-sans text-small text-grey-800">
+                    스페이스바
+                  </kbd>
+                  를 눌러도 답변을 마칠 수 있어요
+                </>
+              ) : phase === "sending" ? (
+                "답변을 보내고 있어요"
+              ) : (
+                "녹음 중에는 스페이스바로도 답변을 마칠 수 있어요"
+              )}
+            </p>
+            {phase === "error" ? (
+              <Button onClick={() => void send()}>다시 보내기</Button>
+            ) : phase === "idle" ? (
+              <Button onClick={begin}>답변 시작</Button>
+            ) : (
+              <Button onClick={() => void finish(false)} disabled={phase !== "recording"}>
+                {phase === "sending" ? "답변 보내는 중" : "답변 완료"}
+              </Button>
+            )}
+          </div>
         </Panel>
-      )}
-      {phase === "idle" && (
-        <Panel tone="muted" className="flex items-center justify-between gap-4 px-4.5 py-4">
-          <p className="text-body text-grey-900">준비되면 답변을 시작해 주세요. {RULES.answerLimitSec / 60}분까지 답할 수 있어요.</p>
-          <Button size="M" onClick={begin}>
-            답변 시작
-          </Button>
-        </Panel>
-      )}
-      {(phase === "recording" || phase === "sending" || phase === "error") && (
-        <Recorder elapsed={Math.min(elapsed, RULES.answerLimitSec)} limit={RULES.answerLimitSec} levels={levels} notice={notice} />
-      )}
-      {failure && (
-        <p role="alert" className="text-small text-red-500">
-          {failure}
-        </p>
-      )}
-      <div className="flex justify-end">
-        {phase === "error" ? (
-          <Button onClick={() => void send()}>다시 보내기</Button>
-        ) : (
-          <Button onClick={() => void finish(false)} disabled={phase !== "recording"}>
-            {phase === "sending" ? "답변 보내는 중" : "답변 완료"}
-          </Button>
-        )}
-      </div>
+      </BelowStage>
     </>
   );
 }
@@ -382,27 +480,60 @@ function TextRound({ sessionId, question, onSubmitted }: RoundProps) {
 
   return (
     <>
-      <QuestionText question={question} />
-      <TextArea
-        id={`answer-${question.answerId}`}
-        label="내 답변"
-        rows={6}
-        value={answer}
-        onChange={(event) => setAnswer(event.target.value)}
-        counterSuffix={`/ ${RULES.answerTextMax.toLocaleString()}자`}
-        error={tooLong ? `답변은 ${RULES.answerTextMax.toLocaleString()}자까지 쓸 수 있어요.` : failure}
-        disabled={pending}
-      />
-      <div className="flex justify-end">
-        <Button onClick={() => void handleSubmit()} disabled={pending || tooLong || answer.trim().length === 0}>
-          {pending ? "답변 보내는 중" : "답변 완료"}
-        </Button>
-      </div>
+      <AboveStage>
+        <QuestionCard question={question} />
+      </AboveStage>
+      <BelowStage>
+        <Panel className="flex flex-col gap-4 p-5">
+          <TextArea
+            id={`answer-${question.answerId}`}
+            label="내 답변"
+            rows={6}
+            value={answer}
+            onChange={(event) => setAnswer(event.target.value)}
+            counterSuffix={`/ ${RULES.answerTextMax.toLocaleString()}자`}
+            error={tooLong ? `답변은 ${RULES.answerTextMax.toLocaleString()}자까지 쓸 수 있어요.` : failure}
+            disabled={pending}
+          />
+          <div className="flex justify-end">
+            <Button onClick={() => void handleSubmit()} disabled={pending || tooLong || answer.trim().length === 0}>
+              {pending ? "답변 보내는 중" : "답변 완료"}
+            </Button>
+          </div>
+        </Panel>
+      </BelowStage>
     </>
   );
 }
 
-function SessionRail({
+/** 글로 답할 때 답변 카드 아래에 두는 가이드 */
+function AnswerGuide() {
+  return (
+    <aside aria-labelledby="answer-guide" className="flex flex-col gap-3">
+      <h2 id="answer-guide" className="text-h3 font-bold text-grey-900">
+        답변 가이드
+      </h2>
+      <ol className="flex flex-col">
+        {answerGuide.map((item, i) => (
+          <li key={item.title} className="flex gap-2.5 border-b border-grey-200 py-3 last:border-b-0">
+            <span className="text-body font-bold text-grey-500">{i + 1}</span>
+            <span className="flex flex-col gap-0.5">
+              <span className="text-body font-bold text-grey-900">{item.title}</span>
+              <span className="text-small text-grey-600">{item.description}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+      <p className="text-small text-grey-600">글로 답하면 답변 내용만 평가해요.</p>
+    </aside>
+  );
+}
+
+/**
+ * 질문 카드와 답변 카드 사이. 카메라 방식이면 큰 영상(장비 점검과 같은 700×440 비율),
+ * 음성만이면 카메라 없이 진행한다는 안내, 텍스트면 아무것도 두지 않는다.
+ */
+function SessionStage({
   mode,
   stream,
   videoRef,
@@ -413,31 +544,11 @@ function SessionRail({
   videoRef: RefObject<HTMLVideoElement | null>;
   cameraFailed: boolean;
 }) {
-  if (mode === "text") {
-    return (
-      <aside aria-labelledby="answer-guide" className="flex flex-col gap-3">
-        <h2 id="answer-guide" className="text-h3 font-bold text-grey-900">
-          답변 가이드
-        </h2>
-        <ol className="flex flex-col">
-          {answerGuide.map((item, i) => (
-            <li key={item.title} className="flex gap-2.5 border-b border-grey-200 py-3 last:border-b-0">
-              <span className="text-body font-bold text-grey-500">{i + 1}</span>
-              <span className="flex flex-col gap-0.5">
-                <span className="text-body font-bold text-grey-900">{item.title}</span>
-                <span className="text-small text-grey-600">{item.description}</span>
-              </span>
-            </li>
-          ))}
-        </ol>
-        <p className="text-small text-grey-600">글로 답하면 답변 내용만 평가해요.</p>
-      </aside>
-    );
-  }
+  if (mode === "text") return null;
 
   if (mode === "voice") {
     return (
-      <Panel as="aside" tone="muted" className="flex flex-col gap-1 p-5">
+      <Panel tone="muted" className="flex flex-col gap-1 p-5">
         <p className="text-body font-bold text-grey-900">카메라 없이 진행 중이에요</p>
         <p className="text-small text-grey-600">답변 내용과 전달력만 확인해요. 녹음은 글로 바꾼 뒤 바로 지워요.</p>
       </Panel>
@@ -445,12 +556,14 @@ function SessionRail({
   }
 
   return (
-    <aside aria-label="카메라" className="flex flex-col gap-3">
-      <CameraPreview size="S" label="카메라 미리보기" stream={stream} videoRef={videoRef} />
-      <p className="text-small font-medium text-grey-900">
-        {cameraFailed ? "카메라를 쓸 수 없어 시선은 측정하지 않아요" : "답변하는 동안 2초마다 시선을 확인해요"}
+    <section aria-label="카메라" className="flex flex-col gap-2">
+      <CameraPreview size="L" label="카메라 미리보기" stream={stream} videoRef={videoRef} />
+      <p className="text-small text-grey-600">
+        <span className="font-medium text-grey-900">
+          {cameraFailed ? "카메라를 쓸 수 없어 시선은 측정하지 않아요." : "답변하는 동안 2초마다 시선을 확인해요."}
+        </span>{" "}
+        시선과 고개 방향만 기록하고 얼굴 이미지는 저장하지 않아요.
       </p>
-      <p className="text-small text-grey-600">시선과 고개 방향만 기록하고 얼굴 이미지는 저장하지 않아요.</p>
-    </aside>
+    </section>
   );
 }

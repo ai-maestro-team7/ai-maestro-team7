@@ -1,4 +1,3 @@
-import { Panel } from "@/components/ui/Panel";
 import { cn } from "@/lib/cn";
 import { MIC_LEVEL_BARS } from "../hooks/useMicLevel";
 import { formatTimer } from "../lib";
@@ -14,11 +13,11 @@ type RecorderProps = {
   notice?: string;
 };
 
-/** 녹음 상태 상자: 경과 시간과 마이크 입력 크기를 보여준다. */
+/** 녹음 상태: 경과 시간과 마이크 입력 크기. 답변 카드 안에 넣는다. */
 export function Recorder({ elapsed, limit, levels, notice }: RecorderProps) {
   const bars = [...Array<number>(Math.max(0, MIC_LEVEL_BARS - levels.length)).fill(0), ...levels];
   return (
-    <Panel className="flex flex-col gap-3.5 p-5">
+    <div className="flex flex-col gap-3.5">
       <div className="flex items-center justify-between">
         <p className="flex items-center gap-2">
           <span aria-hidden className="size-2 animate-pulse rounded-full bg-red-500" />
@@ -44,6 +43,6 @@ export function Recorder({ elapsed, limit, levels, notice }: RecorderProps) {
           />
         ))}
       </div>
-    </Panel>
+    </div>
   );
 }
