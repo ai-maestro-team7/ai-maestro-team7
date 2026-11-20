@@ -3,11 +3,13 @@
 import itertools
 
 import pytest
+from rules.test_ncs_match import ALIO_IT, ALIO_OFFICE, OVERSEAS_VN, add_posting
 
-from opportunity.core import copy_rules, eligibility, ranking
+from opportunity.core import copy_rules, eligibility, facts, ranking
 from opportunity.models import MatchLevel, OppError, Sort
-from opportunity.models.posting import Job, Salary, WorkRegion
+from opportunity.models.posting import AltCandidate, AltCandidates, Job, Salary, WorkRegion
 from opportunity.models.profile import BasicProfile, DesiredJob
+from opportunity.models.region import LocalLifeData
 from opportunity.seeds import demo_world as w
 
 PERSONAS = ("demo1", "demo2", "demo3")
@@ -319,3 +321,125 @@ def test_empty_busan_message_when_no_close_busan_job(deps, as_of):
     deps.users.profiles["game"] = BasicProfile(desired_jobs=[DesiredJob(work24_code="G0301", name="게임 클라이언트")])
     assert feed(deps, as_of, "game").empty_message == copy_rules.EMPTY_BUSAN
     assert feed(deps, as_of, "game", region="CAPITAL").empty_message is None
+
+
+# ---------------------------------------------------------------- 해외 공고, NCS 공고가 섞인 피드
+
+OVERSEAS = "wk24-T-OVERSEAS"
+OVERSEAS_SIDO26 = "wk24-T-OVERSEAS-26"  # 데이터가 어긋나 sido가 부산으로 남은 해외 공고
+BUSAN_ALIO_IT = "alio-T-BUSAN-IT"
+SEOUL_ALIO_IT = "alio-T-SEOUL-IT"
+BUSAN_ALIO_OFFICE = "alio-T-BUSAN-OFFICE"
+WORK24_DATA = Job(code="D0101", middle="D01", major="D", name="데이터 분석가")
+
+
+@pytest.fixture
+def mixed(deps):
+    """해외 공고 2건(1건은 sido=26이 남아 있음)과 잡알리오 NCS 공고 3건을 더한다."""
+    add_posting(deps, OVERSEAS, job=WORK24_DATA, work_region=OVERSEAS_VN, salary=(5000, 6000))
+    add_posting(deps, OVERSEAS_SIDO26, job=WORK24_DATA,
+                work_region=OVERSEAS_VN.model_copy(update={"sido": "26", "unknown": False}))
+    add_posting(deps, BUSAN_ALIO_IT, region=w.NAMGU, job=ALIO_IT)
+    add_posting(deps, SEOUL_ALIO_IT, region=w.GANGNAM, job=ALIO_IT, salary=(4200, 4600))
+    add_posting(deps, BUSAN_ALIO_OFFICE, region=w.SAHA, job=ALIO_OFFICE, description="회계 전표 처리와 경영 지원 사무")
+    return deps
+
+
+@pytest.mark.parametrize("user", PERSONAS)
+def test_t01_same_set_with_overseas_and_ncs(mixed, as_of, user):
+    busan_first = feed(mixed, as_of, user, sort=Sort.BUSAN_FIRST)
+    match = feed(mixed, as_of, user, sort=Sort.MATCH)
+    assert set(ids(busan_first)) == set(ids(match))
+    assert {OVERSEAS, BUSAN_ALIO_IT} & set(ids(match))  # 새 공고가 실제로 후보에 들어왔다
+
+
+@pytest.mark.parametrize("user", PERSONAS)
+def test_t02_with_overseas_and_ncs(mixed, as_of, user):
+    items = feed(mixed, as_of, user, sort=Sort.BUSAN_FIRST).items
+    guard = mixed.config.ranking.inversion_guard
+    for i, j in itertools.combinations(range(len(items)), 2):
+        a, b = items[i], items[j]
+        for busan, other, busan_pos, other_pos in ((a, b, i, j), (b, a, j, i)):
+            if busan.is_busan and not other.is_busan and other.match_score - busan.match_score >= guard:
+                assert other_pos < busan_pos
+
+
+@pytest.mark.parametrize("user", PERSONAS)
+def test_t04_region_never_changes_match_score_with_overseas(mixed, user):
+    profile = mixed.users.get_basic_profile(user)
+    regions_ = (WorkRegion(sido="26", sigungu="26350", label="부산 해운대구"),
+                WorkRegion(sido="11", sigungu="11680", label="서울 강남구"), OVERSEAS_VN)
+    for posting in mixed.catalog.latest.values():
+        result = eligibility.judge(mixed, profile, posting.eligibility_rules)
+        scores = set()
+        for region in regions_:
+            flipped = posting.model_copy(update={"work_region": region, "is_busan": region.sido == "26",
+                                                 "is_capital_area": region.sido == "11",
+                                                 "is_overseas": region.overseas})
+            scores.add(ranking.match_score(mixed.config, profile, flipped, content_similarity=0.7,
+                                           eligibility=result).score)
+        assert len(scores) == 1, posting.job_posting_id
+
+
+def test_overseas_gets_no_busan_boost_or_alternatives_count(mixed, as_of):
+    mixed.catalog.put_alts(AltCandidates(job_posting_id=OVERSEAS, computed_at=w.DATA_AS_OF,
+                                         candidates=[AltCandidate(job_posting_id=w.BUSAN_DATA, similarity=0.9)]))
+    cards = {c.job_posting_id: c for c in feed(mixed, as_of, sort=Sort.BUSAN_FIRST).items}
+    for pid in (OVERSEAS, OVERSEAS_SIDO26):
+        card = cards[pid]
+        assert not card.is_busan and not card.is_capital_area
+        assert card.rank_score == card.match_score  # 가산점 없음
+        assert card.busan_alternatives_count is None
+        assert copy_rules.OVERSEAS_LABEL.format(country="베트남") in card.facts
+    assert cards[OVERSEAS].match_level == cards[w.SEOUL_DATA].match_level  # 정보를 줄이지 않고 같은 규칙으로 잰다
+
+
+def test_region_overseas_filter(mixed, as_of):
+    assert set(ids(feed(mixed, as_of, region="OVERSEAS"))) == {OVERSEAS, OVERSEAS_SIDO26}
+    assert feed(mixed, as_of, region="OVERSEAS").empty_message is None
+    for region in ("BUSAN", "26", "CAPITAL", "11"):
+        assert not {OVERSEAS, OVERSEAS_SIDO26} & set(ids(feed(mixed, as_of, region=region))), region
+    assert {OVERSEAS, OVERSEAS_SIDO26} <= set(ids(feed(mixed, as_of, region="ALL")))
+
+
+def test_all_region_orders_overseas_by_match(mixed, as_of):
+    items = feed(mixed, as_of, sort=Sort.MATCH).items
+    assert [c.match_score for c in items] == sorted((c.match_score for c in items), reverse=True)
+
+
+def test_overseas_fact_without_country(deps, as_of):
+    add_posting(deps, OVERSEAS, job=WORK24_DATA, work_region=OVERSEAS_VN.model_copy(update={"country": None}))
+    card = next(c for c in feed(deps, as_of).items if c.job_posting_id == OVERSEAS)
+    assert facts.FACT_OVERSEAS_NO_COUNTRY in card.facts
+
+
+# ---------------------------------------------------------------- 통근 사실
+COMMUTE = LocalLifeData(commute_minutes={"26290>26350": 35}, commute_source="부산교통공사 (테스트)",
+                        commute_as_of="2026-11-20")
+
+
+def test_commute_fact_only_when_table_has_value(deps, as_of):
+    label = copy_rules.COMMUTE_LABEL.format(minutes=35)
+    before = feed(deps, as_of).items
+    assert all(c.commute_minutes is None for c in before)
+    assert not any(t.startswith("집에서 대중교통") for c in before for t in c.facts)
+
+    deps.local_life = COMMUTE  # demo1은 남구(26290)에 산다
+    cards = {c.job_posting_id: c for c in feed(deps, as_of).items}
+    assert cards[w.BUSAN_DATA].commute_minutes == 35 and label in cards[w.BUSAN_DATA].facts  # 해운대구(26350)
+    others = [c for pid, c in cards.items() if c.work_region.sigungu != "26350"]
+    assert others and all(c.commute_minutes is None for c in others)  # 표에 없는 구간은 추정하지 않는다
+    assert all(label not in c.facts for c in others)
+
+
+def test_commute_needs_source_and_as_of(deps, as_of):
+    deps.local_life = COMMUTE.model_copy(update={"commute_source": None})
+    card = next(c for c in feed(deps, as_of).items if c.job_posting_id == w.BUSAN_DATA)
+    assert card.commute_minutes is None
+
+
+def test_commute_needs_residence(deps, as_of):
+    deps.local_life = COMMUTE
+    profile = deps.users.get_basic_profile("demo1").model_copy(update={"residence_sigungu": None})
+    deps.users.profiles["demo1"] = profile
+    assert all(c.commute_minutes is None for c in feed(deps, as_of).items)

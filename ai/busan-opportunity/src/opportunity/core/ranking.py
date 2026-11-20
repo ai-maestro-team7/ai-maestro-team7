@@ -7,6 +7,7 @@ import base64
 import binascii
 import json
 import math
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -23,7 +24,18 @@ from .context import UserContext, freshness, load_context
 from .eligibility import judge, required_ratio
 from .texts import profile_text
 
-REGION_ALL, REGION_BUSAN, REGION_CAPITAL = "ALL", "BUSAN", "CAPITAL"
+REGION_ALL, REGION_BUSAN, REGION_CAPITAL, REGION_OVERSEAS = "ALL", "BUSAN", "CAPITAL", "OVERSEAS"
+
+# 직무 일치의 근거. 사실 문구를 고를 때 쓴다 (facts.job_fact)
+BASIS_WORK24, BASIS_NAME, BASIS_NCS = facts.BASIS_WORK24, facts.BASIS_NAME, facts.BASIS_NCS
+BASIS_NCS_MAJOR_NAME = facts.BASIS_NCS_MAJOR_NAME
+
+# NCS 코드: 대분류 2 + 중분류 2 + 소분류 2 + 세분류 2 = 8자리
+NCS_FULL = 8
+NCS_MIDDLE = 4
+NCS_MAJOR = 2
+_NCS_DIGITS = re.compile(r"^\d{2}(?:\d{2}){0,3}$")
+_ALIO_NCS = re.compile(r"^R6000(\d{2})$")  # 잡알리오 코드. 끝 2자리가 NCS 대분류 번호
 
 
 @dataclass
@@ -32,6 +44,7 @@ class MatchBreakdown:
 
     score: float
     job_match: float | None = None
+    job_basis: str | None = None  # BASIS_* 가운데 job_match를 정한 쪽
     content_sim: float | None = None
     required_ok: float | None = None
     preferred_ok: float | None = None
@@ -42,27 +55,101 @@ def _norm(text: str | None) -> str:
     return "".join((text or "").lower().replace("·", "").split())
 
 
-def _job_match_one(config: OpportunityConfig, desired: DesiredJob, job: Job) -> float | None:
+def _work24_match(config: OpportunityConfig, desired: DesiredJob, job: Job) -> float | None:
+    """고용24 직종 코드 비교. 공고에 세분류·중분류 코드가 없으면 None.
+
+    잡알리오 공고는 `job.major`에 NCS 대분류 이름이 들어 있어 고용24 코드로 보지 않는다.
+    """
     levels = config.match.job_match_levels
     code = (desired.work24_code or "").strip()
-    if code and (job.code or job.middle or job.major):
-        if job.code and code == job.code:
+    if not code or not (job.code or job.middle):
+        return None
+    if job.code and code == job.code:
+        return levels.exact
+    if job.middle and code.startswith(job.middle):
+        return levels.same_middle
+    if job.major and code.startswith(job.major):
+        return levels.same_major
+    return 0.0
+
+
+def _ncs_prefix(code: str) -> str | None:
+    """공고의 NCS 코드에서 알 수 있는 앞자리. 8자리 NCS는 그대로, 잡알리오 R6000NN은 대분류 NN만."""
+    code = (code or "").strip()
+    alio = _ALIO_NCS.match(code)
+    if alio:
+        return alio.group(1)
+    return code if _NCS_DIGITS.match(code) else None
+
+
+def _ncs_prefixes(job: Job) -> list[str]:
+    return [p for p in (_ncs_prefix(c) for c in job.ncs_codes) if p]
+
+
+def ncs_match_value(config: OpportunityConfig, desired_ncs: str | None, job: Job) -> float | None:
+    """NCS 코드 비교. 8자리가 같으면 exact, 앞 4자리 sameMiddle, 앞 2자리 sameMajor.
+
+    공고 분류가 여러 개면 가장 높은 값을 쓴다. 잡알리오 코드는 대분류만 알아서 최대 sameMajor다.
+    희망 직무 NCS 코드나 공고 NCS 코드가 없으면 None.
+    """
+    levels = config.match.job_match_levels
+    mine = (desired_ncs or "").strip()
+    prefixes = _ncs_prefixes(job)
+    if len(mine) != NCS_FULL or not mine.isdigit() or not prefixes:
+        return None
+    best = 0.0
+    for prefix in prefixes:
+        if len(prefix) == NCS_FULL and prefix == mine:
             return levels.exact
-        if job.middle and code.startswith(job.middle):
-            return levels.same_middle
-        if job.major and code.startswith(job.major):
-            return levels.same_major
-        return 0.0
+        if len(prefix) >= NCS_MIDDLE and prefix[:NCS_MIDDLE] == mine[:NCS_MIDDLE]:
+            best = max(best, levels.same_middle)
+        elif prefix[:NCS_MAJOR] == mine[:NCS_MAJOR]:
+            best = max(best, levels.same_major)
+    return best
+
+
+def _category_only(job: Job) -> bool:
+    """고용24 코드도 8자리 NCS도 없고 잡알리오 대분류 코드만 있는 공고. 이름은 NCS 대분류 이름이다."""
+    prefixes = _ncs_prefixes(job)
+    return not (job.code or job.middle) and bool(prefixes) and all(len(p) == NCS_MAJOR for p in prefixes)
+
+
+def _name_match(config: OpportunityConfig, desired: DesiredJob, job: Job) -> tuple[float | None, str]:
+    """이름 포함 관계. 공고 이름이 NCS 대분류 이름뿐이면 겹쳐도 같은 분야(sameMajor)까지만 본다."""
+    levels = config.match.job_match_levels
     mine, theirs = _norm(desired.name), _norm(job.name)
     if not mine or not theirs:
-        return None
-    return levels.exact if (mine in theirs or theirs in mine) else 0.0
+        return None, BASIS_NAME
+    hit = mine in theirs or theirs in mine
+    if _category_only(job):
+        return (levels.same_major if hit else 0.0), BASIS_NCS_MAJOR_NAME
+    return (levels.exact if hit else 0.0), BASIS_NAME
+
+
+def _job_match_one(config: OpportunityConfig, desired: DesiredJob, job: Job) -> tuple[float | None, str | None]:
+    """고용24 코드(없으면 이름) 비교와 NCS 비교 가운데 높은 값. 같으면 고용24·이름 쪽 근거를 쓴다."""
+    value, basis = _work24_match(config, desired, job), BASIS_WORK24
+    if value is None:
+        value, basis = _name_match(config, desired, job)
+    ncs = ncs_match_value(config, desired.ncs_code, job)
+    if ncs is not None and (value is None or ncs > value):
+        return ncs, BASIS_NCS
+    return value, (basis if value is not None else None)
+
+
+def job_match_detail(config: OpportunityConfig, profile: BasicProfile, job: Job) -> tuple[float | None, str | None]:
+    """희망 직무가 여러 개면 가장 높은 값과 그 근거. 비교할 정보가 전혀 없으면 (None, None)."""
+    best: tuple[float | None, str | None] = (None, None)
+    for desired in profile.desired_jobs:
+        value, basis = _job_match_one(config, desired, job)
+        if value is not None and (best[0] is None or value > best[0]):
+            best = (value, basis)
+    return best
 
 
 def job_match_value(config: OpportunityConfig, profile: BasicProfile, job: Job) -> float | None:
     """희망 직무가 여러 개면 가장 높은 값. 비교할 정보가 없으면 None."""
-    values = [v for v in (_job_match_one(config, d, job) for d in profile.desired_jobs) if v is not None]
-    return max(values) if values else None
+    return job_match_detail(config, profile, job)[0]
 
 
 def content_sim_value(config: OpportunityConfig, similarity: float | None) -> float | None:
@@ -108,7 +195,7 @@ def match_score(config: OpportunityConfig, profile: BasicProfile, posting: Posti
                 eligibility: EligibilityResult | None = None) -> MatchBreakdown:
     """적합도 0~1. 공고의 부산 여부는 계산에 쓰지 않는다 (T-04)."""
     w = config.match.weights
-    jm = job_match_value(config, profile, posting.job)
+    jm, basis = job_match_detail(config, profile, posting.job)
     cs = content_sim_value(config, content_similarity)
     ro = required_ratio(eligibility, config.match.unknown_condition_value) if eligibility is not None else None
     po = preferred_ok_value(profile, posting)
@@ -117,7 +204,8 @@ def match_score(config: OpportunityConfig, profile: BasicProfile, posting: Posti
                 if value is not None]
     total = sum(weight for weight, _ in measured)
     score = sum(weight * value for weight, value in measured) / total if total else 0.0
-    return MatchBreakdown(score=score, job_match=jm, content_sim=cs, required_ok=ro, preferred_ok=po)
+    return MatchBreakdown(score=score, job_match=jm, job_basis=basis, content_sim=cs, required_ok=ro,
+                          preferred_ok=po)
 
 
 def rank_score(config: OpportunityConfig, match: float, *, is_busan: bool, sort: Sort) -> float:
@@ -136,6 +224,21 @@ def match_level(config: OpportunityConfig, match: float) -> MatchLevel:
     if match >= levels.fair:
         return MatchLevel.FAIR
     return MatchLevel.LOW
+
+
+# ---------------------------------------------------------------- 근무지 (대안도 쓴다)
+def is_overseas_posting(posting: PostingLatest) -> bool:
+    """해외 근무 공고. 부산도 수도권도 아니다."""
+    return posting.is_overseas or regions.is_overseas(posting.work_region)
+
+
+def is_busan_posting(config: OpportunityConfig, posting: PostingLatest) -> bool:
+    """근무지가 부산으로 확인된 국내 공고. 부산 가산점과 부산 대안 후보는 이것만 본다."""
+    return not is_overseas_posting(posting) and regions.is_busan(config, posting.work_region)
+
+
+def is_capital_posting(config: OpportunityConfig, posting: PostingLatest) -> bool:
+    return not is_overseas_posting(posting) and regions.is_capital_area(config, posting.work_region)
 
 
 # ---------------------------------------------------------------- 벡터 도우미 (대안·상세도 쓴다)
@@ -183,15 +286,24 @@ def _decode_cursor(cursor: str | None) -> int:
 
 
 def _check_region(region: str) -> None:
-    if region in (REGION_ALL, REGION_BUSAN, REGION_CAPITAL) or region in regions.SIDO_NAMES:
+    if region in (REGION_ALL, REGION_BUSAN, REGION_CAPITAL, REGION_OVERSEAS) or region in regions.SIDO_NAMES:
         return
     raise invalid_input("region 값이 올바르지 않아요.", field="region")
 
 
-def _in_region(posting: PostingLatest, sidos: list[str] | None) -> bool:
+def _region_sidos(config: OpportunityConfig, region: str) -> list[str] | None:
+    """region을 시·도 목록으로. OVERSEAS는 시·도가 없어 빈 목록이다."""
+    return [] if region == REGION_OVERSEAS else regions.region_sidos(config, region)
+
+
+def _in_region(posting: PostingLatest, region: str, sidos: list[str] | None) -> bool:
+    """ALL이면 해외 공고도 그대로 섞는다. OVERSEAS는 해외 공고만, 시·도 필터는 국내 공고만 남긴다."""
+    if region == REGION_OVERSEAS:
+        return is_overseas_posting(posting)
     if sidos is None:
         return True
-    return not posting.work_region.unknown and posting.work_region.sido in sidos
+    return (not is_overseas_posting(posting) and not posting.work_region.unknown
+            and posting.work_region.sido in sidos)
 
 
 def _job_code_ok(posting: PostingLatest, codes: list[str] | None) -> bool:
@@ -230,32 +342,34 @@ def busan_alternatives_count(cfg: OpportunityConfig, alts: AltCandidates | None,
     for cand in alts.candidates:
         latest = latest_by_id.get(cand.job_posting_id)
         if (latest is not None and cand.similarity >= cfg.alternatives.min_similarity
-                and regions.is_busan(cfg, latest.work_region) and is_open(latest, as_of)):
+                and is_busan_posting(cfg, latest) and is_open(latest, as_of)):
             count += 1
     return min(count, cfg.alternatives.view_max)
 
 
-def _card(deps: Deps, row: dict, as_of: datetime, alt_count: int | None) -> PostingCard:
+def _card(deps: Deps, row: dict, as_of: datetime, alt_count: int | None, profile: BasicProfile) -> PostingCard:
     cfg, posting, match = deps.config, row["posting"], row["match"]
-    fact_list = facts.compact([facts.job_fact(cfg, match.job_match), *facts.eligibility_facts(row["eligibility"]),
+    commute = facts.commute_minutes(deps.local_life, profile, posting.work_region)
+    fact_list = facts.compact([facts.job_fact(cfg, match.job_match, basis=match.job_basis),
+                               facts.overseas_fact(posting.work_region) if is_overseas_posting(posting) else None,
+                               facts.commute_fact(commute), *facts.eligibility_facts(row["eligibility"]),
                                facts.deadline_fact(posting.closes_at, as_of)])
     return PostingCard(
         job_posting_id=posting.job_posting_id, title=posting.title, organization=posting.organization,
         org_type=posting.org_type, work_region=posting.work_region,
-        is_busan=regions.is_busan(cfg, posting.work_region),
-        is_capital_area=regions.is_capital_area(cfg, posting.work_region), job=posting.job,
+        is_busan=is_busan_posting(cfg, posting), is_capital_area=is_capital_posting(cfg, posting), job=posting.job,
         closes_at=posting.closes_at, rolling=posting.rolling, salary=posting.salary,
         match_score=round(match.score, facts.SCORE_DIGITS), match_level=match_level(cfg, match.score),
         rank_score=round(row["rank"], facts.SCORE_DIGITS), eligibility=row["eligibility"],
         badges=facts.valid_badges(posting.badges), facts=fact_list, busan_alternatives_count=alt_count,
-        is_sample=posting.is_sample,
+        commute_minutes=commute, is_sample=posting.is_sample,
     )
 
 
 def _few_busan_jobs(cfg: OpportunityConfig, rows: list[dict]) -> bool:
     """같은 중분류 이상으로 맞는 부산 공고가 하나도 없으면 True."""
     need = cfg.match.job_match_levels.same_middle
-    return not any(regions.is_busan(cfg, r["posting"].work_region) and (r["match"].job_match or 0) >= need
+    return not any(is_busan_posting(cfg, r["posting"]) and (r["match"].job_match or 0) >= need
                    for r in rows)
 
 
@@ -266,6 +380,7 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
 
     sort가 None이면 사용자 설정을 쓴다. BUSAN_FIRST와 MATCH는 공고 집합이 같고 순서만 다르다 (T-01).
     마감된 공고는 뺀다 (T-21). 수도권 공고에는 busanAlternativesCount를 붙인다.
+    해외 공고는 부산도 수도권도 아니라 가산점과 busanAlternativesCount가 없다. region=OVERSEAS면 해외 공고만.
     """
     cfg = deps.config
     region = (region or REGION_ALL).strip().upper()
@@ -287,14 +402,14 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
     latest_by_id = deps.catalog.batch_get_latest(list(similarity))
 
     # 2. 거르기: 마감, 지역, 직종 코드, 검색어
-    sidos = regions.region_sidos(cfg, region)
+    sidos = _region_sidos(cfg, region)
     rows = []
     for pid, posting in latest_by_id.items():
-        if not (is_open(posting, ctx.as_of) and _in_region(posting, sidos)
+        if not (is_open(posting, ctx.as_of) and _in_region(posting, region, sidos)
                 and _job_code_ok(posting, job_codes) and _keyword_ok(posting, keyword)):
             continue
         match, result = score_posting(deps, ctx, posting, similarity[pid])
-        rank = rank_score(cfg, match.score, is_busan=regions.is_busan(cfg, posting.work_region), sort=sort)
+        rank = rank_score(cfg, match.score, is_busan=is_busan_posting(cfg, posting), sort=sort)
         rows.append({"posting": posting, "match": match, "eligibility": result, "rank": rank})
 
     # 3. 정렬과 쪽 나누기
@@ -303,7 +418,7 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
     next_cursor = _encode_cursor(offset + limit) if offset + limit < len(rows) else None
 
     # 4. 수도권 카드의 부산 대안 수. ALTS 후보를 한 번에 읽는다.
-    capital = [r["posting"] for r in page if regions.is_capital_area(cfg, r["posting"].work_region)]
+    capital = [r["posting"] for r in page if is_capital_posting(cfg, r["posting"])]
     alts_by_id = {p.job_posting_id: deps.catalog.get_alts(p.job_posting_id) for p in capital}
     cand_ids = {c.job_posting_id for alts in alts_by_id.values() if alts for c in alts.candidates}
     cand_latest = deps.catalog.batch_get_latest(sorted(cand_ids)) if cand_ids else {}
@@ -313,7 +428,7 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
         count = None
         if posting.job_posting_id in alts_by_id:
             count = busan_alternatives_count(cfg, alts_by_id[posting.job_posting_id], ctx.as_of, cand_latest)
-        cards.append(_card(deps, row, ctx.as_of, count))
+        cards.append(_card(deps, row, ctx.as_of, count, ctx.profile))
 
     # 5. 이유 질문: 수도권으로 처음 바꿨을 때 한 번
     ask = False

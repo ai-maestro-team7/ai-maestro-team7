@@ -8,8 +8,9 @@ from datetime import datetime
 from ..config import OpportunityConfig
 from ..models.api import EligibilityResult, RegionalTalentView
 from ..models.enums import BadgeType, CheonggeulType, ConditionResult, OrgType, RegionalTalentStatus
-from ..models.posting import Badge, PostingLatest, Salary
+from ..models.posting import Badge, PostingLatest, Salary, WorkRegion
 from ..models.profile import BasicProfile
+from ..models.region import LocalLifeData
 from . import clock, copy_rules
 from .regions import sido_name
 
@@ -19,6 +20,10 @@ SIMILARITY_DIGITS = 2  # 사실 목록에 쓰는 유사도 자리
 FACT_JOB_EXACT = "희망 직무와 같은 직종"
 FACT_JOB_MIDDLE = "희망 직무와 가까운 직종 (같은 중분류)"
 FACT_JOB_MAJOR = "희망 직무와 같은 대분류 직종"
+FACT_JOB_NCS_EXACT = "희망 직무와 같은 NCS 세분류"
+FACT_JOB_NCS_MIDDLE = "희망 직무와 가까운 분야 (NCS 중분류)"
+FACT_JOB_NCS_MAJOR = "희망 직무와 같은 분야 (NCS 대분류)"
+FACT_OVERSEAS_NO_COUNTRY = "해외 근무 · 국가는 공고문 확인"
 FACT_REQUIRED = "필수 조건 {total}개 중 {met}개 충족"
 FACT_UNKNOWN = "확인이 필요한 조건 {count}개"
 FACT_SIMILAR = "하는 일이 비슷함 (유사도 {similarity})"
@@ -55,15 +60,46 @@ def salary_disclosed(salary: Salary) -> bool:
 
 
 # ---------------------------------------------------------------- 사실
-def job_fact(config: OpportunityConfig, job_match: float | None) -> str | None:
+# 직무 일치의 근거 (`ranking.MatchBreakdown.job_basis`)
+BASIS_WORK24, BASIS_NAME, BASIS_NCS = "WORK24", "NAME", "NCS"
+BASIS_NCS_MAJOR_NAME = "NCS_MAJOR_NAME"  # NCS 대분류 이름과 희망 직무 이름이 겹침
+BASIS_NCS_KINDS = (BASIS_NCS, BASIS_NCS_MAJOR_NAME)
+
+
+def job_fact(config: OpportunityConfig, job_match: float | None, *, basis: str | None = None) -> str | None:
+    """직무 일치 사실. NCS로 맞춘 값은 "직종"이라 하지 않고 NCS 분류 단계를 그대로 말한다.
+
+    basis는 `MatchBreakdown.job_basis`. 없으면 고용24 직종 문구를 쓴다.
+    """
     levels = config.match.job_match_levels
     if job_match is None or job_match <= 0:
         return None
+    ncs = basis in BASIS_NCS_KINDS
     if job_match >= levels.exact:
-        return FACT_JOB_EXACT
+        return FACT_JOB_NCS_EXACT if ncs else FACT_JOB_EXACT
     if job_match >= levels.same_middle:
-        return FACT_JOB_MIDDLE
-    return FACT_JOB_MAJOR
+        return FACT_JOB_NCS_MIDDLE if ncs else FACT_JOB_MIDDLE
+    return FACT_JOB_NCS_MAJOR if ncs else FACT_JOB_MAJOR
+
+
+def overseas_fact(region: WorkRegion) -> str:
+    """해외 근무 · {국가}. 국가 이름이 원문에 없으면 공고문 확인으로 둔다."""
+    country = (region.country or "").strip()
+    return copy_rules.OVERSEAS_LABEL.format(country=country) if country else FACT_OVERSEAS_NO_COUNTRY
+
+
+def commute_minutes(local_life: LocalLifeData, profile: BasicProfile, region: WorkRegion) -> int | None:
+    """거주 시군구 → 근무 시군구 대중교통 분. 표에 값이 있고 출처·기준일이 있을 때만. 추정하지 않는다."""
+    home, work = profile.residence_sigungu, region.sigungu
+    if not home or not work or region.unknown or region.overseas:
+        return None
+    if not (local_life.commute_source and local_life.commute_as_of):
+        return None
+    return local_life.commute_minutes.get(f"{home}>{work}")
+
+
+def commute_fact(minutes: int | None) -> str | None:
+    return copy_rules.COMMUTE_LABEL.format(minutes=minutes) if minutes is not None else None
 
 
 def eligibility_facts(result: EligibilityResult | None) -> list[str]:
