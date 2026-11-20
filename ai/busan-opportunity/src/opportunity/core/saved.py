@@ -9,7 +9,7 @@ from collections.abc import Callable
 from datetime import date, datetime
 
 from ..deps import Deps
-from ..models.api import SavedListResponse, SavedView, SaveRequest, SaveResponse
+from ..models.api import SavedListResponse, SavedView, SaveRequest, SaveResponse, UnsaveResponse
 from ..models.base import OppModel
 from ..models.enums import SavedKind, TrackEvent, WorkspaceStatus
 from ..models.errors import invalid_input, posting_not_found, precondition_not_met
@@ -127,3 +127,20 @@ def list_saved(deps: Deps, user_id: str, *, as_of: str | date | datetime | None 
     items = sorted(deps.users.list_saved(user_id), key=lambda s: (s.saved_at, s.job_posting_id), reverse=True)
     postings = deps.catalog.batch_get_latest([s.job_posting_id for s in items]) if items else {}
     return SavedListResponse(items=[_view(deps, user_id, s, postings.get(s.job_posting_id)) for s in items])
+
+
+def remove_saved(deps: Deps, user_id: str, job_posting_id: str) -> UnsaveResponse:
+    """저장을 푼다. 목표 공고의 마감 일정을 먼저 지우고 `OPP#SAVED#`를 지운다.
+
+    일정을 먼저 지워야 중간에 실패해도 다시 부르면 남은 일정까지 지운다. 워크스페이스(분석·첨삭·면접 기록과
+    지원 상태)는 공통 백엔드 소유라 지우지 않는다. 다시 저장하면 같은 워크스페이스에 이어 붙는다.
+    저장돼 있지 않으면 아무것도 바꾸지 않고 deleted=false (같은 요청을 여러 번 보내도 결과가 같다).
+    """
+    job_posting_id = _check_id(job_posting_id)
+    item = deps.users.get_saved(user_id, job_posting_id)
+    if item is None:
+        return UnsaveResponse(job_posting_id=job_posting_id, deleted=False)
+    for name in item.schedule_names:
+        deps.scheduler.delete(name)
+    deps.users.delete_saved(user_id, job_posting_id)
+    return UnsaveResponse(job_posting_id=job_posting_id, deleted=True)

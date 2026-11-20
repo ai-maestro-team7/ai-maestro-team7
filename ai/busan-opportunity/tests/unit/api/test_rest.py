@@ -265,6 +265,18 @@ def test_post_saved_errors(demo_time):
     assert_error(*call(deps, "POST", "/saved"), 400, "INVALID_INPUT")
 
 
+def test_delete_saved(demo_time):
+    deps = demo_time
+    call(deps, "POST", "/saved", user_id="demo3", body={"jobPostingId": w.BUSAN_FINANCE_PUBLIC, "kind": "TARGET"})
+    assert len(deps.scheduler.schedules) == 2
+    status, body = call(deps, "DELETE", f"/saved/{w.BUSAN_FINANCE_PUBLIC}", user_id="demo3")
+    assert status == 200 and body == {"jobPostingId": w.BUSAN_FINANCE_PUBLIC, "deleted": True}
+    assert deps.scheduler.schedules == {} and call(deps, "GET", "/saved", user_id="demo3")[1]["items"] == []
+    status, body = call(deps, "DELETE", f"/saved/{w.BUSAN_FINANCE_PUBLIC}", user_id="demo3")
+    assert status == 200 and body["deleted"] is False
+    assert_error(*call(deps, "DELETE", "/saved/wk24%231"), 400, "INVALID_INPUT")
+
+
 # ---------------------------------------------------------------- 알림
 def test_notifications_and_read(demo_time):
     deps = demo_time

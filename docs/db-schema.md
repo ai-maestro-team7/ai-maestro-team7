@@ -86,6 +86,7 @@
 - **잇는다.** 공고를 저장하면(INTEREST든 TARGET이든) 그 공고의 워크스페이스가 생긴다. A 명세의 "저장한 공고마다 분석·자소서·면접·학습을 한곳에서" 흐름.
 - **만드는 곳: 공통 백엔드 함수** `ensure_workspace(userId, jobPostingId, snapshotId)`. B의 `POST /saved`가 이 함수를 부르고, `OPP#SAVED#`와 `WORKSPACE#`를 **한 트랜잭션**으로 쓴다. 이미 있으면 기존 워크스페이스를 돌려준다(`attribute_not_exists` 조건).
 - **지원 상태는 `WORKSPACE#.status` 한 곳에만 둔다.** 값은 B의 상태 그대로: `INTEREST` · `PLANNED` · `PREPARING` · `APPLIED` · `RESULT` (+ 지원을 접으면 `CLOSED`). `OPP#SAVED#`에는 상태를 두지 않아 두 곳 값이 어긋날 일이 없다. B의 `GET /saved`는 `OPP#SAVED#` Query 후 워크스페이스를 BatchGet.
+- **저장을 풀면** (`DELETE /saved/{id}`) `OPP#SAVED#`와 마감 일정만 지우고 `WORKSPACE#`는 남긴다. 다시 저장하면 같은 워크스페이스에 이어 붙는다.
 - `workspaceId = ws-{jobPostingId}` (공고 없이 NCS 직무로 만들면 `ws-ncs-{ncsCode}`). 사용자 PK 안에서만 유일하면 되므로 GetItem 한 번으로 "이 공고의 내 워크스페이스"를 찾는다.
 
 ### 2.4 모의면접 (C와 합의)

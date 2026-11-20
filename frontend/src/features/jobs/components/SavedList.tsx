@@ -1,12 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { ApiErrorNotice, ApiLoading } from "@/features/auth/components/ApiFallback";
 import { useApi } from "@/lib/useApi";
-import { getSavedJobs, type SavedJob } from "../saved";
-
-const KIND_LABEL: Record<SavedJob["kind"], string> = { INTEREST: "관심", TARGET: "지원 목표" };
+import { getSavedJobs, unsaveJob } from "../saved";
 
 /** `2026-11-21T10:12:00+09:00` → `11.21` */
 function shortDate(value: string | undefined): string {
@@ -17,11 +16,31 @@ function shortDate(value: string | undefined): string {
 /** 저장한 공고 목록 (`GET /api/v1/opportunities/saved`). 최근에 저장한 것이 위에 온다. */
 export function SavedList() {
   const [saved, reload] = useApi("saved-jobs", getSavedJobs);
+  // 관심 해제한 공고는 목록을 다시 부르지 않고 바로 뺀다
+  const [removed, setRemoved] = useState<ReadonlySet<string>>(() => new Set());
+  const [pending, setPending] = useState<string>();
+  const [failed, setFailed] = useState<string>();
+
+  async function handleUnsave(jobPostingId: string) {
+    if (pending) return;
+    setPending(jobPostingId);
+    setFailed(undefined);
+    try {
+      await unsaveJob(jobPostingId);
+      setRemoved((prev) => new Set(prev).add(jobPostingId));
+    } catch {
+      setFailed(jobPostingId);
+    } finally {
+      setPending(undefined);
+    }
+  }
 
   if (saved.status === "loading") return <ApiLoading />;
   if (saved.status === "error") return <ApiErrorNotice error={saved.error} onRetry={reload} />;
 
-  const items = [...saved.data.items].sort((a, b) => b.savedAt.localeCompare(a.savedAt));
+  const items = saved.data.items
+    .filter((item) => !removed.has(item.jobPostingId))
+    .sort((a, b) => b.savedAt.localeCompare(a.savedAt));
   if (items.length === 0) {
     return (
       <div className="flex w-full flex-col items-center gap-3 border-t border-b border-t-grey-800 border-b-grey-200 py-12 text-center">
@@ -54,10 +73,13 @@ export function SavedList() {
               </p>
             </div>
             <dl className="flex shrink-0 gap-5 text-small text-grey-600">
-              <div>
-                <dt className="sr-only">구분</dt>
-                <dd className="font-medium text-grey-900">{KIND_LABEL[item.kind] ?? item.kind}</dd>
-              </div>
+              {/* 관심 공고는 따로 표시하지 않고, 지원 목표로 담은 공고만 표시한다 */}
+              {item.kind === "TARGET" && (
+                <div>
+                  <dt className="sr-only">구분</dt>
+                  <dd className="font-medium text-grey-900">지원 목표</dd>
+                </div>
+              )}
               {item.closesAt && (
                 <div>
                   <dt className="inline">마감 </dt>
@@ -69,6 +91,20 @@ export function SavedList() {
                 <dd className="inline">{shortDate(item.savedAt)}</dd>
               </div>
             </dl>
+            <Button
+              variant="line"
+              size="M"
+              disabled={pending === item.jobPostingId}
+              aria-label={`${item.title ?? "공고"} 관심 해제`}
+              onClick={() => void handleUnsave(item.jobPostingId)}
+            >
+              {pending === item.jobPostingId ? "해제 중" : "관심 해제"}
+            </Button>
+            {failed === item.jobPostingId && (
+              <p role="alert" className="basis-full text-small text-red-500">
+                관심 해제를 하지 못했어요. 잠시 뒤 다시 눌러 주세요.
+              </p>
+            )}
           </li>
         ))}
       </ul>

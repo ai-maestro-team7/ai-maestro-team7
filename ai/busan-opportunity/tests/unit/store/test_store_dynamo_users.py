@@ -151,6 +151,14 @@ def test_saved_roundtrip_and_layout(users, raw):
     assert users.get_saved("demo1", "wk24-none") is None and users.list_saved("demo2") == []
 
 
+def test_delete_saved_removes_only_saved_item(users, raw):
+    users.put_saved("demo1", saved(), workspace_tx(w.SEOUL_DATA))
+    users.delete_saved("demo1", w.SEOUL_DATA)
+    assert raw(TABLE, "USER#demo1", f"OPP#SAVED#{w.SEOUL_DATA}") is None and users.list_saved("demo1") == []
+    assert raw(TABLE, "USER#demo1", f"WORKSPACE#ws-{w.SEOUL_DATA}")  # 워크스페이스는 남는다
+    users.delete_saved("demo1", w.SEOUL_DATA)  # 없는 항목을 지워도 오류가 아니다
+
+
 def test_update_saved_keeps_created_at_and_fixes_gsi(users, raw, fake_clock):
     item = saved(busan=False, major="D")
     users.put_saved("demo1", item)
