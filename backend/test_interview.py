@@ -96,7 +96,7 @@ def main():
     check("다른 사용자는 세션을 못 봄 (404)", s == 404)
 
     img = (b"\xff\xd8fakejpeg", "image/jpeg")
-    for t in ("2026-11-20T10:00:00.0", "2026-11-20T10:00:00.5"):
+    for t in ("2026-11-20T10:00:00.0", "2026-11-20T10:00:00.5", "2026-11-20T10:00:01.0"):
         call("POST", "/api/v1/interview/frame", multipart={"sessionId": sid, "type": "CALIBRATION", "capturedAt": t, "image": img})
 
     def answer(aid, qid):
@@ -115,6 +115,10 @@ def main():
     check("제출 뒤 도착한 캡처 → accepted=false", s == 200 and b["accepted"] is False)
     keys = [o["Key"] for o in boto3.client("s3").list_objects_v2(Bucket="test-uploads").get("Contents", [])]
     check("녹음은 변환 끝나면 바로 삭제", not any("/answers/" in k for k in keys))
+    check("Transcribe 결과 파일(답변 원문)도 함께 삭제", not any("/transcripts/" in k for k in keys))
+    job = api.get_interview("u-1", sid)["transcribeJobs"]["a-q1-1"]
+    check("변환 결과 위치를 백엔드가 정함: uploads/interview/{ivId}/transcripts/{answerId}.json",
+          job["transcriptKey"] == f"uploads/interview/{sid}/transcripts/a-q1-1.json")
 
     s, b = call("GET", f"/api/v1/interview/{sid}/status")
     check("꼬리질문으로 진행", b["nextQuestion"]["isFollowUp"] is True)
@@ -132,8 +136,21 @@ def main():
     frames = api.query_frames("u-1", sid)
     check("FRAME SK = INTERVIEW#{ivId}#FRAME#{answerId}#{capturedAt}", any(f["SK"].startswith(f"INTERVIEW#{sid}#FRAME#a-q1-1#") for f in frames))
     check("캡처 이미지는 저장 안 함 (frameKeys·이미지 필드 없음)", all("image" not in f and "frameKeys" not in f for f in frames))
-    check("FRAME 필드: type, accepted, valid, gaze, head", all({"type", "accepted", "valid", "gaze", "head"} <= set(f) for f in frames))
-    check("정면 기준값이 session.baseline에 저장", api.get_interview("u-1", sid)["session"]["baseline"] is not None)
+    check("FRAME 필드: type, accepted, valid, gaze, head, eyesOpen", all({"type", "accepted", "valid", "gaze", "head", "eyesOpen"} <= set(f) for f in frames))
+    check("보정 캡처 3장 → 정면 기준값이 session.baseline에 저장", api.get_interview("u-1", sid)["session"]["baseline"] is not None)
+
+    # 보정 캡처가 3장 미만이면 baseline=None 그대로 (태도 미측정, 대체값 없음)
+    s, b = call("POST", "/api/v1/interview/start", body={"job": "데이터 분석", "interviewType": "MIXED", "cameraConsent": True, "resumeText": RESUME})
+    sid2 = b["sessionId"]
+    call("POST", "/api/v1/interview/frame", multipart={"sessionId": sid2, "type": "CALIBRATION", "capturedAt": "2026-11-20T11:00:00", "image": img})
+    for _ in range(4):
+        st = call("GET", f"/api/v1/interview/{sid2}/status")[1]
+        if st["status"] == "COMPLETED":
+            break
+        call("POST", "/api/v1/interview/answer", multipart={"sessionId": sid2, "answerId": st["nextQuestion"]["answerId"],
+                                                           "timeLimitReached": "false", "audio": (b"OggS-fake", "audio/webm")})
+    done = api.get_interview("u-1", sid2)
+    check("보정 1장 → baseline은 None 그대로 저장, 리포트는 생성", done["status"] == "COMPLETED" and done["session"]["baseline"] is None)
 
     # 지워진 세션을 뒤늦은 작업이 되살리지 않음 (회원 탈퇴 중 경쟁 상태)
     s, b = call("POST", "/api/v1/interview/start", body={"job": "데이터 분석", "interviewType": "MIXED", "cameraConsent": False, "resumeText": RESUME})

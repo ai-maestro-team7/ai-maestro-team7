@@ -28,6 +28,7 @@ SCHEDULER_ROLE_ARN=arn:aws:iam::${ACCOUNT_ID}:role/${SCHEDULER_ROLE_NAME}
 
 ROLE_ARN=${ROLE_ARN:-arn:aws:iam::${ACCOUNT_ID}:role/${PREFIX}-lambda-role}
 
+
 # 프론트 주소가 정해지면 바꾼다. 개발 중에는 * (모두 허용)
 ALLOWED_ORIGIN=${ALLOWED_ORIGIN:-*}
 

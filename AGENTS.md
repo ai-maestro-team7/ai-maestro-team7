@@ -139,7 +139,7 @@ B(부산 채용공고·청년정책 맞춤 추천) 코드를 짤 때는 이 절�
 - 패키지는 `ai/busan-opportunity/src/opportunity/` 아래에 `models`, `config`, `seeds`, `ingest`, `enrich`, `core`, `api`, `notify`로 둔다. 테스트는 `tests/{unit, rules, personas, contract}`, 프론트용 가짜 응답은 `mocks/`에 둔다 (개발계획서2 §13).
 - 입구는 `api/rest_handler.py`(REST)와 `api/agent_handler.py`(Action Group `BusanOpportunity`) 두 개다. 둘 다 같은 비즈니스 함수를 부르고 요청·응답 모양만 바꾼다.
 - API Gateway가 HTTP API(payload v2.0)라서 Powertools는 `APIGatewayHttpResolver`를 쓴다. 명세 §2.3에 적힌 `APIGatewayRestResolver`가 아니다 (`docs/api.md` §1).
-- 배포는 단일 Lambda `team07-api`에 같이 묶인다 (D-17, Python 3.13 arm64). `infra/package.sh`는 아직 `ai/interview/`만 묶으므로 B 코드를 넣을 때 백엔드 담당과 같이 고친다. 의존성은 `ai/busan-opportunity/requirements.txt`에 적는다.
+- 배포는 단일 Lambda `team07-api`에 같이 묶인다 (D-17, Python 3.13 arm64). `infra/package.sh`가 `ai/busan-opportunity/src/opportunity/`를 `opportunity` 패키지로, `contracts/src/team07_contracts/`를 `team07_contracts`로 함께 묶고, `ai/busan-opportunity/requirements.txt`·`contracts/requirements.txt` 의존성을 Linux arm64용으로 넣는다. 모델 ID는 Lambda 환경 변수 `MODEL_ID`(기본 Haiku 5.5, 시연 Sonnet 5.5)·`EMBEDDING_MODEL_ID`(`infra/config.sh`).
 - 수집·알림 배치용 Lambda, EventBridge Scheduler, SES, S3 Vectors 권한은 백엔드 담당에게 요청한다. B 명세의 CDK `infra/`는 만들지 않는다 (D-16).
 - `ai/` 아래 코드는 `backend/`를 import하지 않는다 (Requirement 12). 공고 자격 판정은 `backend/eligibility.py`의 `evaluate_eligibility` 하나로 하기로 했으니 (D-11), B가 판정 결과를 어떻게 받을지는 백엔드 담당과 정한다.
 
@@ -218,5 +218,5 @@ B(부산 채용공고·청년정책 맞춤 추천) 코드를 짤 때는 이 절�
 - 고용24 채용정보 일일 호출 한도
 - 부산 공공부문 일자리·인사혁신처 공공취업정보를 데이터 소스에 넣을지
 - 국토부 전월세 API 신청 여부 (안 하면 주거비 행 없이 간다)
-- B 판정 결과를 `backend/eligibility.py`와 어떻게 주고받을지, `infra/package.sh`에 B 패키지를 넣는 방법 (백엔드 담당)
+- (정리됨) 판정은 백엔드가 `backend/eligibility.py`의 `evaluate_eligibility`를 `Deps.eligibility`로 넣어 준다. B 패키징은 `infra/package.sh`에 들어갔다 (백엔드 담당)
 - 통합 Agent 프레임워크 (D-23, A 소유). Bedrock Agents가 아니면 Action Group 입구(`agent_handler.py`)를 그쪽 도구 형식에 맞춘다. 비즈니스 함수는 그대로 둔다.
