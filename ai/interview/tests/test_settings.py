@@ -49,4 +49,4 @@ def test_max_tokens_invalid(monkeypatch, raw):
 
 def test_versions():
     assert versions.SCORING_VERSION == "v1.0"
-    assert versions.PROMPT_VERSION == "A-v1/B-v1"
+    assert versions.PROMPT_VERSION == "A-v2/B-v1"

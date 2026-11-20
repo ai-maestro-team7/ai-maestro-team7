@@ -118,11 +118,23 @@ def test_questions_prompt_rules():
 
 
 def test_prompt_files_follow_versions():
-    assert prompting.QUESTIONS_FILE == "a_questions_v1.md"
+    assert prompting.QUESTIONS_FILE == "a_questions_v2.md"
     assert prompting.FOLLOW_UP_FILE == "b_follow_up_v1.md"
     for name in (prompting.SYSTEM_FILE, prompting.QUESTIONS_FILE, prompting.FOLLOW_UP_FILE):
         assert (prompting.PROMPT_DIR / name).is_file()
-    assert versions.PROMPT_VERSION == "A-v1/B-v1"
+    assert versions.PROMPT_VERSION == "A-v2/B-v1"
+
+
+def test_questions_prompt_single_question_examples():
+    # A-v2: "한 질문에는 한 가지만" 규칙에 나쁜 예와 좋은 예를 붙였다 (#58)
+    prompt = prompting.questions_prompt("데이터 분석", "MIXED", RESUME, None)
+    assert "A와 B를 설명하고 C는 무엇인가요" in prompt
+    assert "나쁜 예" in prompt and "좋은 예" in prompt
+
+
+def test_questions_v1_file_kept():
+    # 이전 버전 파일은 지우지 않는다
+    assert (prompting.PROMPT_DIR / "a_questions_v1.md").is_file()
 
 
 def test_prompt_dir_inside_package():
