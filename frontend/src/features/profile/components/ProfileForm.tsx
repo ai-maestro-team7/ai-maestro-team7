@@ -18,13 +18,16 @@ import {
   BUSAN_SIGUNGU_OPTIONS,
   EDUCATION_OPTIONS,
   EMPLOYMENT_OPTIONS,
+  GRADUATE_SCHOOL,
   GRADUATION_OPTIONS,
+  HIGHER_EDUCATION,
   JOB_FIELD_OPTIONS,
   MAX_PRIORITIES,
   PRIORITY_OPTIONS,
   SIDO_OPTIONS,
 } from "../options";
 import type { BasicProfile, BasicProfileInput } from "../types";
+import { CertificateInput } from "./CertificateInput";
 
 type Option = { value: string; label: string };
 
@@ -98,8 +101,11 @@ type FormState = {
   residenceSigungu: string;
   educationLevel: string;
   graduationStatus: string;
+  schoolRegion: string;
+  schoolName: string;
   employmentStatus: string;
   major: string;
+  certificates: string[];
   jobField: string;
   jobName: string;
   priorities: string[];
@@ -116,8 +122,11 @@ function toForm(profile: BasicProfile | null): FormState {
     residenceSigungu: profile?.residenceSigungu ?? "",
     educationLevel: profile?.educationLevel ?? "",
     graduationStatus: profile?.graduationStatus ?? "",
+    schoolRegion: profile?.universityRegion ?? "",
+    schoolName: profile?.schoolName ?? "",
     employmentStatus: profile?.employmentStatus ?? "",
     major: profile?.major ?? "",
+    certificates: profile?.certificates ?? [],
     jobField: jobs.find((job) => FIELD_VALUES.has(job.name))?.name ?? "",
     jobName: jobs.find((job) => !FIELD_VALUES.has(job.name))?.name ?? "",
     priorities: profile?.priorities ?? [],
@@ -150,6 +159,8 @@ function ProfileFields({ profile }: { profile: BasicProfile | null }) {
     setErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
   };
   const inBusan = form.residenceSido === BUSAN_SIDO;
+  const higherEducation = HIGHER_EDUCATION.has(form.educationLevel);
+  const highSchool = form.educationLevel === "HIGH_SCHOOL";
 
   // 고른 순서를 지킨다. 서버는 3개까지만 받는다
   function togglePriority(value: string) {
@@ -174,6 +185,7 @@ function ProfileFields({ profile }: { profile: BasicProfile | null }) {
 
     const jobName = form.jobName.trim();
     const major = form.major.trim();
+    const schoolName = form.schoolName.trim();
     // 직무 이름을 적었으면 앞에 둔다. 분야 이름은 공공기관 공고의 분류와 맞추는 데 쓴다.
     // 이름이 그대로인 직무는 저장돼 있던 직무 코드(NCS 등)를 지우지 않고 함께 보낸다
     const keep = (name: string) => profile?.desiredJobs?.find((job) => job.name === name) ?? { name };
@@ -184,8 +196,12 @@ function ProfileFields({ profile }: { profile: BasicProfile | null }) {
       residenceSigungu: inBusan ? form.residenceSigungu : null,
       educationLevel: form.educationLevel,
       graduationStatus: form.graduationStatus || null,
+      // 학교 지역은 학력을 고른 경우에만, 대학 이름은 전문대 이상일 때만 보낸다 (고졸로 바꾸면 이름을 지운다)
+      universityRegion: (higherEducation || highSchool) && form.schoolRegion ? form.schoolRegion : null,
+      schoolName: higherEducation && schoolName ? schoolName : null,
       employmentStatus: form.employmentStatus,
       major: major || null,
+      certificates: form.certificates.length > 0 ? form.certificates : null,
       desiredJobs,
       desiredRegion: "ALL",
       priorities: form.priorities,
@@ -273,6 +289,34 @@ function ProfileFields({ profile }: { profile: BasicProfile | null }) {
           placeholder="선택 안 함"
         />
       </Row>
+      {(higherEducation || highSchool) && (
+        <div className="flex w-full flex-col gap-2.5">
+          <Row>
+            {higherEducation && (
+              <TextField
+                id="profile-school-name"
+                label={GRADUATE_SCHOOL.has(form.educationLevel) ? "학부 대학 이름 (선택)" : "학교 이름 (선택)"}
+                placeholder="예: 부산대학교"
+                maxLength={50}
+                value={form.schoolName}
+                onChange={(event) => set("schoolName", event.target.value)}
+              />
+            )}
+            <Select
+              id="profile-school-region"
+              label={highSchool ? "고등학교 지역 (선택)" : "학교 지역 (선택)"}
+              value={form.schoolRegion}
+              onChange={(value) => set("schoolRegion", value)}
+              options={SIDO_OPTIONS}
+              placeholder="선택 안 함"
+            />
+          </Row>
+          <p className="text-small text-grey-600">
+            부산에 있는 학교를 졸업했거나 졸업 예정이면 이전 공공기관의 지역인재 전형 대상일 수 있어서 따로 알려 드려요.
+            {GRADUATE_SCHOOL.has(form.educationLevel) && " 대학원을 마쳤다면 학부 대학 기준이에요."}
+          </p>
+        </div>
+      )}
       <TextField
         id="profile-major"
         label="전공 (선택)"
@@ -281,6 +325,7 @@ function ProfileFields({ profile }: { profile: BasicProfile | null }) {
         value={form.major}
         onChange={(event) => set("major", event.target.value)}
       />
+      <CertificateInput id="profile-certificates" value={form.certificates} onChange={(next) => set("certificates", next)} />
       <Row>
         <Select
           id="profile-job-field"

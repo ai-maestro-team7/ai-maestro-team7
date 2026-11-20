@@ -75,6 +75,18 @@ def test_failure_paths_have_no_raw_text(caplog):
     assert_clean(repr(exc.value))
 
 
+def test_follow_up_fallback_logs_have_no_raw_text(caplog):
+    # 꼬리질문 판단 출력이 원문을 담은 채 2번 실패해도(→ 꼬리질문 없이 진행) 로그에는 코드만 남는다 (#109)
+    result = interview.start_interview("iv-1", "데이터 분석", RESUME, "MIXED", True, PROFILE,
+                                       llm=FakeLLM([sample_text("llm/questions_ok.json")]))
+    bad = '{"needFollowUp": true, "reason": "ABSTRACT", "followUpQuestions": ["' + ANSWER_TEXT[:20] * 10 + '"]}'
+    with caplog.at_level(logging.DEBUG):
+        out = interview.process_answer(result["session"], answer("a-q1-1", ANSWER_TEXT), llm=FakeLLM([bad, bad]))
+    assert out["action"] == "NEXT_QUESTION"
+    assert "fallback=NO_FOLLOW_UP" in caplog.text and "followUpCheck=JUDGE_FAILED" in caplog.text
+    assert_clean(caplog.text)
+
+
 def test_voice_logs_have_no_raw_text(monkeypatch, caplog, capsys):
     from fakes import FakePolly, FakeS3, FakeTranscribe, client_error
     from interview import voice

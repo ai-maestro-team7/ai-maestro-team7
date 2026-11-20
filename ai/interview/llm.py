@@ -90,7 +90,7 @@ class ToolLLMClient(Protocol):
     """툴을 골라 부르는 에이전트 실행 (report design §6.3). tools는 타입 힌트·설명이 있는 일반 함수다."""
 
     def run_with_tools(self, *, system_prompt: str, user_prompt: str, tools: list[Callable[..., Any]],
-                       limits: dict[str, int]) -> str: ...
+                       limits: dict[str, int], max_tokens: int | None = None) -> str: ...
 
 
 def _call_with_retry(invoke: Callable[[], str], *, schema: type[S], stage: str,
@@ -141,13 +141,17 @@ def call_json(llm: LLMClient, *, system_prompt: str, user_prompt: str, schema: t
 def call_json_with_tools(llm: ToolLLMClient, *, system_prompt: str, user_prompt: str,
                          tools: list[Callable[..., Any]], limits: dict[str, int], schema: type[S], stage: str,
                          check: Callable[[S], None] | None = None,
-                         before_attempt: Callable[[], None] | None = None) -> S:
+                         before_attempt: Callable[[], None] | None = None,
+                         max_tokens: int | None = None) -> S:
     """call_json과 같은 규칙으로, 툴을 쓰는 에이전트의 마지막 답을 검사한다.
 
     limits(턴·토큰)는 strands가 에이전트 실행마다 새로 센다. 툴 쪽 상한은 before_attempt로 시도마다 새로 센다.
+    max_tokens(호출당 출력 상한)를 주지 않으면 클라이언트 기본값(피드백 값)을 쓴다. 주지 않을 때는 인자를 넘기지 않아
+    max_tokens를 모르는 클라이언트도 그대로 쓸 수 있다.
     """
+    extra = {} if max_tokens is None else {"max_tokens": max_tokens}
     return _call_with_retry(lambda: llm.run_with_tools(system_prompt=system_prompt, user_prompt=user_prompt,
-                                                       tools=tools, limits=limits),
+                                                       tools=tools, limits=limits, **extra),
                             schema=schema, stage=stage, check=check, before_attempt=before_attempt)
 
 
@@ -200,13 +204,14 @@ class StrandsLLMClient:
             _raise_truncated_or_reraise(exc)
 
     def run_with_tools(self, *, system_prompt: str, user_prompt: str, tools: list[Callable[..., Any]],
-                       limits: dict[str, int]) -> str:
-        """툴을 골라 부르는 에이전트 (피드백, report 결정 7).
+                       limits: dict[str, int], max_tokens: int | None = None) -> str:
+        """툴을 골라 부르는 에이전트 (피드백 report 결정 7, 꼬리질문 판단 #109).
 
         strands 1.65 Agent.__call__(limits=…)는 상한에 닿으면 예외 없이 다음 턴 경계에서 멈춘다.
         그때 마지막 답에 JSON이 없으면 호출한 쪽의 출력 검사가 실패로 본다.
+        max_tokens가 없으면 피드백 값(INTERVIEW_FEEDBACK_MAX_TOKENS)을 쓴다.
         """
-        model = _get_model(settings.feedback_max_tokens())
+        model = _get_model(settings.feedback_max_tokens() if max_tokens is None else max_tokens)
         from strands import Agent, tool
 
         agent = Agent(model=model, system_prompt=system_prompt, tools=[tool(f) for f in tools],

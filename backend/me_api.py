@@ -95,12 +95,24 @@ def desired_jobs(v):
     return True
 
 
+MAX_CERTIFICATES = 10
+
+
+def certificates(v):
+    """가진 자격증 이름 목록. 10개까지, 이름마다 1~50자, 겹치면 안 된다."""
+    if not isinstance(v, list) or len(v) > MAX_CERTIFICATES or not all(text(50)(c) for c in v):
+        return False
+    return len({c.strip().casefold() for c in v}) == len(v)
+
+
 PROFILE_FIELDS = {
     "birthYear": int_range(1950, 2015),
     "residenceSido": lambda v: isinstance(v, str) and bool(SIDO.match(v)),
     "residenceSigungu": lambda v: isinstance(v, str) and bool(SIGUNGU.match(v)),
     "residenceSince": lambda v: isinstance(v, str) and bool(YEAR_MONTH.match(v)),
+    # 최종 학교 소재지 (지역인재 판정). 대학원까지 마쳤으면 학부 대학, 고졸이면 고등학교 소재지
     "universityRegion": lambda v: isinstance(v, str) and bool(SIDO.match(v)),
+    "schoolName": text(50),  # 대학 이름 (전문대 이상). 고졸이면 비운다
     "graduationStatus": enum("ENROLLED", "GRADUATING", "GRADUATED"),
     "educationLevel": enum("HIGH_SCHOOL", "ASSOCIATE", "BACHELOR", "MASTER", "DOCTOR"),
     "major": text(50),
@@ -113,6 +125,10 @@ PROFILE_FIELDS = {
     "priorities": lambda v: isinstance(v, list) and len(v) <= 3 and all(
         p in ("SALARY", "GROWTH", "STABILITY", "WORK_LIFE", "HOUSING", "LOCATION") for p in v),
     "talentPoolConsent": lambda v: isinstance(v, bool),
+    "certificates": certificates,
+    # 채팅 조건 저장 (D-40). 사용자가 화면 버튼을 눌렀을 때만 들어온다
+    "desiredSalaryMin": int_range(0, 100_000),  # 만 원/년
+    "desiredCareerType": enum("NEW", "EXPERIENCED", "ANY"),
 }
 SYSTEM_FIELDS = {"PK", "SK", "entityType", "schemaVersion", "ownerUserId", "createdAt", "updatedAt", "isDemo"}
 
@@ -129,7 +145,11 @@ def h_get_profile(event, user_id, params):
 
 
 def h_put_profile(event, user_id, params):
-    data = parse_json(event)
+    return 200, update_profile(user_id, parse_json(event))
+
+
+def update_profile(user_id, data):
+    """기본 프로필 부분 수정. PUT /me/profile과 채팅 Agent의 조건 저장 도구(D-40)가 같이 쓴다."""
     data = {k: v for k, v in data.items() if k not in ("userId", *SYSTEM_FIELDS)}  # 본문의 userId 등은 무시
     unknown = sorted(set(data) - set(PROFILE_FIELDS))
     if unknown:
@@ -150,12 +170,16 @@ def h_put_profile(event, user_id, params):
         if v is None:  # null을 보내면 그 항목을 지움
             removes.append(f"#f{i}")
         else:
+            if isinstance(v, str):
+                v = v.strip()
+            elif k == "certificates":
+                v = [c.strip() for c in v]
             sets.append(f"#f{i} = :f{i}")
             values[f":f{i}"] = to_dynamo(v)
     expr = "SET " + ", ".join(sets) + (" REMOVE " + ", ".join(removes) if removes else "")
     item = table().update_item(Key={"PK": f"USER#{user_id}", "SK": "PROFILE#BASIC"}, UpdateExpression=expr,
                                ExpressionAttributeNames=names, ExpressionAttributeValues=values, ReturnValues="ALL_NEW")["Attributes"]
-    return 200, public_profile(item)
+    return public_profile(item)
 
 
 # ---------------------------------------------------------------- 워크스페이스

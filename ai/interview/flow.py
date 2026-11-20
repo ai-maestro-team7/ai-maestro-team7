@@ -1,7 +1,7 @@
 """면접 진행 규칙: start_interview, process_answer (design §5).
 
 진행 규칙(질문 수, 꼬리질문 수, 평가 불가 처리, 다음 행동)은 이 파일의 코드가 정한다.
-LLM은 질문 문장과 꼬리질문 필요 여부만 준다 (C §2.3).
+LLM은 질문 문장과 꼬리질문 필요 여부만 준다 (C §2.3). 꼬리질문 판단은 읽기 전용 툴을 쓰는 에이전트다 (#109).
 받은 Session은 바꾸지 않고 새 값을 돌려준다. DB·API를 부르지 않는다.
 """
 
@@ -12,7 +12,7 @@ from . import settings
 from .config import load_scoring_config
 from .delivery import measure_delivery
 from .errors import INVALID_INPUT, InterviewError
-from .follow_up import judge_follow_up
+from .follow_up import build_follow_up_context, judge_follow_up
 from .models import (AnswerRecord, AnswerResult, NextQuestion, Question, Session, StartInterviewInput, dump,
                      parse_input)
 from .questions import generate_from_request
@@ -104,22 +104,26 @@ def process_answer(session, answer_result, *, llm=None):
     delivery = (measure_delivery(text, result.transcription.words, load_scoring_config().delivery)
                 if evaluable else None)
 
+    # 꼬리질문은 기본 질문당 최대 1개: 기본 질문이고, 평가 가능하고, 아직 꼬리질문을 쓰지 않았을 때만 판단한다.
+    # 판단은 이번 답변을 기록하기 전 Session으로 한다 (판단 결과를 답변 기록에 남기기 위해, #109)
+    decision = None
+    if not pending.is_follow_up and evaluable and not current.follow_up_used:
+        decision = judge_follow_up(build_follow_up_context(current, base, pending.text, text), llm=llm)
+
     new = current.model_copy(deep=True)  # 받은 Session은 바꾸지 않는다
     new.answers.append(AnswerRecord(
         answer_id=pending.answer_id, question_id=pending.question_id, is_follow_up=pending.is_follow_up,
         question=pending.text, answer_text=text, evaluable=evaluable, reason=reason,
         time_limit_reached=result.time_limit_reached, delivery=delivery,
+        follow_up_check=decision.reason if decision is not None else None,
     ))
 
     action, next_question = None, None
-    # 꼬리질문은 기본 질문당 최대 1개: 기본 질문이고, 평가 가능하고, 아직 꼬리질문을 쓰지 않았을 때만 판단한다
-    if not pending.is_follow_up and evaluable and not new.follow_up_used:
-        decision = judge_follow_up(new.job, new.resume_text, pending.text, text, llm=llm)
-        if decision.need:
-            next_question = follow_up_question(base, decision.question)
-            new.follow_up_used = True
-            new.current_question = next_question
-            action = "FOLLOW_UP"
+    if decision is not None and decision.need:  # SUFFICIENT·JUDGE_FAILED면 아래에서 다음 기본 질문으로
+        next_question = follow_up_question(base, decision.question)
+        new.follow_up_used = True
+        new.current_question = next_question
+        action = "FOLLOW_UP"
 
     if action is None:
         new.current_index += 1
@@ -132,8 +136,9 @@ def process_answer(session, answer_result, *, llm=None):
             new.current_question = None
             action = "REPORT"
 
-    logger.info("stage=%s action=%s evaluable=%s reason=%s speechRateReason=%s longPauseReason=%s durationMs=%d",
-                STAGE_ANSWER, action, evaluable, reason,
+    logger.info("stage=%s action=%s evaluable=%s reason=%s followUpCheck=%s speechRateReason=%s longPauseReason=%s "
+                "durationMs=%d", STAGE_ANSWER, action, evaluable, reason,
+                decision.reason if decision is not None else None,
                 delivery.speech_rate_reason if delivery is not None else None,
                 delivery.long_pause_reason if delivery is not None else None, _ms(started))
     return {

@@ -73,6 +73,8 @@ export type PostingCard = {
   facts: string[];
   /** 수도권 공고에만 */
   busanAlternativesCount?: number;
+  /** 지역인재 전형: LIKELY(학교 소재지가 맞아 대상일 수 있음), CHECK_NEEDED(공고문 확인). 해당 없으면 없음 */
+  regionalTalent?: "LIKELY" | "CHECK_NEEDED";
   isSample: boolean;
 };
 
