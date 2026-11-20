@@ -66,14 +66,14 @@
     - 데이터 분석 가상 자소서(실명·연락처·실제 학교·회사 이름 없음), `profile_data_analysis.json`(계약 예시 `data-analysis-demo`와 같은 내용), 답변 4종, LLM 응답 7종
     - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5_
 
-- [ ] 7. 질문 생성과 면접 시작
-  - [ ] 7.1 `questions.py`에 `generate_questions(job, resume_text, interview_type, profile=None, *, llm=None)`를 만든다
+- [x] 7. 질문 생성과 면접 시작
+  - [x] 7.1 `questions.py`에 `generate_questions(job, resume_text, interview_type, profile=None, *, llm=None)`를 만든다
     - 입력 검사(`StartInterviewInput`과 같은 규칙), Prompt_A 호출, `questionId` `q1`~`q3` 부여
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
-  - [ ] 7.2 `tests/test_questions.py`를 쓴다
+  - [x] 7.2 `tests/test_questions.py`를 쓴다
     - Session 없이 호출, 질문 3개와 ID, 질문 2개 응답 2번이면 `AI_OUTPUT_INVALID`, 잘못된 입력은 LLM을 부르지 않고 `INVALID_INPUT`
     - _Requirements: 7.1, 7.3, 7.4, 7.5_
-  - [ ] 7.3 `flow.py`에 `start_interview`를 만든다 (design §5.1)
+  - [x] 7.3 `flow.py`에 `start_interview`를 만든다 (design §5.1)
     - 초기 Session(`currentIndex` 0, `followUpUsed` false, `answers` [], `baseline` null, `scoringVersion`, `modelId`, `promptVersion`, `currentQuestion` q1, 검사한 `profile`)과 `nextQuestion`
     - _Requirements: 8.1~8.7, 3.3_
 
