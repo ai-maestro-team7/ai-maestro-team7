@@ -160,8 +160,11 @@ def run_turn(deps: Deps, task: dict) -> dict:
         logger.info("stage=chat.skipped userHash=%s messageId=%s", user_hash, message_id)
         return {"messageId": message_id, "status": "SKIPPED", "reason": "NOT_PENDING"}
 
-    message = deps.store.get_message(user_id, session_id, message_id)
+    message = deps.store.get_message(user_id, session_id, message_id)  # 강한 일관 읽기 (store/dynamo.py)
     if message is None:
+        # 잡은 턴을 풀어 다음 메시지가 막히지 않게 한다
+        deps.store.end_turn(user_id, session_id, message_id, now=deps.now_iso())
+        logger.warning("stage=chat.missing userHash=%s messageId=%s", user_hash, message_id)
         return {"messageId": message_id, "status": "SKIPPED", "reason": "NOT_FOUND"}
     error: ErrorInfo | None = None
     reply: ChatReply | None = None

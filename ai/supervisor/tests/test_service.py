@@ -399,3 +399,12 @@ def test_prompt_v4_rules():
                  "면접을 원하지 않는다고 했으면 다시 권하지 않는다", "이 공고로 모의면접 체험해 볼래요",
                  "여러 기능을 한 번에 이어 실행하지 않는다"):
         assert rule in prompt
+
+
+def test_missing_claimed_message_releases_session_lock(monkeypatch):
+    deps = build_deps(ScriptedRunner(lambda tools: reply()))
+    started = service.start_turn(deps, "demo1", {"message": "안녕"})
+    monkeypatch.setattr(deps.store, "get_message", lambda *a, **k: None)  # 읽기가 아직 따라오지 못한 경우
+    out = service.run_turn(deps, deps.dispatcher.events[-1]["agentTask"])
+    assert out["status"] == "SKIPPED" and deps.runner.runs == []
+    assert deps.store.get_session("demo1", started["sessionId"]).pending_message_id is None
