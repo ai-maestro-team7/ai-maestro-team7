@@ -6,7 +6,7 @@
 
 저장 (team07-career-mentor, PK = USER#{userId}, ivId = sessionId):
   INTERVIEW#{ivId}                                   면접 함수가 준 session 그대로 + 백엔드 관리 값
-  INTERVIEW#{ivId}#FRAME#{answerId}#{capturedAt}     analyze_face 결과 (이미지는 저장하지 않음)
+  INTERVIEW#{ivId}#FRAME#{answerId}#{capturedAt}     analyze_face 결과: valid, gaze, head, eyesOpen (이미지는 저장하지 않음)
   INTERVIEW#{ivId}#REPORT                            리포트
 
 뒤에서 처리: SQS 권한이 없어 Lambda 비동기 자기 호출(InvocationType=Event)로 처리한다.
@@ -259,9 +259,11 @@ def task_answer(t):
     if tr.get("status") == "IN_PROGRESS":
         tr = {"status": "FAILED"}  # 너무 오래 걸리면 변환 실패로 기록하고 면접은 계속
 
-    # 요청: 녹음은 Transcribe 변환이 끝나면 바로 삭제 (7일 자동 삭제는 안전장치)
+    # 녹음과 Transcribe 결과 파일(답변 원문이 들어 있음)은 변환이 끝나면 바로 삭제 (7일 자동 삭제는 안전장치)
     if UPLOAD_BUCKET:
-        s3().delete_object(Bucket=UPLOAD_BUCKET, Key=job["audioKey"])
+        for k in (job.get("audioKey"), job.get("transcriptKey")):
+            if k:
+                s3().delete_object(Bucket=UPLOAD_BUCKET, Key=k)
 
     update_interview(user_id, iv_id, {"stage": "JUDGING"})
     answer_result = {"answerId": answer_id, "timeLimitReached": job["timeLimitReached"], "transcription": tr}
@@ -280,9 +282,11 @@ def make_report(user_id, iv_id):
     session = item["session"]
     frames = query_frames(user_id, iv_id)
     if session.get("baseline") is None:
-        calib = [f for f in frames if f["type"] == "CALIBRATION" and f.get("valid")]
-        session["baseline"] = impl.compute_baseline(calib)  # 부족하면 함수가 기본값을 돌려줌
-    answer_frames = [{k: f.get(k) for k in ("type", "questionId", "answerId", "capturedAt", "accepted", "valid", "gaze", "head")}
+        calib = [{k: f.get(k) for k in ("valid", "reason", "gaze", "head", "eyesOpen")}
+                 for f in frames if f["type"] == "CALIBRATION" and f.get("valid")]
+        # 유효 3장 미만이면 함수가 None을 돌려준다 → 태도 미측정. 백엔드는 대체값을 넣지 않고 그대로 저장·전달 (C 명세)
+        session["baseline"] = impl.compute_baseline(calib)
+    answer_frames = [{k: f.get(k) for k in ("type", "questionId", "answerId", "capturedAt", "accepted", "valid", "gaze", "head", "eyesOpen")}
                      for f in frames if f["type"] == "ANSWER"]
     report = impl.generate_report(session, answer_frames)
     report.setdefault("interviewDate", now_iso()[:10])
@@ -379,14 +383,16 @@ def h_answer(event, user_id, params, request_id):
     if UPLOAD_BUCKET:
         s3().put_object(Bucket=UPLOAD_BUCKET, Key=key, Body=audio, ContentType=audio_type)
     job_name = re.sub(r"[^0-9a-zA-Z._-]", "-", f"team07-{iv_id}-{answer_id}")[:200]
-    job_name = impl.start_transcription(f"s3://{UPLOAD_BUCKET}/{key}", job_name, media_format)
+    transcript_key = audio_key(user_id, iv_id, f"transcripts/{answer_id}.json")  # 결과 파일도 uploads/ (7일 규칙)
+    job_name = impl.start_transcription(f"s3://{UPLOAD_BUCKET}/{key}", job_name, media_format, UPLOAD_BUCKET, transcript_key)
 
     table().update_item(
         Key={"PK": pk(user_id), "SK": sk(iv_id)},
         UpdateExpression="SET submittedAnswerIds = list_append(submittedAnswerIds, :one), transcribeJobs.#aid = :job",
         ExpressionAttributeNames={"#aid": answer_id},
         ExpressionAttributeValues=to_dynamo({":one": [answer_id], ":job": {
-            "jobName": job_name, "audioKey": key, "timeLimitReached": as_bool(fields.get("timeLimitReached"))}}),
+            "jobName": job_name, "audioKey": key, "transcriptKey": transcript_key,
+            "timeLimitReached": as_bool(fields.get("timeLimitReached"))}}),
     )
     enqueue({"task": "interview.answer", "userId": user_id, "sessionId": iv_id, "answerId": answer_id, "requestId": request_id})
     return 202, {"sessionId": iv_id, "answerId": answer_id, "status": "PROCESSING", "stage": "TRANSCRIBING"}
@@ -415,7 +421,8 @@ def h_frame(event, user_id, params, request_id):
     face = impl.analyze_face(image)  # 이미지는 여기서만 쓰고 저장하지 않음
     frame = {"PK": pk(user_id), "SK": sk(iv_id, "FRAME", answer_id or "CALIBRATION", captured_at), "entityType": "InterviewFrame",
              "type": ftype, "questionId": question_id, "answerId": answer_id, "capturedAt": captured_at, "accepted": accepted,
-             "valid": bool(face.get("valid")), "reason": face.get("reason"), "gaze": face.get("gaze"), "head": face.get("head")}
+             "valid": bool(face.get("valid")), "reason": face.get("reason"), "gaze": face.get("gaze"), "head": face.get("head"),
+             "eyesOpen": face.get("eyesOpen")}
     table().put_item(Item=to_dynamo(frame))
     return 200, {"accepted": accepted, "valid": frame["valid"]}
 
