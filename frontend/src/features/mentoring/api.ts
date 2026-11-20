@@ -182,10 +182,13 @@ export function createTextDocument(text: string): Promise<CreateDocumentResponse
   );
 }
 
-export async function createPdfDocument(file: File): Promise<CreateDocumentResponse> {
+export async function createPdfDocument(
+  file: File,
+  documentType: "RESUME" | "COVER_LETTER" = "RESUME",
+): Promise<CreateDocumentResponse> {
   const created = await post<{ documentId: string; uploadUrl: string }>(
     "/api/v1/mentoring/documents/upload-url",
-    { fileName: file.name, contentType: "application/pdf", sizeBytes: file.size, documentType: "RESUME" },
+    { fileName: file.name, contentType: "application/pdf", sizeBytes: file.size, documentType },
     "document-upload",
   );
   const uploaded = await fetch(created.uploadUrl, { method: "PUT", headers: { "content-type": "application/pdf" }, body: file });
@@ -195,6 +198,37 @@ export async function createPdfDocument(file: File): Promise<CreateDocumentRespo
 
 export function getDocument(documentId: string): Promise<DocumentResponse> {
   return request(`/api/v1/mentoring/documents/${encodeURIComponent(documentId)}`);
+}
+
+/** 글자 추출이 끝난 뒤의 단계. 그 뒤의 역량 추출(ANALYZING~COMPLETED)은 기다리지 않는다. */
+const TEXT_READY = ["EXTRACTED", "ANALYZING", "REQUIRES_USER_REVIEW", "COMPLETED"];
+
+/**
+ * 올린 PDF의 글자 추출만 기다린다. 모의면접처럼 원문 글만 쓰는 화면은 LLM 역량 추출까지 기다릴 필요가 없다.
+ * 추출에 실패하면 `EXTRACTION_FAILED` 오류를 던진다.
+ */
+export async function waitForDocumentText(documentId: string, signal?: AbortSignal): Promise<DocumentResponse> {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < POLL_TIMEOUT_MS) {
+    if (signal?.aborted) throw new DOMException("요청이 취소됐어요.", "AbortError");
+    const document = await getDocument(documentId);
+    if (TEXT_READY.includes(document.extractionStatus)) return document;
+    if (document.extractionStatus === "FAILED") {
+      throw new ApiError(422, "EXTRACTION_FAILED", "PDF에서 글자를 읽지 못했어요. 글자를 복사할 수 있는 PDF인지 확인해 주세요.", false);
+    }
+    await new Promise<void>((resolve, reject) => {
+      const onAbort = () => {
+        window.clearTimeout(timer);
+        reject(new DOMException("요청이 취소됐어요.", "AbortError"));
+      };
+      const timer = window.setTimeout(() => {
+        signal?.removeEventListener("abort", onAbort);
+        resolve();
+      }, POLL_INTERVAL_MS);
+      signal?.addEventListener("abort", onAbort, { once: true });
+    });
+  }
+  throw new ApiError(408, "POLL_TIMEOUT", "PDF를 읽는 데 오래 걸리고 있어요. 잠시 뒤 다시 올려 주세요.", true);
 }
 
 export function getProfile(): Promise<ProfileResponse> {
