@@ -1,0 +1,158 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/profiles/profile-0003/confirm",
+    "body": {
+      "baseVersion": 1,
+      "decisions": [
+        {
+          "skillId": "skill-1",
+          "action": "CONFIRM"
+        }
+      ]
+    }
+  },
+  "response": {
+    "status": 201,
+    "body": {
+      "schemaVersion": "2.0",
+      "profileId": "profile-0003",
+      "profileVersion": 2,
+      "basedOnVersion": 1,
+      "createdBy": "USER_CONFIRMATION",
+      "sourceDocumentIds": [
+        "doc-0001"
+      ],
+      "targetRolePreference": [],
+      "skills": [
+        {
+          "skillId": "skill-1",
+          "name": "데이터 전처리",
+          "ncsUnitCode": "2001010501_23v2",
+          "evidenceLevel": "EVIDENCED",
+          "factStatus": "VERIFIED",
+          "evidenceIds": [
+            "ev-1"
+          ]
+        },
+        {
+          "skillId": "skill-2",
+          "name": "데이터 시각화",
+          "evidenceLevel": "EVIDENCED",
+          "factStatus": "NEEDS_CONFIRMATION",
+          "evidenceIds": [
+            "ev-2"
+          ]
+        },
+        {
+          "skillId": "skill-3",
+          "name": "SQL",
+          "evidenceLevel": "PARTIAL",
+          "factStatus": "NEEDS_CONFIRMATION",
+          "evidenceIds": [
+            "ev-3"
+          ]
+        },
+        {
+          "skillId": "skill-4",
+          "name": "머신러닝",
+          "evidenceLevel": "SELF_REPORTED",
+          "factStatus": "NEEDS_CONFIRMATION",
+          "evidenceIds": [
+            "ev-4"
+          ]
+        }
+      ],
+      "evidence": [
+        {
+          "evidenceId": "ev-1",
+          "sourceDocumentId": "doc-0001",
+          "page": 1,
+          "startChar": 113,
+          "endChar": 155,
+          "quotedText": "Python pandas로 결측치를 처리하고 정류장별 이용량을 집계했습니다."
+        },
+        {
+          "evidenceId": "ev-2",
+          "sourceDocumentId": "doc-0001",
+          "page": 1,
+          "startChar": 158,
+          "endChar": 190,
+          "quotedText": "분석 결과를 Tableau 대시보드로 만들어 발표했습니다."
+        },
+        {
+          "evidenceId": "ev-3",
+          "sourceDocumentId": "doc-0001",
+          "page": 1,
+          "startChar": 197,
+          "endChar": 235,
+          "quotedText": "교내 데이터 분석 동아리에서 SQL 스터디를 1년 동안 운영했습니다."
+        },
+        {
+          "evidenceId": "ev-4",
+          "sourceDocumentId": "doc-0001",
+          "page": 1,
+          "startChar": 268,
+          "endChar": 297,
+          "quotedText": "머신러닝에 관심이 있어 온라인 강의를 듣고 있습니다."
+        },
+        {
+          "evidenceId": "ev-5",
+          "sourceDocumentId": "doc-0001",
+          "page": 1,
+          "startChar": 41,
+          "endChar": 79,
+          "quotedText": "부산 버스 이용 데이터 분석 프로젝트 (2025.03~2025.06)"
+        },
+        {
+          "evidenceId": "ev-6",
+          "sourceDocumentId": "doc-0001",
+          "page": 1,
+          "startChar": 242,
+          "endChar": 261,
+          "quotedText": "ADsP(데이터분석 준전문가) 취득"
+        }
+      ],
+      "projects": [
+        {
+          "itemId": "proj-1",
+          "name": "부산 버스 이용 데이터 분석 프로젝트",
+          "summary": "정류장별 이용량 집계와 대시보드 발표",
+          "period": "2025.03~2025.06",
+          "factStatus": "NEEDS_CONFIRMATION",
+          "evidenceIds": [
+            "ev-5"
+          ]
+        }
+      ],
+      "experiences": [
+        {
+          "itemId": "exp-1",
+          "name": "데이터 분석 동아리 SQL 스터디 운영",
+          "period": "1년",
+          "factStatus": "NEEDS_CONFIRMATION",
+          "evidenceIds": [
+            "ev-3"
+          ]
+        }
+      ],
+      "certificates": [
+        {
+          "itemId": "cert-1",
+          "name": "ADsP",
+          "factStatus": "NEEDS_CONFIRMATION",
+          "evidenceIds": [
+            "ev-6"
+          ]
+        }
+      ],
+      "needsConfirmation": [
+        "통계 분석",
+        "프로젝트에서 본인이 직접 만든 시각화 범위"
+      ],
+      "modelId": "mock-llm",
+      "promptVersion": "profile-extract-v1",
+      "createdAt": "2026-11-21T10:00:00+09:00"
+    }
+  }
+}

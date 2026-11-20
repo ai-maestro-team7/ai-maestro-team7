@@ -1,0 +1,22 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/documents/doc-0001"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "documentId": "doc-0001",
+      "documentType": "RESUME",
+      "title": "가상 데이터 분석 이력서",
+      "version": 1,
+      "extractionStatus": "COMPLETED",
+      "charCount": 297,
+      "pageCount": 1,
+      "taskId": "task-0002",
+      "taskStatus": "COMPLETED",
+      "createdAt": "2026-11-21T10:00:00+09:00",
+      "updatedAt": "2026-11-21T10:00:00+09:00"
+    }
+  }
+}
