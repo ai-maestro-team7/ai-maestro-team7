@@ -1,0 +1,22 @@
+{
+  "scorePolicyVersion": "fit-v1",
+  "categoryWeights": {
+    "REQUIRED": 0.7,
+    "PREFERRED": 0.2,
+    "EXPERIENCE": 0.1
+  },
+  "evidenceLowerBounds": {
+    "EVIDENCED": 1.0,
+    "PARTIAL": 0.5,
+    "SELF_REPORTED": 0.25,
+    "NOT_FOUND": 0.0,
+    "USER_CONFIRMED_GAP": 0.0
+  },
+  "evidenceUpperBounds": {
+    "EVIDENCED": 1.0,
+    "PARTIAL": 0.5,
+    "SELF_REPORTED": 0.25,
+    "NOT_FOUND": 1.0,
+    "USER_CONFIRMED_GAP": 0.0
+  }
+}
