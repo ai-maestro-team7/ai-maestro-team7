@@ -1,6 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
-import { type Column, DataTable, TableCell, TableRow } from "@/components/ui/DataTable";
+import { type Column, DataTable, DataTableSkeleton, TableCell, TableRow } from "@/components/ui/DataTable";
 import { StatusDot } from "@/components/ui/StatusDot";
 import { cn } from "@/lib/cn";
 import { applyPeriod, firstLine, POLICY_STATUS, policyDetailHref } from "../lib";
@@ -66,4 +66,9 @@ export function PolicyTable({ policies }: { policies: PolicyCard[] }) {
       ))}
     </DataTable>
   );
+}
+
+/** 정책을 불러오는 동안 보여주는 표 자리 */
+export function PolicyTableSkeleton({ rows = 3 }: { rows?: number }) {
+  return <DataTableSkeleton columns={POLICY_COLUMNS} label="정책을 불러오는 중" rows={rows} rowClassName="py-4.5" />;
 }

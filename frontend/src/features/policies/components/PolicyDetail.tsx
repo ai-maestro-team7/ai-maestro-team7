@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/Button";
 import { DetailSection, DotList, LabeledValue } from "@/components/ui/DetailSection";
 import { Panel } from "@/components/ui/Panel";
 import { StatusDot } from "@/components/ui/StatusDot";
-import { ApiErrorNotice, ApiLoading } from "@/features/auth/components/ApiFallback";
+import { PageSkeleton } from "@/components/ui/Skeleton";
+import { ApiErrorNotice } from "@/features/auth/components/ApiFallback";
 import { useUsername } from "@/features/auth/useUsername";
 import { formatDate } from "@/lib/format";
 import { useApi } from "@/lib/useApi";
@@ -36,7 +37,7 @@ export function PolicyDetail() {
   }, [title]);
 
   if (!id) return <NotFound />;
-  if (state.status === "loading") return <ApiLoading className="py-24" label="정책을 불러오는 중" />;
+  if (state.status === "loading") return <PageSkeleton label="정책을 불러오는 중" />;
   if (state.status === "error") {
     return state.error.status === 404 ? <NotFound /> : <ApiErrorNotice error={state.error} onRetry={reload} />;
   }
