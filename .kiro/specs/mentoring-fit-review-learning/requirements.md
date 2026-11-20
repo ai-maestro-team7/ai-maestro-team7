@@ -311,7 +311,7 @@ mentoring-fit-review-learning은 A 파트(`docs/개발계획서1.md`)의 둘째 
 
 | ID | 항목 | 선택지 | 관련 |
 | --- | --- | --- | --- |
-| M-8 | 점수의 "관련 경험 근거"(0.1) 분류에 무엇을 넣을지 | 사용자가 확인한 Story_Item 중 요건과 연결된 것 / Career_Profile `experiences` / MVP에서는 비워 두고 재정규화 | Requirement 5 기준 2·3. A F-02는 가중치만 있고 항목의 원천이 없다. 공고 `requirements[].kind`에는 경험 분류가 없다 (D-10) |
+| M-8 | 점수의 "관련 경험 근거"(0.1) 분류에 무엇을 넣을지 | **결정 (2026-11-20, A, #88): MVP에서는 비워 두고 재정규화.** 이후 선택지: 사용자가 확인한 Story_Item 중 요건과 연결된 것 / Career_Profile `experiences` | Requirement 5 기준 2·3. A F-02는 가중치만 있고 항목의 원천이 없다. 공고 `requirements[].kind`에는 경험 분류가 없다 (D-10) |
 | M-9 | 고용24 훈련과정·국가자격 시험일정을 MVP에서 실제로 연결할지 | 둘 다 연결 / 시험일정만 / MVP는 미연결(`SCHEDULE_UNVERIFIED`·`NO_LIVE_COURSES` + 공식 안내 링크) | Requirement 13, BE-9. 시험일정 키는 발급됨(하루 1,000건). 훈련과정 승인 상태는 노션 표에서 확인 필요 |
 | M-10 | 부산 청년지원 프로그램 안내 (A F-05 처리 10단계) | B 정책 지갑 화면 링크만 / `team07-catalog` `POLICY#`를 A가 읽어 교육 관련 정책만 붙임 | 정책 데이터와 정책 지갑은 B 소유 (B-08). A가 같은 기능을 다시 만들지 않는다 |
 | M-11 | 학습 진행 체크·수정 기록 저장 경로 | `PATCH /learning-paths/{id}`로 새 버전 / MVP에서 뺌 | Requirement 14 기준 2. A §6.1에 경로가 없다 |
