@@ -5,6 +5,7 @@ import os
 import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from hashlib import sha256
 
 KST = timezone(timedelta(hours=9))
 ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN", "*")
@@ -63,6 +64,11 @@ def get_user_id(event):
     if len(user_id) > 128 or "#" in user_id:
         raise TeamError(400, "INVALID_INPUT", "사용자 정보 형식이 올바르지 않아요.")
     return user_id
+
+
+def hash_user_id(user_id: str) -> str:
+    """인증된 Cognito sub로 개인 문서 저장·삭제에 동일한 S3 접두사를 만든다."""
+    return sha256(user_id.encode("utf-8")).hexdigest()
 
 
 # ---------------------------------------------------------------- DynamoDB 값 변환
