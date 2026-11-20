@@ -64,14 +64,17 @@ def actions(deps: Deps, record: TurnRecord) -> list[ChatAction]:
 
     interview = record.interview
     if interview is not None:
+        posting = interview.posting or {}
+        linked = {"job_posting_id": posting.get("jobPostingId"), "posting_title": posting.get("title"),
+                  "posting_organization": posting.get("organization")}
         if interview.cover_letter is not None:
             out.append(ChatAction(type=ActionType.START_INTERVIEW, job=interview.job,
                                   document_id=interview.cover_letter.document_id,
-                                  title=interview.cover_letter.title or "저장된 자기소개서"))
+                                  title=interview.cover_letter.title or "저장된 자기소개서", **linked))
         else:
             limits = deps.config.cover_letter
             out.append(ChatAction(type=ActionType.REQUEST_COVER_LETTER, job=interview.job,
-                                  min_chars=limits.min_chars, max_chars=limits.max_chars))
+                                  min_chars=limits.min_chars, max_chars=limits.max_chars, **linked))
     return out
 
 

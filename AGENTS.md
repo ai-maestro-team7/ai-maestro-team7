@@ -162,7 +162,7 @@ B(부산 채용공고·청년정책 맞춤 추천) 코드를 짤 때는 이 절�
 | 같은 `Idempotency-Key` 재요청 | 본문이 다르면 409 `PRECONDITION_NOT_MET` | D-31 |
 | 저장 공고 상태를 `OppUserState`에 | `POST /saved`가 공통 함수 `ensure_workspace`를 불러 `OPP#SAVED#`와 `WORKSPACE#`를 한 트랜잭션으로 쓴다. 지원 상태는 `WORKSPACE#.status`에만 둔다 | D-36, db-schema §2.3 |
 | 알림 ID `{createdAt}#{해시}` | `{yyyyMMddTHHmmss}-{해시 8자}`. 주소에 `#`이 들어가면 요청이 깨진다 | db-schema §2.2 |
-| C `/start`에 직무와 요건을 넘김 | 면접 페이지로 이동하고 `job` 칸(1~50자)만 채운다 | B rev 55 §10.1 |
+| C `/start`에 직무와 요건을 넘김 | `job`(1~50자, 필수)은 그대로 두고 채용공고를 선택으로 넘긴다: 글 `jobPosting{title?, company?, text}` 또는 B 공고 ID `jobPostingId`(백엔드가 변환) | B rev 55 §10.1 → #158 팀 합의, #167 연결 |
 | 개발용 사용자 헤더 | `X-User-Id` + `ALLOW_DEV_USER_HEADER=1`, 로컬 테스트에서만 | D-35 |
 
 - 데모 계정 `demo1`~`demo3`이 B 페르소나 ①②③이다. 통합 데모는 페르소나 ① 데이터 분석(NCS 20010105)으로 한다 (D-37).

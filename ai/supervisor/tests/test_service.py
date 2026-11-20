@@ -101,6 +101,31 @@ def test_interview_prepared_gives_only_interview_card():
     assert [a["type"] for a in message["actions"]] == ["REQUEST_COVER_LETTER"]
 
 
+def test_interview_with_this_posting_carries_posting():
+    """"이 공고로" 면접: 화면에 보여 준 공고만 넘기고, 면접 행동에 공고 ID·제목·기관이 실린다 (#167)."""
+    seen = {}
+
+    def script(tools):
+        tools["search_job_postings"](job_name="데이터 분석")
+        seen["bad"] = tools["prepare_mock_interview"](job="데이터 분석", job_posting_id="wk24-made-up")
+        seen["ok"] = tools["prepare_mock_interview"](job="데이터 분석 신입", job_posting_id="demo-busan-data")
+        return reply("이 공고에 맞춰 면접 체험을 준비했어요.")
+
+    deps = build_deps(ScriptedRunner(script), documents=[cover_letter()])
+    _, _, message = ask(deps, "이 공고로 모의면접 체험해 볼래요")
+    assert seen["bad"]["error"]["code"] == "UNKNOWN_POSTING"
+    assert seen["ok"]["ready"] is True and seen["ok"]["jobPosting"] == {"title": "데이터 분석 신입"}
+    assert message["actions"] == [{"type": "START_INTERVIEW", "job": "데이터 분석 신입", "documentId": "doc-cl",
+                                   "title": "데이터 분석 자소서", "conditions": [], "jobPostingId": "demo-busan-data",
+                                   "postingTitle": "데이터 분석 신입", "postingOrganization": "(주)가상데이터"}]
+
+
+def test_interview_without_posting_has_no_posting_fields():
+    deps = build_deps(ScriptedRunner(interview_script))
+    _, _, message = ask(deps, "모의면접 체험해 볼래요")
+    assert not {"jobPostingId", "postingTitle"} & set(message["actions"][0])
+
+
 # ---------------------------------------------------------------- S-05 답 검사
 def test_s05_ungrounded_number_retries_then_passes():
     bad = lambda tools: tools["search_job_postings"]() and reply("연봉 9,999만 원 공고가 있어요.")  # noqa: E731
@@ -336,15 +361,16 @@ def test_prompt_v3_rules():
     for rule in ("공식 데이터에는 조건에 맞는 공고가 없어요", "teamDataNote", "save_search_conditions",
                  "`saved=true`일 때만", "묻지 않았는데 저장하지 않는다", "실시간으로 부르지 않는다"):
         assert rule in prompt
-    assert deps.config.prompt_version == "chat-v5"
+    assert deps.config.prompt_version == "chat-v6"
 
 
-def test_prompt_v5_rules():
+def test_prompt_v6_rules():
     deps = build_deps(ScriptedRunner(lambda tools: reply()))
     ask(deps)
     prompt = deps.runner.runs[-1]["system_prompt"]
     for rule in ("recentPostings", "면접을 원하지 않는다고 했으면 다시 권하지 않는다", "이 공고로 모의면접 체험해 볼래요",
-                 "여러 기능을 한 번에 이어 실행하지 않는다", "이 서비스에서 하지 않는다"):
+                 "여러 기능을 한 번에 이어 실행하지 않는다", "이 서비스에서 하지 않는다",
+                 "`job_posting_id`로 함께 넘긴다"):
         assert rule in prompt
     # 진단·첨삭 화면과 진단 도구를 지웠다 (#155). 지침이 없는 도구나 화면을 가리키지 않는다
     for gone in ("start_resume_diagnosis", "진단 결과 보기", "이 공고와 내 이력서 비교해 보기"):

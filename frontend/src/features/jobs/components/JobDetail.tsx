@@ -249,7 +249,7 @@ function PostingView({ detail }: { detail: PostingDetailResponse }) {
               </>
             )}
             <div className="flex flex-col gap-2 pt-1.5">
-              <Button href={interviewHref(posting.title)} fullWidth>
+              <Button href={interviewHref(posting.title, posting.jobPostingId)} fullWidth>
                 이 공고로 모의면접
               </Button>
             </div>

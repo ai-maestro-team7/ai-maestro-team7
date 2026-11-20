@@ -1,6 +1,6 @@
 {
   "configVersion": "1.4",
-  "promptVersion": "chat-v5",
+  "promptVersion": "chat-v6",
   "maxTokens": 3000,
   "maxTurns": 8,
   "maxToolCalls": 8,

@@ -47,11 +47,14 @@ export type ChatCard =
   | { type: "POSTING"; posting: ChatPosting }
   | { type: "POLICY"; policy: ChatPolicy };
 
+/** "이 공고로" 면접할 때 Agent가 실어 주는 공고 (#167). 면접 화면은 이 공고로 질문을 만들고 공고 올리기를 끈다 */
+export type LinkedPosting = { jobPostingId?: string; postingTitle?: string; postingOrganization?: string };
+
 export type ChatAction =
   | { type: "SAVE_CONDITIONS"; conditions: string[]; profilePatch: Record<string, unknown> }
   | { type: "SUGGEST_INTERVIEW"; job: string }
-  | { type: "START_INTERVIEW"; job: string; documentId: string; title?: string }
-  | { type: "REQUEST_COVER_LETTER"; job: string; minChars: number; maxChars: number }
+  | ({ type: "START_INTERVIEW"; job: string; documentId: string; title?: string } & LinkedPosting)
+  | ({ type: "REQUEST_COVER_LETTER"; job: string; minChars: number; maxChars: number } & LinkedPosting)
   /** 사용자가 채팅으로 저장을 승낙해 Agent가 저장했다 (D-40) */
   | { type: "CONDITIONS_SAVED"; conditions: string[] };
 
@@ -97,6 +100,8 @@ export type InterviewHandoff = {
   coverLetter?: string;
   documentId?: string;
   documentTitle?: string;
+  /** 면접에 쓸 공고의 제목·기관. 공고 ID는 주소(?posting=)로 넘긴다 */
+  posting?: { jobPostingId: string; title?: string; organization?: string };
   source: "chat";
   /** 남긴 사용자 (토큰 sub). 지금 로그인한 사용자와 다르면 쓰지 않는다 */
   owner: string | null;

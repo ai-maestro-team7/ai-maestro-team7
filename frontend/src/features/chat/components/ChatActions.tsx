@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { TextArea } from "@/components/ui/TextArea";
 import { ApiError, saveMyProfile } from "@/lib/api";
 import type { BasicProfileInput } from "@/features/profile/types";
-import { interviewHref, writeHandoff } from "../lib";
+import { interviewHref, linkedPosting, writeHandoff } from "../lib";
 import type { ChatAction } from "../types";
 
 type SaveAction = Extract<ChatAction, { type: "SAVE_CONDITIONS" }>;
@@ -58,14 +58,22 @@ export function SaveConditions({ action }: { action: SaveAction }) {
 export function StartInterview({ action }: { action: StartAction }) {
   const router = useRouter();
   function start() {
-    writeHandoff({ job: action.job, documentId: action.documentId, documentTitle: action.title, source: "chat" });
-    router.push(interviewHref(action.job));
+    writeHandoff({
+      job: action.job,
+      documentId: action.documentId,
+      documentTitle: action.title,
+      posting: linkedPosting(action),
+      source: "chat",
+    });
+    router.push(interviewHref(action.job, action.jobPostingId));
   }
   return (
     <div className="flex flex-col gap-2.5 rounded-field bg-grey-50 p-4">
       <p className="text-body font-bold text-grey-900">‘{action.job}’ 모의면접 체험</p>
       <p className="text-small text-grey-600">
-        {action.title ?? "저장된 자기소개서"}로 질문을 만들어요. 체험용 면접이고 점수는 합격 확률이 아니에요.
+        {action.title ?? "저장된 자기소개서"}
+        {action.postingTitle ? `와 ‘${action.postingTitle}’ 공고` : ""}로 질문을 만들어요. 체험용 면접이고 점수는 합격 확률이
+        아니에요.
       </p>
       <div>
         <Button size="M" onClick={start}>
@@ -89,8 +97,8 @@ export function CoverLetterForm({ action }: { action: RequestAction }) {
       setError(`자기소개서는 ${action.minChars.toLocaleString()}~${action.maxChars.toLocaleString()}자로 넣어 주세요.`);
       return;
     }
-    writeHandoff({ job: action.job, coverLetter: trimmed, source: "chat" });
-    router.push(interviewHref(action.job));
+    writeHandoff({ job: action.job, coverLetter: trimmed, posting: linkedPosting(action), source: "chat" });
+    router.push(interviewHref(action.job, action.jobPostingId));
   }
 
   return (

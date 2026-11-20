@@ -136,6 +136,9 @@ export function jobDetailHref(jobPostingId: string): string {
 }
 
 /** C 모의면접 `job` 칸은 1~50자 (B rev 55 §10.1) */
-export function interviewHref(title: string): string {
-  return `/interview?job=${encodeURIComponent(title.slice(0, 50))}`;
+/** 공고 상세 → 면접 설정. 공고 ID를 같이 넘기면 면접 화면이 그 공고로 질문을 만들고 공고 올리기를 끈다 (#167) */
+export function interviewHref(title: string, jobPostingId?: string): string {
+  const params = new URLSearchParams({ job: title.slice(0, 50) });
+  if (jobPostingId) params.set("posting", jobPostingId);
+  return `/interview?${params.toString()}`;
 }

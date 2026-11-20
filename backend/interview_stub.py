@@ -23,7 +23,8 @@ def _question(q, answer_no=1, follow_up=False, text=None):
     return {"questionId": qid, "answerId": f"a-{q['questionId']}-{answer_no}", "text": text or q["question"], "isFollowUp": follow_up}
 
 
-def start_interview(session_id, job, resume_text, interview_type, camera_consent, profile=None):
+def start_interview(session_id, job, resume_text, interview_type, camera_consent, profile=None, job_posting=None):
+    """job_posting(#158)은 대역에서 쓰지 않는다."""
     questions = [{"questionId": i, "questionType": t, "question": s.format(job=job)} for i, t, s in QUESTIONS]
     session = {
         "sessionId": session_id, "job": job, "interviewType": interview_type, "cameraConsent": camera_consent,
@@ -31,6 +32,17 @@ def start_interview(session_id, job, resume_text, interview_type, camera_consent
         "questions": questions, "currentIndex": 0, "followUpUsed": False, "answers": [], "baseline": None,
     }
     return {"session": session, "nextQuestion": _question(questions[0])}
+
+
+def normalize_job_posting(value):
+    return value if isinstance(value, dict) else None  # 대역은 검사하지 않는다 (#158 인계 §2)
+
+
+def job_posting_from_posting(data):
+    """대역: 공고 제목·기관과 업무 내용만 옮긴다. 실제 변환 규칙은 C `interview.job_posting`."""
+    data = data or {}
+    text = (data.get("jobDescription") or "").strip()
+    return {"title": data.get("title"), "company": data.get("organization"), "text": text} if len(text) >= 30 else None
 
 
 def synthesize_question(text):

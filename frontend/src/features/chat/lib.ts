@@ -29,6 +29,14 @@ export function parseHandoff(raw: string | null): InterviewHandoff | null {
       coverLetter: typeof value.coverLetter === "string" ? value.coverLetter : undefined,
       documentId: typeof value.documentId === "string" ? value.documentId : undefined,
       documentTitle: typeof value.documentTitle === "string" ? value.documentTitle : undefined,
+      posting:
+        value.posting && typeof value.posting.jobPostingId === "string"
+          ? {
+              jobPostingId: value.posting.jobPostingId,
+              title: typeof value.posting.title === "string" ? value.posting.title : undefined,
+              organization: typeof value.posting.organization === "string" ? value.posting.organization : undefined,
+            }
+          : undefined,
       source: "chat",
       owner,
     };
@@ -58,8 +66,22 @@ export function chatHref(sessionId?: string | null): string {
   return sessionId ? `/chat/?s=${encodeURIComponent(sessionId)}` : "/chat/";
 }
 
-export function interviewHref(job: string): string {
-  return `/interview/?${new URLSearchParams({ job, mode: "voice" }).toString()}`;
+/** 면접 설정 화면 주소. 공고와 함께 가면 `posting`을 붙인다. 면접 화면은 이 값이 있을 때만 공고 올리기를 끈다 (#167) */
+export function interviewHref(job: string, jobPostingId?: string): string {
+  const params = new URLSearchParams({ job, mode: "voice" });
+  if (jobPostingId) params.set("posting", jobPostingId);
+  return `/interview/?${params.toString()}`;
+}
+
+/** 면접 행동에 실린 공고를 인계 값으로 */
+export function linkedPosting(action: {
+  jobPostingId?: string;
+  postingTitle?: string;
+  postingOrganization?: string;
+}): { jobPostingId: string; title?: string; organization?: string } | undefined {
+  return action.jobPostingId
+    ? { jobPostingId: action.jobPostingId, title: action.postingTitle, organization: action.postingOrganization }
+    : undefined;
 }
 
 export const POLICY_STATUS_LABEL: Record<string, string> = {

@@ -39,6 +39,7 @@ class SearchRecord:
 class InterviewRecord:
     job: str
     cover_letter: DocumentInfo | None
+    posting: dict | None = None  # "이 공고로" 면접할 때 그 공고 카드 (jobPostingId·title·organization). 질문을 공고에 맞춘다 (#167)
 
 
 @dataclass
@@ -166,13 +167,15 @@ class TurnTools:
             (예: "응 저장해 줘", "저장할래"). 입력은 없다. 저장할 값은 바로 앞 검색에서 정해진 조건이다."""
             return tools._call("save_search_conditions", tools._save)
 
-        def prepare_mock_interview(job: str) -> dict:
+        def prepare_mock_interview(job: str, job_posting_id: str | None = None) -> dict:
             """모의면접 체험을 준비한다. 저장된 자소서가 있는지 확인한다. 사용자가 면접 연습을 원할 때 쓴다.
+            "이 공고로" 면접하면 그 공고 ID를 넘긴다. 면접 질문을 그 공고의 업무·요건에 맞춰 만든다.
 
             Args:
                 job: 면접 볼 직무 이름 (1~50자, 예: 데이터 분석)
+                job_posting_id: 면접에 쓸 공고 ID. 이번 검색 결과나 <user_context>의 recentPostings에 있는 것만
             """
-            return tools._call("prepare_mock_interview", lambda: tools._prepare_interview(job))
+            return tools._call("prepare_mock_interview", lambda: tools._prepare_interview(job, job_posting_id))
 
         return [get_my_status, search_job_postings, find_youth_policies, ask_youth_policy, save_search_conditions,
                 prepare_mock_interview]
@@ -307,18 +310,28 @@ class TurnTools:
             rows += list(self.record.search.feed.get("items") or [])
         return {r["jobPostingId"]: r for r in rows if isinstance(r, dict) and r.get("jobPostingId")}
 
-    def _prepare_interview(self, job: str) -> dict:
+    def _prepare_interview(self, job: str, job_posting_id: str | None = None) -> dict:
         name = _clean(job, 200)
         if not name or len(name) > self.deps.config.interview_job_max_chars:
             return {"error": {"code": "INVALID_INPUT",
                               "message": f"직무 이름은 1~{self.deps.config.interview_job_max_chars}자로 주세요."}}
+        posting = None
+        pid = (job_posting_id or "").strip() or None
+        if pid:
+            # 모델이 지어낸 ID는 받지 않는다. 화면에 보여 준 공고만 가리킬 수 있다
+            card = self.known_postings().get(pid)
+            if card is None:
+                return {"error": {"code": "UNKNOWN_POSTING",
+                                  "message": "방금 보여 드린 공고 가운데서 골라 주세요. 어떤 공고인지 다시 알려 주세요."}}
+            posting = {"jobPostingId": pid, "title": card.get("title"), "organization": card.get("organization")}
         letter = self.cover_letter()
-        self.record.interview = InterviewRecord(job=name, cover_letter=letter)
+        self.record.interview = InterviewRecord(job=name, cover_letter=letter, posting=posting)
         limits = self.deps.config.cover_letter
+        linked = {"jobPosting": {"title": posting["title"]}} if posting else {}
         if letter:
-            return {"ready": True, "job": name, "coverLetter": {"title": letter.title or "저장된 자기소개서"},
+            return {"ready": True, "job": name, "coverLetter": {"title": letter.title or "저장된 자기소개서"}, **linked,
                     "next": "화면에 [모의면접 시작하기] 버튼이 떠요. 체험용 면접이에요"}
-        return {"ready": False, "job": name, "needsCoverLetter": True,
+        return {"ready": False, "job": name, "needsCoverLetter": True, **linked,
                 "next": f"화면에 자소서 입력 칸이 떠요. {limits.min_chars:,}~{limits.max_chars:,}자로 붙여 넣으면 면접 화면으로 넘어가요"}
 
 
