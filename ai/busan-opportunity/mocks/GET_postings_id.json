@@ -1,0 +1,167 @@
+{
+  "posting": {
+    "jobPostingId": "wk24-DEMO0002",
+    "snapshotId": "20261121-a1b2c3d4",
+    "title": "Data Analyst",
+    "organization": "(주)가상테크",
+    "jobDescription": "데이터 분석과 통계 모델링으로 서비스 지표를 분석하고 SQL로 데이터를 다룬다",
+    "requirements": [
+      {
+        "requirementId": "req-1",
+        "name": "SQL",
+        "kind": "REQUIRED_SKILL",
+        "weight": 1.0,
+        "sourceQuote": "필수: SQL"
+      },
+      {
+        "requirementId": "pref-1",
+        "name": "Tableau",
+        "kind": "PREFERRED_SKILL",
+        "weight": 1.0,
+        "sourceQuote": "우대: Tableau"
+      }
+    ],
+    "eligibilityRules": [
+      {
+        "ruleId": "rule-edu",
+        "type": "EDUCATION",
+        "value": "BACHELOR",
+        "sourceQuote": "학력 조건"
+      }
+    ],
+    "closesAt": "2026-11-30",
+    "officialUrl": "https://example.invalid/postings/wk24-DEMO0002",
+    "sourceType": "DEMO",
+    "checkedAt": "2026-11-21T04:40:00+09:00",
+    "source": "WORK24",
+    "company": {
+      "name": "(주)가상테크",
+      "hqSido": "11"
+    },
+    "orgType": "PRIVATE",
+    "workRegion": {
+      "sido": "11",
+      "sigungu": "11680",
+      "label": "서울 강남구",
+      "unknown": false
+    },
+    "job": {
+      "code": "D0101",
+      "middle": "D01",
+      "major": "D",
+      "name": "데이터 분석가",
+      "ncsCodes": []
+    },
+    "employmentType": "FULL_TIME",
+    "careerType": "NEW",
+    "salary": {
+      "disclosed": true,
+      "min": 4000,
+      "max": 4400,
+      "unit": "MANWON_YEAR"
+    },
+    "rolling": false,
+    "remoteWork": "NONE",
+    "selectionSteps": [],
+    "documents": [],
+    "badges": [],
+    "extractStatus": "DONE",
+    "extractedBy": {},
+    "contentHash": "demo"
+  },
+  "isBusan": false,
+  "isCapitalArea": true,
+  "closed": false,
+  "isSample": true,
+  "matchLevel": "GOOD",
+  "eligibility": {
+    "status": "ELIGIBLE",
+    "conditions": [
+      {
+        "ruleId": "rule-edu",
+        "type": "EDUCATION",
+        "result": "MET",
+        "reason": "학력 조건 충족"
+      },
+      {
+        "ruleId": "rule-career",
+        "type": "CAREER",
+        "result": "MET",
+        "reason": "신입 지원 가능"
+      }
+    ],
+    "unknown": [],
+    "ruleVersion": "elig-v1"
+  },
+  "badges": [],
+  "relatedPolicies": [],
+  "alternativesPreview": [
+    {
+      "jobPostingId": "wk24-DEMO0001",
+      "title": "데이터 분석 신입",
+      "organization": "(주)가상데이터",
+      "workRegion": {
+        "sido": "26",
+        "sigungu": "26350",
+        "label": "부산 해운대구",
+        "unknown": false
+      },
+      "closesAt": "2026-12-05",
+      "similarity": 0.86,
+      "matchScore": 0.74,
+      "matchLevel": "GOOD",
+      "badges": [
+        {
+          "type": "CHEONGKKEUL",
+          "label": "청끌기업 · 급여",
+          "source": "부산광역시",
+          "asOf": "2026-06-30",
+          "cheonggeulType": "SALARY"
+        }
+      ],
+      "facts": [
+        "하는 일이 비슷함 (유사도 0.86)",
+        "급여가 공고에 적혀 있음",
+        "청끌기업 · 급여",
+        "마감 D-14"
+      ],
+      "whyShown": "하는 일이 비슷하고 급여가 공고에 적혀 있어요",
+      "isSample": true
+    },
+    {
+      "jobPostingId": "alio-DEMO0001",
+      "title": "2026년 신입직원 채용 (데이터)",
+      "organization": "가상금융공사",
+      "workRegion": {
+        "sido": "26",
+        "sigungu": "26290",
+        "label": "부산 남구",
+        "unknown": false
+      },
+      "closesAt": "2026-11-30",
+      "similarity": 0.81,
+      "matchScore": 0.71,
+      "matchLevel": "GOOD",
+      "badges": [
+        {
+          "type": "RELOCATED_INSTITUTION",
+          "label": "부산 이전 공공기관",
+          "source": "국토교통부 혁신도시",
+          "asOf": "2026-06-30"
+        }
+      ],
+      "facts": [
+        "하는 일이 비슷함 (유사도 0.81)",
+        "부산 이전 공공기관 · 지역인재 전형 대상일 수 있음",
+        "마감 D-9"
+      ],
+      "whyShown": "보고 있는 공고와 하는 일이 비슷해요",
+      "isSample": true
+    }
+  ],
+  "facts": [
+    "희망 직무와 같은 직종",
+    "마감 D-9"
+  ],
+  "dataAsOf": "2026-11-21T04:52:00+09:00"
+}

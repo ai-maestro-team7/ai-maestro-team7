@@ -14,7 +14,7 @@ AI 코딩 에이전트(Claude Code 등)가 이 저장소에서 작업할 때 지
 - 백엔드·인프라·공통 문서가 들어와 배포돼 있다: `README.md`, `.gitignore`, `.python-version`(3.13), `backend/`(단일 Lambda `team07-api`, 테스트 62개), `infra/`(AWS CLI 스크립트), `docs/api.md`(공통 API 규칙)·`docs/db-schema.md`(v1.3)·`docs/team-guide.md`. 테스트·배포 명령은 README. CI는 없다.
 - 이전 뼈대(`4aa11cc`)는 정리해 PR #9~#14로 다시 들어왔다 (D-25).
 - 지식 패키지 ZIP, 강의·환경 안내, OpenAPI 발급 현황, C 기능 정리 페이지는 팀 노션 허브에만 있다. 코드에 걸리는 내용은 아래 "노션 허브 자료"에 옮겼다. A의 `openapi.yaml`은 아직 어디에도 없다. 없는 파일을 있다고 가정하지 않는다.
-- `docs/개발계획서2.md`(B)는 B 명세 최신판(rev 55, B 담당 보관)보다 한 판 오래됐다. B의 DB·필드 이름은 `docs/db-schema.md` v1.3과 아래 "B 작업 기준"을 따른다.
+- `docs/개발계획서2.md`(B)는 rev 55다. 그 뒤에 정해진 것(`docs/db-schema.md` v1.3, 결정 기록)은 아래 "B 작업 기준"을 따른다.
 
 | 문서 | 볼 때 |
 |---|---|
@@ -133,7 +133,7 @@ C 기능 정리 페이지 (노션 "AI 모의면접 에이전트 기능")
 - 미확정 (임의 결정 금지): 통합 Agent 프레임워크 (D-23, A) · 프론트엔드 프레임워크 (D-24) · MVP 우선순위와 진로 설문·캘린더·기업 관계 그래프 담당 (D-27, 팀 리더)
 
 ## B 작업 기준 (`ai/busan-opportunity/`)
-B(부산 채용공고·청년정책 맞춤 추천) 코드를 짤 때는 이 절부터 본다. 근거는 `docs/개발계획서2.md`, B 명세 rev 55, `docs/db-schema.md` v1.3, 결정 기록이다. 이 절은 steering보다 나중에 정리했다. B 내용이 steering과 다르면 이 절과 `docs/db-schema.md`를 따른다.
+B(부산 채용공고·청년정책 맞춤 추천) 코드를 짤 때는 이 절부터 본다. 근거는 `docs/개발계획서2.md`(rev 55), `docs/db-schema.md` v1.3, 결정 기록이다. 코드 구조와 함께 쓰는 파일은 `ai/busan-opportunity/README.md`에 있다. 이 절은 steering보다 나중에 정리했다. B 내용이 steering과 다르면 이 절과 `docs/db-schema.md`를 따른다.
 
 ### 위치와 연결
 - 패키지는 `ai/busan-opportunity/src/opportunity/` 아래에 `models`, `config`, `seeds`, `ingest`, `enrich`, `core`, `api`, `notify`로 둔다. 테스트는 `tests/{unit, rules, personas, contract}`, 프론트용 가짜 응답은 `mocks/`에 둔다 (개발계획서2 §13).
@@ -144,9 +144,9 @@ B(부산 채용공고·청년정책 맞춤 추천) 코드를 짤 때는 이 절�
 - `ai/` 아래 코드는 `backend/`를 import하지 않는다 (Requirement 12). 공고 자격 판정은 `backend/eligibility.py`의 `evaluate_eligibility` 하나로 하기로 했으니 (D-11), B가 판정 결과를 어떻게 받을지는 백엔드 담당과 정한다.
 
 ### 명세보다 나중에 바뀐 것
-`docs/개발계획서2.md`에 적힌 것과 지금 따를 것이다.
+명세 예전 판이나 rev 55에 적힌 것 가운데 지금은 다르게 하는 것이다.
 
-| 개발계획서2 | 지금 따를 것 | 근거 |
+| 예전 내용 | 지금 따를 것 | 근거 |
 |---|---|---|
 | 테이블 `Postings`·`Policies`·`OppUserState`·멱등 테이블 (§6) | `team07-catalog`의 `POSTING#`(`SNAP#`·`LATEST`·`ALTS`)·`POLICY#`·`COMPANY#`, `team07-career-mentor`의 `OPP#PREFS`·`OPP#SAVED#`·`OPP#ALERT#`·`OPP#NOTI#`·`OPP#CAP#`·`OPP#EXPL#`, 공통 `IDEM#` | D-13, db-schema §2.2·§3 |
 | `postingId`, 덮어쓰기 + TTL(마감 + 14일) | `jobPostingId` + `snapshotId`. 내용이 바뀔 때만 새 스냅샷을 만들고 지우지 않는다. 마감 여부는 `isExpired` | D-09, D-34 |

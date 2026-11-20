@@ -1,0 +1,43 @@
+{
+  "policy": {
+    "policyId": "seed-busan-joy-double",
+    "title": "부산청년 기쁨두배통장",
+    "summary": "월 10만 원 저축 시 시가 같은 금액 지원",
+    "category": "ASSET",
+    "stage": "EMPLOYED",
+    "bucket": "AFTER_EMPLOYMENT",
+    "eligibility": {
+      "status": "AFTER_EMPLOYMENT",
+      "reasons": [
+        "일하는 청년 대상: 지금은 미취업",
+        "나이 18~39세 충족",
+        "부산 거주 충족"
+      ],
+      "manualChecks": []
+    },
+    "benefit": {
+      "text": "월 10만 원 저축 시 시가 같은 금액 지원",
+      "publicShareMax": 360,
+      "selfShareMax": 360,
+      "unit": "MANWON"
+    },
+    "application": {
+      "expected": "2027년 8월 (작년 8.10~8.21 기준)",
+      "selection": "LOTTERY",
+      "lastCompetition": "13:1 (2025)"
+    },
+    "exclusiveWith": [
+      "청년내일저축계좌"
+    ],
+    "alertAvailable": true,
+    "alertSubscribed": false,
+    "url": "https://example.invalid/busan-policy",
+    "source": "BUSAN_SEED",
+    "asOf": "2026-11-20",
+    "checklist": [
+      "주민등록초본",
+      "신청서"
+    ]
+  },
+  "dataAsOf": "2026-11-21T04:52:00+09:00"
+}

@@ -1,0 +1,15 @@
+{
+  "items": [
+    {
+      "jobPostingId": "alio-DEMO0001",
+      "kind": "TARGET",
+      "status": "PLANNED",
+      "isBusan": true,
+      "savedAt": "2026-11-21T10:12:00+09:00",
+      "workspaceId": "ws-alio-DEMO0001",
+      "title": "2026년 신입직원 채용 (데이터)",
+      "organization": "가상금융공사",
+      "closesAt": "2026-11-30"
+    }
+  ]
+}

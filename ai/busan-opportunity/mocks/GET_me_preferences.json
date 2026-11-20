@@ -1,0 +1,9 @@
+{
+  "sort": "BUSAN_FIRST",
+  "leaveReason": "SALARY",
+  "notifications": {
+    "email": false,
+    "weekly": false
+  },
+  "receivingPolicies": []
+}

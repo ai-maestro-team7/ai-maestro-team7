@@ -1,0 +1,134 @@
+{
+  "items": [
+    {
+      "jobPostingId": "wk24-DEMO0001",
+      "title": "데이터 분석 신입",
+      "organization": "(주)가상데이터",
+      "orgType": "PRIVATE",
+      "workRegion": {
+        "sido": "26",
+        "sigungu": "26350",
+        "label": "부산 해운대구",
+        "unknown": false
+      },
+      "isBusan": true,
+      "isCapitalArea": false,
+      "job": {
+        "code": "D0101",
+        "middle": "D01",
+        "major": "D",
+        "name": "데이터 분석가",
+        "ncsCodes": []
+      },
+      "closesAt": "2026-12-05",
+      "rolling": false,
+      "salary": {
+        "disclosed": true,
+        "min": 3400,
+        "max": 3800,
+        "unit": "MANWON_YEAR"
+      },
+      "matchScore": 0.74,
+      "matchLevel": "GOOD",
+      "eligibility": {
+        "status": "ELIGIBLE",
+        "conditions": [
+          {
+            "ruleId": "rule-edu",
+            "type": "EDUCATION",
+            "result": "MET",
+            "reason": "학력 조건 충족"
+          },
+          {
+            "ruleId": "rule-career",
+            "type": "CAREER",
+            "result": "MET",
+            "reason": "신입 지원 가능"
+          }
+        ],
+        "unknown": [],
+        "ruleVersion": "elig-v1"
+      },
+      "badges": [
+        {
+          "type": "CHEONGKKEUL",
+          "label": "청끌기업 · 급여",
+          "source": "부산광역시",
+          "asOf": "2026-06-30",
+          "cheonggeulType": "SALARY"
+        }
+      ],
+      "facts": [
+        "희망 직무와 같은 직종",
+        "필수 조건 2개 중 2개 충족",
+        "마감 D-14"
+      ],
+      "isSample": true
+    },
+    {
+      "jobPostingId": "wk24-DEMO0002",
+      "title": "Data Analyst",
+      "organization": "(주)가상테크",
+      "orgType": "PRIVATE",
+      "workRegion": {
+        "sido": "11",
+        "sigungu": "11680",
+        "label": "서울 강남구",
+        "unknown": false
+      },
+      "isBusan": false,
+      "isCapitalArea": true,
+      "job": {
+        "code": "D0101",
+        "middle": "D01",
+        "major": "D",
+        "name": "데이터 분석가",
+        "ncsCodes": []
+      },
+      "closesAt": "2026-11-30",
+      "rolling": false,
+      "salary": {
+        "disclosed": true,
+        "min": 4000,
+        "max": 4400,
+        "unit": "MANWON_YEAR"
+      },
+      "matchScore": 0.79,
+      "matchLevel": "GOOD",
+      "eligibility": {
+        "status": "ELIGIBLE",
+        "conditions": [
+          {
+            "ruleId": "rule-edu",
+            "type": "EDUCATION",
+            "result": "MET",
+            "reason": "학력 조건 충족"
+          },
+          {
+            "ruleId": "rule-career",
+            "type": "CAREER",
+            "result": "MET",
+            "reason": "신입 지원 가능"
+          }
+        ],
+        "unknown": [],
+        "ruleVersion": "elig-v1"
+      },
+      "badges": [],
+      "facts": [
+        "희망 직무와 같은 직종",
+        "마감 D-9"
+      ],
+      "busanAlternativesCount": 2,
+      "isSample": true
+    }
+  ],
+  "ranking": {
+    "sort": "BUSAN_FIRST",
+    "basis": "비슷하게 맞는 공고 중 부산 근무 공고를 먼저 보여드려요",
+    "busanBoost": 0.06
+  },
+  "dataAsOf": "2026-11-21T04:52:00+09:00",
+  "stale": false,
+  "askLeaveReason": false
+}

@@ -1,0 +1,54 @@
+{
+  "base": {
+    "jobPostingId": "wk24-DEMO0002",
+    "label": "서울 강남구 · (주)가상테크"
+  },
+  "alt": {
+    "jobPostingId": "alio-DEMO0001",
+    "label": "부산 남구 · 가상금융공사"
+  },
+  "rows": [
+    {
+      "key": "SALARY",
+      "label": "급여 (공고 기재)",
+      "base": "연 4,000~4,400만 원",
+      "alt": "공고에 없음",
+      "comparable": false,
+      "source": "각 공고"
+    },
+    {
+      "key": "REGIONAL_POLICY",
+      "label": "나에게 맞는 지역 정책 (온통청년 기준)",
+      "base": {
+        "count": 1
+      },
+      "alt": {
+        "count": 3
+      },
+      "source": "온통청년",
+      "asOf": "2026-11-21",
+      "note": "전국 공통 정책 1개는 어디서든 같아요",
+      "nationalCommon": 1
+    },
+    {
+      "key": "REGIONAL_TALENT",
+      "label": "지역인재 전형",
+      "base": "해당 없음",
+      "alt": "대상일 수 있음"
+    },
+    {
+      "key": "VERIFIED",
+      "label": "시·정부 인증",
+      "base": "-",
+      "alt": "-"
+    }
+  ],
+  "costAdjusted": {
+    "available": false,
+    "reason": "SALARY_NOT_COMPARABLE"
+  },
+  "familyHousingOption": true,
+  "familyHousingApplied": false,
+  "suggestMore": true,
+  "dataAsOf": "2026-11-21T04:52:00+09:00"
+}
