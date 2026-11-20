@@ -1,0 +1,45 @@
+{
+  "result": {
+    "pagging": {"totCount": 4, "pageNum": 1, "pageSize": 100},
+    "youthPolicyList": [
+      {
+        "plcyNo": "20260100000001",
+        "plcyNm": "[가상] 전국 취업 지원",
+        "plcyExplnCn": "구직 활동을 돕는 가상 정책",
+        "plcySprtCn": "월 50만 원 지원",
+        "lclsfNm": "일자리",
+        "sprtTrgtMinAge": "19",
+        "sprtTrgtMaxAge": "34",
+        "aplyYmd": "20261101 ~ 20261130",
+        "aplyUrlAddr": "https://example.invalid/policy/1",
+        "zipCd": "",
+        "earnCndSeNm": "무관"
+      },
+      {
+        "plcyNo": "20260100000002",
+        "plcyNm": "[가상] 부산 주거 지원",
+        "plcyExplnCn": "주거비를 돕는 가상 정책",
+        "lclsfNm": "주거",
+        "sprtTrgtMinAge": "0",
+        "sprtTrgtMaxAge": "0",
+        "aplyYmd": "상시",
+        "refUrlAddr1": "https://example.invalid/policy/2",
+        "zipCd": "26000",
+        "earnCndSeNm": "연소득",
+        "earnEtcCn": "중위소득 150% 이하",
+        "addAplyQlfcCndCn": "부산 거주 6개월 이상"
+      },
+      {
+        "plcyNo": "20260100000003",
+        "plcyNm": "[가상] 서울 구 단위 지원",
+        "lclsfNm": "교육",
+        "aplyYmd": "",
+        "zipCd": "11680,11650"
+      },
+      {
+        "plcyNo": "2026#0004",
+        "plcyNm": "번호에 샵이 든 정책"
+      }
+    ]
+  }
+}

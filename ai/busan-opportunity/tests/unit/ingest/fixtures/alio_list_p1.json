@@ -1,0 +1,36 @@
+{
+  "totalCount": 3,
+  "result": [
+    {
+      "recrutPblntSn": "2026001",
+      "instNm": "가상금융공사",
+      "recrutPbancTtl": "2026년 신입직원 채용",
+      "workRgnNmLst": "부산",
+      "pbancEndYmd": "2026-12-10",
+      "ncsCdNmLst": "금융·보험",
+      "acbgCondNmLst": "학력무관",
+      "hireTypeNmLst": "정규직",
+      "recrutSeNm": "신입",
+      "srcUrl": "https://example.invalid/alio/2026001"
+    },
+    {
+      "recrutPblntSn": "2026002",
+      "instNm": "가상진흥원",
+      "recrutPbancTtl": "전문직 채용",
+      "workRgnNmLst": "서울,부산",
+      "pbancEndYmd": "2026-12-20",
+      "ncsCdNmLst": "사업관리",
+      "acbgCondNmLst": "대졸(4년)",
+      "hireTypeNmLst": "정규직,계약직",
+      "recrutSeNm": "경력",
+      "srcUrl": "https://example.invalid/alio/2026002"
+    },
+    {
+      "recrutPblntSn": "2026#003",
+      "instNm": "가상공단",
+      "recrutPbancTtl": "번호에 샵이 든 공고",
+      "workRgnNmLst": "부산",
+      "pbancEndYmd": "2026-12-20"
+    }
+  ]
+}
