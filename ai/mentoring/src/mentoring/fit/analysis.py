@@ -48,6 +48,7 @@ from .records import (
     EligibilityCondition,
     EvidenceQuote,
     JobFitAnalysis,
+    LinkOut,
     LinkOutput,
     PostingLatestView,
     PostingSnapshotView,
@@ -315,10 +316,22 @@ def _link(deps, task: Task, requirements: list[dict], profile: CareerProfile) ->
     evidence_by_id = {e.evidence_id: e for e in profile.evidence}
     outs: dict = {}
     calls = 0
-    if requirements and skills:
+    # NCS 능력단위 코드가 같은 역량은 모델 없이 코드로 연결한다 (#104). 같은 입력이면 항상 같은 연결
+    by_code: dict[str, list] = {}
+    for s in skills:
+        if s.ncs_unit_code and s.evidence_level != EvidenceLevel.USER_CONFIRMED_GAP:
+            by_code.setdefault(s.ncs_unit_code, []).append(s)
+    for req in requirements:
+        matched = by_code.get(req.get("ncs_unit_code") or "")
+        if matched:
+            outs[req["requirement_id"]] = LinkOut(
+                requirement_id=req["requirement_id"], skill_ids=[s.skill_id for s in matched],
+                evidence_ids=[i for s in matched for i in s.evidence_ids])
+    pending = [r for r in requirements if r["requirement_id"] not in outs]
+    if pending and skills:
         mask = deps.text.mask_pii
         req_view = [{"requirementId": r["requirement_id"], "name": r["name"],
-                     **({"sourceQuote": r["source_quote"]} if r.get("source_quote") else {})} for r in requirements]
+                     **({"sourceQuote": r["source_quote"]} if r.get("source_quote") else {})} for r in pending]
         skill_view = [{"skillId": s.skill_id, "name": mask(s.name).masked_text,
                        "evidence": [{"evidenceId": i, "quotedText": mask(evidence_by_id[i].quoted_text).masked_text}
                                     for i in s.evidence_ids if i in evidence_by_id]}
@@ -338,8 +351,10 @@ def _link(deps, task: Task, requirements: list[dict], profile: CareerProfile) ->
             if failures > cfg.schema_retries:
                 raise ai_output_invalid()
             problems = ["출력이 정해진 JSON 형식과 맞지 않았다"]
+        pending_ids = {r["requirement_id"] for r in pending}
         for out in output.links:
-            outs.setdefault(out.requirement_id, out)
+            if out.requirement_id in pending_ids:  # 코드로 연결한 요건은 모델이 바꾸지 못한다
+                outs.setdefault(out.requirement_id, out)
 
     # 사용자가 "없다"고 확인한 역량은 이름이 같은 요건에서 확인된 격차로 쓴다
     gap_names = {_norm(s.name) for s in profile.skills if s.evidence_level == EvidenceLevel.USER_CONFIRMED_GAP}

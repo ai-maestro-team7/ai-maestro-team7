@@ -17,6 +17,7 @@ class ExtractedSkill(MentoringModel):
     name: str = Field(min_length=1)
     normalized_name: str | None = None
     ncs_unit_code: str | None = None
+    basic_skill_id: str | None = None
     evidence_level: EvidenceLevel
     quotes: list[QuoteRef] = Field(default_factory=list)
 

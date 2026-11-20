@@ -277,3 +277,17 @@ def test_ut08_same_input_same_result(repeat):
         result = analyze(fit_deps())
         scores.add((result["fitScore"], result["potentialUpperBound"], json.dumps(result["strengths"])))
     assert len(scores) == 1
+
+
+def test_ncs_mode_links_same_unit_code_without_model():
+    coded = Skill(skill_id="skill-7", name="Python pandas 데이터 전처리", ncs_unit_code="2001010502_23v2",
+                  evidence_level=EvidenceLevel.EVIDENCED, fact_status=FactStatus.VERIFIED, evidence_ids=["ev-1"])
+    # 남은 요건(2001010501) 하나만 모델에 묻는다. 모델이 코드로 연결된 요건을 바꾸려 해도 무시한다
+    links = {"links": [{"requirementId": "2001010502_23v2", "skillIds": [], "evidenceIds": []},
+                       {"requirementId": "2001010501_23v2", "skillIds": [], "evidenceIds": []}]}
+    deps = fit_deps([links, SUMMARY], career=profile(extra_skills=[coded]))
+    result = analyze(deps, {"profileId": "profile-1", "targetNcsCode": NCS_DATA})
+    [strength] = result["strengths"]
+    assert strength["ncsUnitCode"] == "2001010502_23v2" and strength["skills"] == ["Python pandas 데이터 전처리"]
+    link_prompt = deps.llm.calls[0]["user"]
+    assert "2001010501_23v2" in link_prompt and '"requirementId": "2001010502_23v2"' not in link_prompt

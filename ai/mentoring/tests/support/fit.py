@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from mentoring.fit.store import MemoryAnalysisStore, MemoryCatalog
 from mentoring.models import CareerProfile, Certificate, Evidence, EvidenceLevel, FactStatus, Skill
-from mentoring.reference.models import CompetencyUnit, JobProfile
+from mentoring.reference.models import BasicSkill, CompetencyUnit, JobProfile
 
 from .factory import make_deps
 
@@ -82,6 +82,10 @@ class FakeNcs:
 
     def list_units(self, ncs_code):
         return list(self.units.get(ncs_code, []))
+
+    def list_basic_skills(self):
+        return [BasicSkill(skill_id="003", name="의사소통능력", ability_id=1, sub_area_id=3, sub_area_name="경청능력"),
+                BasicSkill(skill_id="010", name="문제해결능력", ability_id=3, sub_area_id=1, sub_area_name="사고력")]
 
 
 @dataclass

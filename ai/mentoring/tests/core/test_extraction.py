@@ -5,7 +5,7 @@ from mentoring.core.documents import create_text_document
 from mentoring.core.profiles import get_latest_profile
 from mentoring.models import EvidenceLevel, FactStatus, TextDocumentRequest
 from support.data import DATA_ANALYST_RESUME, QUOTE_PANDAS, QUOTE_TABLEAU, good_output
-from support.factory import KNOWN_UNIT, make_deps, run_pending
+from support.factory import make_deps, run_pending
 
 USER = "user-a"
 
@@ -161,7 +161,8 @@ def test_unknown_ncs_unit_code_is_dropped():
     deps = make_deps([output])
     submit(deps)
     codes = {s.name: s.ncs_unit_code for s in get_latest_profile(deps, USER).skills}
-    assert codes["데이터 전처리"] == KNOWN_UNIT and codes["데이터 시각화"] is None
+    # 이 테스트 입력에는 희망 직무가 없어 taxonomy 후보가 비어 있다.
+    assert codes["데이터 전처리"] is None and codes["데이터 시각화"] is None
 
 
 def test_without_reference_lookup_no_ncs_codes_are_attached():
