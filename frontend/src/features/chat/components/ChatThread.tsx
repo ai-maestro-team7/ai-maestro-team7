@@ -6,7 +6,7 @@ import { Chip } from "@/components/ui/Chip";
 import { Skeleton, SkeletonGroup } from "@/components/ui/Skeleton";
 import { ApiError } from "@/lib/api";
 import { cancelChatMessage, getChatSession, isSettled, sendChat, waitForReply } from "../api";
-import { CHAT_EXAMPLES } from "../lib";
+import { CHAT_EXAMPLES, interviewSuggestion } from "../lib";
 import type { ChatMessage } from "../types";
 import { ChatComposer } from "./ChatComposer";
 import { AssistantMessage, POLL_FAILED, UserBubble } from "./ChatMessages";
@@ -63,6 +63,8 @@ export function ChatThread({
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  /** Esc로 숨긴 추천의 답 ID. 다음 답이 오면 다시 추천한다 */
+  const [hiddenSuggestionFor, setHiddenSuggestionFor] = useState<string | null>(null);
   const [resumeOpen, setResumeOpen] = useState(false);
   // 서류를 올려 글자·역량을 찾는 중. 이때 보내면 끝난 서류가 대화에 붙지 못하므로 보내기를 막는다
   const [docBusy, setDocBusy] = useState(false);
@@ -244,6 +246,7 @@ export function ChatThread({
   }
 
   const last = messages[messages.length - 1];
+  const suggestion = last && last.messageId !== hiddenSuggestionFor ? interviewSuggestion(last) : null;
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       <div className="flex flex-1 flex-col gap-6 pt-6 pb-8">
@@ -331,6 +334,8 @@ export function ChatThread({
               generating={generating}
               stopping={stopping}
               disabled={locked}
+              suggestion={suggestion}
+              onDismissSuggestion={() => last && setHiddenSuggestionFor(last.messageId)}
             />
           </PdfDropZone>
         )}

@@ -15,7 +15,7 @@
 | `ports.py` | 바깥 의존성 인터페이스. 구현은 `backend/agent_api.py` |
 | `store/` | `SESSION#`·`CHAT#` 저장소 (DynamoDB, 메모리) |
 | `config/supervisor_config.json` | 한도·버전·금지 문구 |
-| `prompts/system_v6.md` | 시스템 프롬프트 (`promptVersion` `chat-v6`, 이전 판 v1~v5 보관) |
+| `prompts/system_v7.md` | 시스템 프롬프트 (`promptVersion` `chat-v7`, 이전 판 v1~v6 보관). v7: 공고가 여럿인데 어느 공고로 면접할지 말하지 않으면 먼저 묻는다 (입력칸 반투명 추천과 짝) |
 
 - 이 패키지는 `backend/`와 다른 파트 패키지를 import하지 않는다. B 함수와 A 문서는 포트로 받는다.
 - 도구에는 userId 인자가 없다. 백엔드가 확인한 사용자를 클로저로 넣는다.

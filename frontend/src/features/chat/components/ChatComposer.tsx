@@ -3,6 +3,7 @@
 import { Square } from "lucide-react";
 import { type FormEvent, type KeyboardEvent, useLayoutEffect, useRef } from "react";
 import { Button } from "@/components/ui/Button";
+import { cn } from "@/lib/cn";
 import { AttachButton } from "./PdfAttach";
 
 /** 입력칸이 커지는 최대 높이 (약 6줄) */
@@ -11,6 +12,9 @@ const MAX_HEIGHT_PX = 168;
 /**
  * 채팅 화면 아래 입력칸. Enter로 보내고 Shift+Enter로 줄을 바꾼다 (한글 조합 중 Enter는 보내지 않는다).
  * 답을 만드는 동안에는 보내기 자리에 멈추기 버튼이 온다.
+ *
+ * suggestion이 있고 입력칸이 비어 있으면 그 문장을 반투명하게 보여 준다. Tab(또는 오른쪽 [Tab] 단추)을 누르면
+ * 입력칸에 채워지고, Enter를 누르면 바로 보낸다. Esc를 누르면 이번 추천을 숨긴다.
  */
 export function ChatComposer({
   value,
@@ -20,6 +24,8 @@ export function ChatComposer({
   generating,
   stopping,
   disabled,
+  suggestion,
+  onDismissSuggestion,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -30,6 +36,9 @@ export function ChatComposer({
   /** 멈추기 요청을 보내는 중 */
   stopping: boolean;
   disabled: boolean;
+  /** 반투명 추천 문장. 입력칸이 비어 있을 때만 보인다 */
+  suggestion?: string | null;
+  onDismissSuggestion?: () => void;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
 
@@ -50,7 +59,25 @@ export function ChatComposer({
     submit();
   }
 
+  const ghost = !value && !disabled && !generating ? (suggestion ?? null) : null;
+
+  function acceptSuggestion() {
+    if (!ghost) return;
+    onChange(ghost);
+    ref.current?.focus();
+  }
+
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (ghost && !event.nativeEvent.isComposing && !event.shiftKey && event.key === "Tab") {
+      event.preventDefault();
+      acceptSuggestion();
+      return;
+    }
+    if (ghost && event.key === "Escape") {
+      event.preventDefault();
+      onDismissSuggestion?.();
+      return;
+    }
     if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault();
       submit();
@@ -74,9 +101,29 @@ export function ChatComposer({
         maxLength={1000}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="조건을 말하거나 궁금한 점을 물어보세요"
-        className="min-h-9.5 flex-1 resize-none bg-transparent py-1.75 text-body text-grey-900 placeholder:text-grey-500 focus:outline-none"
+        placeholder={ghost ?? "조건을 말하거나 궁금한 점을 물어보세요"}
+        aria-describedby={ghost ? "chat-suggestion-hint" : undefined}
+        className={cn(
+          "min-h-9.5 flex-1 resize-none bg-transparent py-1.75 text-body text-grey-900 focus:outline-none",
+          ghost ? "placeholder:text-grey-400" : "placeholder:text-grey-500",
+        )}
       />
+      {ghost && (
+        <>
+          <span id="chat-suggestion-hint" className="sr-only">
+            Tab 키를 누르면 추천 문장이 입력칸에 채워지고, Enter 키로 보낼 수 있어요. Esc 키로 추천을 숨겨요.
+          </span>
+          <button
+            type="button"
+            onClick={acceptSuggestion}
+            tabIndex={-1}
+            className="mb-1.5 shrink-0 rounded-control border border-grey-300 px-1.5 py-0.5 text-small font-medium text-grey-500 hover:bg-grey-50"
+          >
+            Tab
+            <span className="sr-only"> 추천 문장 채우기</span>
+          </button>
+        </>
+      )}
       {generating ? (
         <Button type="button" size="M" variant="secondary" onClick={onStop} disabled={stopping} className="gap-1.5">
           <Square aria-hidden className="size-3 fill-current" strokeWidth={2.5} />

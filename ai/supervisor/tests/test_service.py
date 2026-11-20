@@ -361,7 +361,7 @@ def test_prompt_v3_rules():
     for rule in ("공식 데이터에는 조건에 맞는 공고가 없어요", "teamDataNote", "save_search_conditions",
                  "`saved=true`일 때만", "묻지 않았는데 저장하지 않는다", "실시간으로 부르지 않는다"):
         assert rule in prompt
-    assert deps.config.prompt_version == "chat-v6"
+    assert deps.config.prompt_version == "chat-v7"
 
 
 def test_prompt_v6_rules():
@@ -528,3 +528,13 @@ def test_delete_while_answer_runs_drops_late_result():
     ids["sid"] = started["sessionId"]
     assert service.run_turn(deps, task)["reason"] == "CANCELLED"
     assert deps.store.list_messages("demo1", ids["sid"], 100) == []  # 지운 대화에 답이 다시 생기지 않는다
+
+
+def test_prompt_v7_asks_which_posting_before_interview():
+    """공고가 여럿인데 어느 공고인지 말하지 않으면 먼저 묻는다 (입력칸 반투명 추천 문장과 짝)."""
+    deps = build_deps(ScriptedRunner(lambda tools: reply()))
+    ask(deps)
+    prompt = deps.runner.runs[-1]["system_prompt"]
+    for rule in ("추천해 준 공고 중 하나로 모의면접 해 볼래요", "모의면접을 진행해 보고 싶은 공고가 있나요?",
+                 "{기관} 공고로 모의면접 해 볼래요", "방금 보여 준 공고가 하나뿐이면"):
+        assert rule in prompt

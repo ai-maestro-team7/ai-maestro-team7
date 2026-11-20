@@ -1,5 +1,5 @@
 import { sessionOwner } from "@/lib/session";
-import type { InterviewHandoff } from "./types";
+import type { ChatMessage, InterviewHandoff } from "./types";
 
 const HANDOFF_KEY = "team07.interviewHandoff";
 const HANDOFF_EVENT = "team07:interviewHandoff";
@@ -97,3 +97,23 @@ export const POLICY_STATUS_LABEL: Record<string, string> = {
 export function asOfLabel(value?: string): string | null {
   return value ? `기준 ${value.slice(0, 10)}` : null;
 }
+
+/** 반투명 추천 문장이 입력칸 한 줄에 다 보이도록 잡은 길이. 넘으면 공고 제목을 빼고 기관 이름만 쓴다 */
+const SUGGESTION_MAX_CHARS = 40;
+
+/**
+ * 공고를 보여 준 답 다음에 입력칸에 반투명으로 띄울 추천 문장 (Tab으로 채우고 Enter로 보낸다).
+ * 공고가 하나면 그 공고로 모의면접을, 여럿이면 어느 공고로 할지 Agent가 묻게 하는 말을 고른다.
+ * 이미 면접 버튼(시작·자소서 입력)이 뜬 답이거나 공고가 없으면 띄우지 않는다.
+ */
+export function interviewSuggestion(message: ChatMessage | undefined): string | null {
+  if (!message || message.role !== "ASSISTANT" || message.status !== "COMPLETED") return null;
+  if ((message.actions ?? []).some((a) => a.type === "START_INTERVIEW" || a.type === "REQUEST_COVER_LETTER")) return null;
+  const postings = (message.cards ?? []).flatMap((c) => (c.type === "POSTING" ? [c.posting] : []));
+  if (postings.length === 0) return null;
+  if (postings.length > 1) return "추천해 준 공고 중 하나로 모의면접 해 볼래요";
+  const { organization, title } = postings[0];
+  const withTitle = `${organization} ‘${title}’ 공고로 모의면접 해 볼래요`;
+  return withTitle.length <= SUGGESTION_MAX_CHARS ? withTitle : `${organization} 공고로 모의면접 해 볼래요`;
+}
+
