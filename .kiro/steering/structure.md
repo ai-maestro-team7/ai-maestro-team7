@@ -13,8 +13,17 @@ docs/
   개발계획서3.md        C 파트 명세
   CONTRIBUTING.md      협업 규칙
 .kiro/steering/         product.md, tech.md, structure.md
+AGENTS.md               AI 코딩 에이전트 규칙 (steering 요약)
+ai/
+  mentoring/            A 역량 분석·첨삭·학습 경로·통합 Agent
+  busan-opportunity/    B 부산 기회 추천
+  interview/            C AI 모의면접 함수
+backend/                공통 백엔드·인프라 (API, 인증, DB·S3, 배포)
+frontend/               프론트엔드 화면
 ```
-- 아직 코드, README, 설정 파일(.gitignore 포함), CI가 없다.
+- 최상위 폴더는 PR #1(커밋 `9d5958c` "Ai·Backend·Frontend 폴더 구조 추가")에서 만들고, PR #2(커밋 `b941a68` "최상위 폴더 이름을 소문자로 변경")에서 이름을 소문자로 바꿨다. 다섯 폴더 모두 `.gitkeep`만 있고 코드는 아직 없다.
+- 폴더와 파트 연결은 폴더 이름과 명세 기준이다: `mentoring` = A(`/api/v1/mentoring`), `busan-opportunity` = B(개발계획서2 §13), `interview` = C(개발계획서3).
+- 아직 README, 설정 파일(.gitignore 포함), 빌드·테스트 명령, CI가 없다.
 - 이전 뼈대: 커밋 `4aa11cc` "백엔드·인프라 뼈대 추가"가 `README.md`, `.gitignore`, `.python-version`(3.13), `backend/`(단일 Lambda `app.py`, 로컬 확인 스크립트), `infra/`(AWS CLI 생성·배포 스크립트, IAM 정책), `examples/strands_hello.py`, `docs/api.md`·`db-schema.md`·`team-guide.md`를 담고 있었다. 2026-11-20 11:05 "저장소 초기화" 커밋(`089499a`)으로 `main`에서 빠졌다. steering에서 "이전 뼈대"라고 적은 내용은 이 커밋 기준이며, 팀이 그 결정을 유지하는지 확인해야 한다.
 - 문서에 나오지만 저장소에 없는 것: 지식 패키지 `team7-career-mentor-knowledge-package-2026-11-20.zip`(`README_START_HERE.md`, 스켈레톤, `bedrock/documents/`, `structured/` CSV, `agent/` 프롬프트, `validation/`, `integrations/collect_official_apis.py`), A의 `openapi.yaml`, B 아키텍처 그림(노션 임베드), C 기능 정리 페이지(노션)
 
@@ -41,12 +50,13 @@ docs/
 
 - 다른 파트의 기능을 중복 구현하지 않고 계약(API, 읽기 권한, 이벤트)으로 연결한다.
 
-## 명세에 계획된 코드 구조 (최상위 배치 미확정)
-- B (개발계획서2 §13): `busan-opportunity/` 아래 `src/opportunity/{models, config, seeds, ingest, enrich, core, api, notify}`, `mocks/`, `tests/{unit, rules, personas, contract}`, `AGENTS.md`, `infra/`(CDK)
+## 파트별 코드 구조 (최상위 폴더는 PR #1·#2 기준, 내부 구조는 명세 기준)
+- B (개발계획서2 §13): `ai/busan-opportunity/` 아래 `src/opportunity/{models, config, seeds, ingest, enrich, core, api, notify}`, `mocks/`, `tests/{unit, rules, personas, contract}`, `AGENTS.md`, `infra/`(CDK)
   - `models/`는 Pydantic 계약, `config/`는 `opportunity_config.json`, `core/`는 순수 규칙(LLM 호출 금지), `enrich/`는 LLM 추출·설명·임베딩, `api/`는 REST 입구와 Agent 입구가 같은 함수를 부른다.
-- C (개발계획서3): 같은 저장소의 `interview/` 폴더 (`config/scoring_v1.json`, `samples/`). 백엔드가 import해서 부른다. 함수는 DB·API를 직접 부르지 않고 Bedrock·Polly·Transcribe·Rekognition만 부른다. 단계별 PR로 전달한다.
-- A (개발계획서1): 폴더 구조가 적혀 있지 않다. 구성 단위는 멘토링 API, 분석 워커(Extract → Validate → Profile → Retrieve → Calculate → Save 순서 고정), 공식 데이터 어댑터 `OfficialDataPort`, 지식 패키지의 수집 스크립트 재사용이다.
-- 이전 뼈대는 `backend/app.py` 단일 Lambda에 `ROUTES` 표로 경로를 붙이는 방식이었고, `infra/package.sh`가 `backend/` 바로 아래의 `.py`만 묶었다. 이 방식을 다시 쓰면 `interview/`·`busan-opportunity/` 코드는 패키징에 포함되지 않으므로 백엔드 담당과 맞춘다.
+- C (개발계획서3): `ai/interview/` 폴더 (`config/scoring_v1.json`, `samples/`). 백엔드가 import해서 부른다. 함수는 DB·API를 직접 부르지 않고 Bedrock·Polly·Transcribe·Rekognition만 부른다. 단계별 PR로 전달한다.
+- A (개발계획서1): 위치는 `ai/mentoring/`. 내부 폴더 구조는 명세에 없다. 구성 단위는 멘토링 API, 분석 워커(Extract → Validate → Profile → Retrieve → Calculate → Save 순서 고정), 공식 데이터 어댑터 `OfficialDataPort`, 지식 패키지의 수집 스크립트 재사용이다.
+- 이전 뼈대는 `backend/app.py` 단일 Lambda에 `ROUTES` 표로 경로를 붙이는 방식이었고, `infra/package.sh`가 `backend/` 바로 아래의 `.py`만 묶었다. 지금 백엔드 폴더도 이름이 `backend/`로 같다. 이 방식을 그대로 다시 쓰면 `ai/` 아래 코드는 패키징에 포함되지 않으므로 백엔드 담당과 맞춘다.
+- `busan-opportunity`처럼 하이픈이 든 폴더 이름은 Python 패키지로 바로 import할 수 없다. B 명세처럼 그 아래 `src/opportunity/`에 패키지를 둔다.
 
 ## 코딩 규칙
 - 비즈니스 로직은 입력·출력이 분명한 함수로 두고, 입구(REST 핸들러, Agent 툴, 백엔드 호출부)는 얇게 유지한다.
@@ -56,7 +66,7 @@ docs/
 - 조회와 저장을 나눈다. Agent 툴 설명에는 무엇을, 언제, 입출력을 적고, 툴 응답은 문장보다 사실 목록으로 준다.
 - 오류는 원인이 드러나는 코드로 낸다. C 함수는 `InterviewError(code, message, retryable)`를 던지고 백엔드가 공통 오류 형식으로 바꾼다.
 - Python 함수·인자는 snake_case. JSON 키 표기는 API 규약 합의를 따른다 (`tech.md`).
-- 테스트는 외부 서비스 없이 돌도록 mock·fixture를 쓴다 (A MockLLM·CSV 폴백, B `mocks/`·데모 스냅샷, C `interview/samples/`). 명세의 시나리오(A UT·INT·EVAL, B T-01~T-22·페르소나, C 연결 시나리오)를 완료 기준으로 쓴다.
+- 테스트는 외부 서비스 없이 돌도록 mock·fixture를 쓴다 (A MockLLM·CSV 폴백, B `mocks/`·데모 스냅샷, C `ai/interview/samples/`). 명세의 시나리오(A UT·INT·EVAL, B T-01~T-22·페르소나, C 연결 시나리오)를 완료 기준으로 쓴다.
 - 빌드·테스트·배포 명령은 아직 저장소에 없다. 이전 뼈대는 `uv`로 로컬 확인 스크립트를 돌리고 `infra/deploy.sh`로 배포했다.
 
 ## 협업 규칙 (`docs/CONTRIBUTING.md`)
@@ -79,7 +89,8 @@ docs/
 - 파트 경계를 넘는 변경은 계약 문서를 먼저 고치고 리뷰를 요청한다.
 
 ## 구조 미확정
-- 최상위 배치: 이전 뼈대처럼 `backend/` 단일 Lambda에 붙일지, 파트별 폴더(`busan-opportunity/`, `interview/`, A 폴더)로 나눌지
+- `backend/` Lambda가 `ai/` 아래 파트 코드를 import·패키징하는 방식 (경로 설정, 파트별 의존성 파일)
+- B 명세의 `infra/`(CDK)를 `ai/busan-opportunity/` 안에 둘지, 인프라를 `backend/`로 모을지
 - Lambda 분리와 패키징 방식 (이전 뼈대는 `team07-api` 하나)
 - 이전 뼈대(`4aa11cc`)의 코드·문서를 다시 가져올지
 - B가 계획한 `AGENTS.md`를 둘지, Kiro steering으로 대신할지

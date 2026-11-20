@@ -10,7 +10,7 @@ AI 코딩 에이전트(Claude Code 등)가 이 저장소에서 작업할 때 지
 - 방향: 부산에 남으라고 밀지 않는다. 부산에서도 맞는 기회를 발견하고 사용자가 스스로 고르게 돕는다.
 
 ## 저장소 현황
-- 지금은 문서만 있다. 코드, README, `.gitignore`, 빌드·테스트·배포 명령, CI가 없다.
+- 최상위 폴더는 `ai/{mentoring, busan-opportunity, interview}`, `backend/`, `frontend/`로 정했다 (PR #1, PR #2에서 소문자로 변경). 폴더만 있고 코드는 없다. README, `.gitignore`, 빌드·테스트·배포 명령, CI도 없다.
 - 이전 뼈대(커밋 `4aa11cc`: `backend/`, `infra/`, `docs/api.md`·`db-schema.md`·`team-guide.md`)는 커밋 `089499a` "저장소 초기화"로 `main`에서 빠졌다. 그 내용을 다시 쓸지는 팀 확인이 필요하다.
 - 지식 패키지 ZIP, A의 `openapi.yaml`, 노션 문서는 저장소에 없다. 없는 파일을 있다고 가정하지 않는다.
 
@@ -34,7 +34,7 @@ AI 코딩 에이전트(Claude Code 등)가 이 저장소에서 작업할 때 지
 | 백엔드·인프라 | API Gateway, Lambda, DB·S3, 인증, 공통 프로필, IAM | - |
 
 - 다른 파트 기능을 중복 구현하지 않고 계약(API, 읽기 권한, 이벤트)으로 연결한다. 파트 경계를 넘는 변경은 계약 문서를 먼저 고치고 리뷰를 요청한다.
-- 계획된 위치: B는 `busan-opportunity/`(개발계획서2 §13, 그 폴더용 `AGENTS.md`도 계획됨), C는 `interview/`. A와 최상위 배치는 미확정이다.
+- 위치: A `ai/mentoring/`, B `ai/busan-opportunity/`(내부 구조는 개발계획서2 §13, 그 폴더용 `AGENTS.md`도 계획됨), C `ai/interview/`, 공통 백엔드·인프라 `backend/`, 프론트 `frontend/`.
 - B의 `core/`는 순수 규칙이라 LLM을 부르지 않는다. LLM은 `enrich/`(추출·설명)에서만 부른다.
 - C 함수는 DB·API를 직접 부르지 않고 Bedrock·Polly·Transcribe·Rekognition만 부른다. 오류는 `InterviewError(code, message, retryable)`로 던진다.
 
@@ -103,5 +103,5 @@ AI 코딩 에이전트(Claude Code 등)가 이 저장소에서 작업할 때 지
 - DynamoDB 테이블 구성과 키 구조, 공고 데이터 계약(A 스냅샷 vs B 덮어쓰기), 상태 값 이름
 - 벡터 저장소와 임베딩 모델, 프론트엔드 프레임워크
 - Python 3.12·CDK(B 명세) vs Python 3.13·AWS CLI 스크립트(이전 뼈대)
-- 최상위 폴더 배치, Lambda 분리·패키징 방식, 이전 뼈대 재사용 여부
+- `backend/`가 `ai/` 코드를 import·패키징하는 방식, Lambda 분리, B `infra/`(CDK) 위치, 이전 뼈대 재사용 여부
 - MVP 우선순위가 제안서 9.2와 파트 명세에서 다른 기능, 담당이 없는 기능(워크스페이스, 문서 버전, 진로 설문, 캘린더, 기업 관계 그래프)
