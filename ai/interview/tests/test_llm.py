@@ -428,3 +428,34 @@ def test_strands_missing_package(monkeypatch, reset_model):
     with pytest.raises(InterviewError) as exc:
         llm.StrandsLLMClient().complete(system_prompt="S", user_prompt="U")
     assert exc.value.code == AWS_SERVICE_ERROR and exc.value.retryable is False
+
+
+# ---------------------------------------------------------------- 실패 종류 로그 (#121)
+
+
+@pytest.mark.parametrize("raw,kind", [
+    ("", "kind=no_json"),
+    ("죄송하지만 답할 수 없어요.", "kind=no_json"),
+    ('{"value": ', "kind=no_json"),   # 닫는 중괄호가 없으면 JSON을 찾지 못한 것으로 본다
+    ('{"value": }', "kind=json"),
+    ('{"value": "문자"}', "kind=schema:value"),
+    ('{"other": 1}', "kind=schema:value"),
+])
+def test_invalid_output_logs_kind_without_content(raw, kind, caplog):
+    """출력 검사가 실패하면 종류와 필드 이름, 길이만 로그에 남긴다. 출력 내용은 남기지 않는다."""
+    fake = FakeLLM([raw, raw])
+    with caplog.at_level(logging.WARNING, logger="interview"), pytest.raises(InterviewError):
+        call(fake)
+    assert kind in caplog.text and f"outputChars={len(raw)}" in caplog.text
+    if raw:
+        assert raw not in caplog.text
+
+
+def test_check_failure_logs_kind(caplog):
+    def check(parsed):
+        raise ValueError("값이 범위를 벗어남: 비밀")
+
+    fake = FakeLLM(['{"value": 1}', '{"value": 1}'])
+    with caplog.at_level(logging.WARNING, logger="interview"), pytest.raises(InterviewError):
+        llm.call_json(fake, system_prompt="SYS", user_prompt="USER", schema=Out, stage="test", check=check)
+    assert "kind=check" in caplog.text and "비밀" not in caplog.text
