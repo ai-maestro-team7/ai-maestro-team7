@@ -8,12 +8,13 @@
   - [x] 0.1 requirements·design·tasks (결정 1~8, AGENTS.md "job만 넘긴다" 결정이 #158 팀 합의로 바뀐 것 기록)
   - 커밋: `docs: 면접 채용공고 입력 스펙 추가`
 
-- [ ] 1. 입력 모델과 변환 함수
-  - [ ] 1.1 `settings.py` 공고 길이 값, `models.JobPostingInput`, `QuestionRequest.job_posting` (design §3)
-  - [ ] 1.2 `job_posting.py` `normalize_job_posting`, `job_posting_from_posting`, `__init__` 내보내기 (design §4)
-  - [ ] 1.3 `test_job_posting.py`, `test_models.py`·`test_package.py`·`test_settings.py` 수정
+- [x] 1. 입력 모델과 변환 함수
+  - [x] 1.1 `settings.py` 공고 길이 값, `models.JobPostingInput`, `QuestionRequest.job_posting` (design §3)
+  - [x] 1.2 `job_posting.py` `normalize_job_posting`, `job_posting_from_posting`, `__init__` 내보내기 (design §4)
+  - [x] 1.3 `test_job_posting.py`, `test_models.py`·`test_package.py` 수정, `samples/job_posting_data_analysis.json`(가상 공고)
+    - 설정 값 확인은 `test_job_posting.py`에 넣었다 (`test_settings.py`는 2에서 버전만 바꾼다)
     - _Requirements: 1, 2, 3, 6.1, 7.2, 7.3_
-  - 커밋: `feat: 면접 채용공고 입력 모델과 변환 함수 추가`
+  - 커밋: `feat: 면접 채용공고 입력 모델과 변환 함수 추가` (690 passed 6 skipped)
 
 - [ ] 2. 공고에 맞춘 질문 생성 (A-v3)
   - [ ] 2.1 `prompting` `DATA_TAGS`·`questions_prompt(job_posting)`, `prompts/a_questions_v3.md`, `versions` A-v3 (design §5·§6)
