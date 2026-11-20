@@ -35,7 +35,10 @@ jobs:
           uv run --no-project --with boto3 python test_app.py
           uv run --no-project python test_eligibility.py
           uv run --no-project --with boto3 --with "moto[dynamodb]" python test_me.py
-          uv run --no-project --with boto3 --with "moto[dynamodb,s3]" python test_interview.py
+          PYTHONPATH=../ai/mentoring/src:../contracts/src \
+            uv run --no-project --with boto3 --with "moto[dynamodb,s3]" --with-requirements ../ai/mentoring/requirements.txt --with-requirements ../contracts/requirements.txt python test_interview.py
+          PYTHONPATH=../ai/mentoring/src:../contracts/src \
+            uv run --no-project --with-requirements ../ai/mentoring/requirements.txt --with-requirements ../contracts/requirements.txt python -m unittest test_mentoring_api
           uv run --no-project --with boto3 --with "moto[dynamodb,s3]" --with pydantic --with aws-lambda-powertools python test_opportunities.py
 
       - name: 부산 기회 추천 (ai/busan-opportunity/)

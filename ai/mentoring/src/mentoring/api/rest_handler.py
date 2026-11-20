@@ -15,9 +15,10 @@ from pydantic import ValidationError
 from ..core.documents import create_text_document, get_document
 from ..core.logs import log_event, user_hash
 from ..core.profiles import confirm_profile, get_latest_profile
+from ..core.upload import complete_upload, create_upload_url
 from ..deps import Deps
 from ..errors import MentoringError, invalid_input, not_implemented, unauthorized
-from ..models import ConfirmRequest, TextDocumentRequest
+from ..models import ConfirmRequest, TextDocumentRequest, UploadUrlRequest
 from . import errors
 
 PREFIX = "/api/v1/mentoring"
@@ -78,6 +79,17 @@ def _json(status: int, body: dict) -> Response:
 
 
 # ---------------------------------------------------------------- 문서
+@app.post(f"{PREFIX}/documents/upload-url")
+def rest_create_upload_url():
+    body = create_upload_url(_deps(), _user_id(), _body(UploadUrlRequest), _header("Idempotency-Key"))
+    return _json(201, body)
+
+
+@app.post(f"{PREFIX}/documents/<document_id>/complete")
+def rest_complete_upload(document_id: str):
+    return _json(202, complete_upload(_deps(), _user_id(), _id(document_id, "documentId")))
+
+
 @app.post(f"{PREFIX}/documents/text")
 def rest_create_text_document():
     body = create_text_document(_deps(), _user_id(), _body(TextDocumentRequest), _header("Idempotency-Key"))
@@ -103,7 +115,6 @@ def rest_confirm_profile(profile_id: str):
 
 # ---------------------------------------------------------------- 아직 만들지 않은 경로 (개발계획서1 §6.1)
 _LATER = [
-    ("POST", "/documents/upload-url"), ("POST", "/documents/<document_id>/complete"),
     ("POST", "/stories"), ("GET", "/stories"), ("PATCH", "/stories/<story_id>"),
     ("POST", "/analyses"), ("GET", "/analyses/<analysis_id>"),
     ("POST", "/reviews"), ("GET", "/reviews/<review_id>"),

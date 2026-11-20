@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+/*
+ * 디자인 토큰. 값은 Figma "v2 · AI 티 걷어낸 버전" 변수에서 가져왔다.
+ * 화면 코드는 여기 정의한 토큰 클래스만 쓴다 (16진수 색을 직접 쓰지 않는다).
+ */
+@theme {
+  /* Tailwind 기본 색을 지워 토큰 밖의 색을 쓰지 못하게 한다. */
+  --color-*: initial;
+  --color-white: #ffffff;
+  --color-transparent: transparent;
+  --color-current: currentColor;
+
+  --color-grey-50: #f9fafb;
+  --color-grey-100: #f2f4f6;
+  --color-grey-200: #e5e8eb;
+  --color-grey-300: #d1d6db;
+  --color-grey-400: #b0b8c1;
+  --color-grey-500: #8b95a1;
+  --color-grey-600: #6b7684;
+  --color-grey-700: #4e5968;
+  --color-grey-800: #333d4b;
+  --color-grey-900: #191f28;
+
+  --color-blue-50: #e8f3ff;
+  --color-blue-500: #3182f6;
+  --color-orange-500: #fe9800;
+  --color-green-500: #03b26c;
+  --color-red-500: #f04452;
+  --color-dark: #191f28;
+
+  /* 글꼴: Noto Sans KR. 크기/줄 높이는 Figma v2 텍스트 스타일 */
+  --font-sans: var(--font-noto-sans-kr), "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+
+  --text-title: 26px;
+  --text-title--line-height: 36px;
+  --text-num: 30px;
+  --text-num--line-height: 38px;
+  --text-question: 24px;
+  --text-question--line-height: 36px;
+  --text-logo: 20px;
+  --text-logo--line-height: 28px;
+  --text-h2: 19px;
+  --text-h2--line-height: 28px;
+  --text-h3: 16px;
+  --text-h3--line-height: 24px;
+  --text-body: 15px;
+  --text-body--line-height: 24px;
+  --text-btn: 15px;
+  --text-btn--line-height: 22px;
+  --text-btn-s: 14px;
+  --text-btn-s--line-height: 20px;
+  --text-small: 13px;
+  --text-small--line-height: 20px;
+
+  /* 모서리: 버튼 M·Chip·검색 8, 버튼 L·입력칸 10, 상자 12 */
+  --radius-control: 8px;
+  --radius-field: 10px;
+  --radius-card: 12px;
+  /* 체크박스 20px 상자 */
+  --radius-check: 5px;
+
+  /* GNB·본문·Footer 공통 폭 */
+  --container-content: 1080px;
+  /* 2단 배치: 본문 700 + 오른쪽 332 */
+  --container-main: 700px;
+  --container-rail: 332px;
+}
+
+@layer base {
+  html {
+    color: var(--color-grey-900);
+    background: var(--color-white);
+  }
+
+  body {
+    font-family: var(--font-sans);
+    /* Figma 텍스트 스타일 자간 -1.5% */
+    letter-spacing: -0.015em;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-blue-500);
+    outline-offset: 2px;
+  }
+}

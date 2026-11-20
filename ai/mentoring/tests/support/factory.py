@@ -38,9 +38,10 @@ def hash_user(user_id: str) -> str:
     return hashlib.sha256(f"test:{user_id}".encode()).hexdigest()
 
 
-def make_deps(responses=None, *, reference="default", config=None) -> Deps:
+def make_deps(responses=None, *, reference="default", config=None, extractor=None) -> Deps:
     counter = count(1)
-    return Deps(
+    metrics: list[dict] = []
+    deps = Deps(
         config=config or small_config(),
         users=MemoryUserRepo(),
         objects=MemoryObjectStore(),
@@ -51,11 +52,23 @@ def make_deps(responses=None, *, reference="default", config=None) -> Deps:
         reference=FakeReference({KNOWN_UNIT}) if reference == "default" else reference,
         now=lambda: FIXED_NOW,
         new_id=lambda prefix: f"{prefix}-{next(counter):04d}",
+        extractor=extractor,
+        metrics_sink=lambda line: metrics.append(json.loads(line)),
     )
+    deps.metrics = metrics  # 테스트 확인용: 남긴 EMF 기록
+    return deps
+
+
+def metric_values(deps, name: str) -> list:
+    return [m[name] for m in deps.metrics if name in m]
 
 
 def run_pending(deps) -> list[dict]:
-    """대기열에 쌓인 작업을 작업 입구로 실행한다 (Lambda 비동기 자기 호출 대신)."""
+    """대기열에 쌓인 작업을 작업 입구로 실행한다 (Lambda 비동기 자기 호출 대신).
+    작업이 다음 작업을 보내면(텍스트 추출 → 역량 추출) 대기열이 빌 때까지 이어서 실행한다."""
     from mentoring.api import task_handler
 
-    return [task_handler.handle(message, deps) for message in deps.tasks.drain()]
+    results = []
+    while deps.tasks.queue:
+        results.extend(task_handler.handle(message, deps) for message in deps.tasks.drain())
+    return results

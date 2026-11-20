@@ -1,0 +1,19 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/stories",
+    "body": {}
+  },
+  "response": {
+    "status": 501,
+    "body": {
+      "error": {
+        "code": "NOT_IMPLEMENTED",
+        "message": "아직 준비 중인 기능이에요.",
+        "requestId": "req-mock",
+        "retryable": false,
+        "details": {}
+      }
+    }
+  }
+}

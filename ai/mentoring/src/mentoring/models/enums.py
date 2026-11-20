@@ -56,7 +56,8 @@ TERMINAL_TASK_STATUSES = {TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.RE
 
 class TaskType(str, Enum):
     """db-schema §2.5 `taskType` 값."""
-    PROFILE_EXTRACT = "PROFILE_EXTRACT"
+    DOCUMENT_EXTRACT = "DOCUMENT_EXTRACT"  # 업로드한 PDF → 정규화 텍스트
+    PROFILE_EXTRACT = "PROFILE_EXTRACT"    # 정규화 텍스트 → 역량 프로필
 
 
 class ConfirmAction(str, Enum):

@@ -3,5 +3,5 @@ pytest>=8
 hypothesis>=6
 # 하위 모듈 테스트용: reference(#37) moto, extract(#41) 테스트 PDF 생성, evals(#44) boto3
 boto3
-moto[dynamodb]>=5
+moto[dynamodb,s3]>=5
 reportlab>=4

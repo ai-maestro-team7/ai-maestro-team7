@@ -125,8 +125,7 @@ def test_idempotency_header_replays(deps):
 
 
 def test_routes_not_built_yet_are_501(deps):
-    for method, path in [("POST", "/documents/upload-url"), ("POST", "/documents/doc-1/complete"),
-                         ("POST", "/stories"), ("POST", "/analyses"), ("POST", "/agent/chat")]:
+    for method, path in [("POST", "/stories"), ("POST", "/analyses"), ("POST", "/agent/chat")]:
         assert_error(*call(deps, method, path), 501, "NOT_IMPLEMENTED")
 
 
@@ -159,3 +158,15 @@ def test_logs_contain_no_resume_text_or_user_id(deps, caplog):
     assert logged
     for secret in (QUOTE_PANDAS, "010-0000-1234", "applicant-a@example.com", "내 이력서.pdf", "user-a"):
         assert secret not in logged
+
+
+# ---------------------------------------------------------------- PDF 업로드 경로
+def test_upload_routes_over_http(deps):
+    status, body = call(deps, "POST", "/documents/upload-url", body={
+        "fileName": "resume.pdf", "contentType": "application/pdf", "sizeBytes": 2048})
+    assert status == 201 and body["status"] == "PENDING" and body["uploadUrl"].startswith("https://")
+    status, error = call(deps, "POST", f"/documents/{body['documentId']}/complete")
+    assert_error(status, error, 501, "NOT_IMPLEMENTED")  # 이 Deps에는 추출기가 없다
+    status, error = call(deps, "POST", "/documents/upload-url", body={
+        "fileName": "a.png", "contentType": "image/png", "sizeBytes": 10})
+    assert_error(status, error, 400, "INVALID_INPUT")

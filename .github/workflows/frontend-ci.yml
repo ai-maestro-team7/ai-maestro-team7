@@ -1,0 +1,40 @@
+# frontend/ 가 바뀐 PR마다 lint · 타입 검사 · 정적 빌드를 돌린다.
+# 빌드 결과(frontend/out)는 Frontend Deploy가 그대로 올릴 수 있게 아티팩트로 남긴다.
+name: Frontend CI
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-*.yml"
+  workflow_call: {}
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: 의존성 설치
+        run: npm ci
+      - name: ESLint
+        run: npm run lint
+      - name: 타입 검사
+        run: npm run typecheck
+      - name: 정적 빌드 (out/)
+        run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frontend-out
+          path: frontend/out
+          retention-days: 7
+          if-no-files-found: error

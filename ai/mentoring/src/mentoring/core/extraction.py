@@ -12,6 +12,7 @@
 import bisect
 import json
 import re
+import time
 from dataclasses import dataclass, field
 
 from pydantic import ValidationError
@@ -35,6 +36,7 @@ from ..models.llm_output import ExtractedEntry, ExtractionOutput, QuoteRef
 from ..ports import VersionConflict
 from .documents import set_document_status
 from .logs import log_event, user_hash
+from .metrics import emit_metric
 
 REVIEW_EVIDENCE_MISMATCH = "EVIDENCE_MISMATCH"
 _FOUND = {"EXACT", "RELOCATED"}
@@ -63,6 +65,7 @@ class Assembled:
 
 # ---------------------------------------------------------------- 실행
 def run_profile_extraction(deps, task: Task) -> ExtractionOutcome:
+    started = time.perf_counter()
     uid = task.owner_user_id
     version = deps.users.get_document_version(uid, task.resource_id, task.resource_version)
     if version is None or version.owner_user_id != uid:  # 작업을 처리할 때 소유권을 다시 확인한다 (A §10.1)
@@ -92,6 +95,7 @@ def run_profile_extraction(deps, task: Task) -> ExtractionOutcome:
         if output is None:
             schema_failures += 1
             _log_validation(deps, task, "SCHEMA_INVALID", calls)
+            emit_metric(deps, "LLMSchemaFailure", 1, feature="profile")
             if schema_failures > cfg.schema_retries:
                 raise MentoringError(500, "AI_OUTPUT_INVALID",
                                      "분석 결과 형식이 올바르지 않아요. 잠시 후 다시 시도해 주세요.", True)
@@ -113,6 +117,10 @@ def run_profile_extraction(deps, task: Task) -> ExtractionOutcome:
     else:
         status, doc_status, reason = TaskStatus.COMPLETED, ExtractionStatus.COMPLETED, None
     set_document_status(deps, uid, version.document_id, version.version, doc_status, review_reason=reason)
+    failed_checks = assembled.unsupported_items + assembled.dropped_without_evidence
+    if failed_checks:
+        emit_metric(deps, "EvidenceValidationFailure", failed_checks, feature="profile")
+    emit_metric(deps, "AnalysisLatency", round((time.perf_counter() - started) * 1000, 1), feature="profile")
     log_event("profile.extracted", userHash=user_hash(deps, uid), taskId=task.task_id, feature="profile",
               status=status.value, modelId=deps.llm.model_id, promptVersion=cfg.prompt_version,
               validation="PASS" if not assembled.unsupported_items else REVIEW_EVIDENCE_MISMATCH,

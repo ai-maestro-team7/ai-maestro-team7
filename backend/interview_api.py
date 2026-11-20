@@ -169,7 +169,7 @@ def load_resume_text(user_id, document_id):
 
 
 def load_latest_profile(user_id):
-    """요청: profile = PROFILE#LATEST가 가리키는 최신 버전의 projects, skills, needsConfirmation"""
+    """PROFILE#LATEST가 가리키는 역량 프로필을 면접 계약 형식으로 넘긴다."""
     latest = table().get_item(Key={"PK": pk(user_id), "SK": "PROFILE#LATEST"}).get("Item")
     if not latest:
         return None
@@ -177,8 +177,13 @@ def load_latest_profile(user_id):
     item = table().get_item(Key={"PK": pk(user_id), "SK": f"PROFILE#{latest['latestProfileId']}#V#{version:04d}"}).get("Item")
     if not item:
         return None
-    item = to_plain(item)
-    return {k: item.get(k, []) for k in ("projects", "skills", "needsConfirmation")}
+    try:
+        from mentoring.core.summary import to_career_profile_summary
+    except ModuleNotFoundError as error:
+        if error.name not in {"mentoring", "mentoring.core", "mentoring.core.summary"}:
+            raise
+        return None
+    return to_career_profile_summary(to_plain(item))
 
 
 # ---------------------------------------------------------------- 응답 조립

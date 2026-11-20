@@ -1,0 +1,9 @@
+{
+  "configVersion": "knowledge-v1",
+  "queryMinChars": 1,
+  "queryMaxChars": 500,
+  "defaultK": 5,
+  "maxK": 10,
+  "readTimeoutSeconds": 20,
+  "allowedDocumentIds": null
+}

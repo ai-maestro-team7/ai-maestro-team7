@@ -64,12 +64,29 @@ class UserRepo(Protocol):
     def idem_complete(self, user_id: str, key: str, result: dict) -> None: ...
 
 
+class ObjectInfo(Protocol):
+    """head() 결과. S3 구현(#61)은 `S3ObjectInfo`로 같은 필드를 준다."""
+    size_bytes: int
+    content_type: str | None
+
+
 class ObjectStore(Protocol):
-    """개인 문서 버킷 (`team07-career-docs-<계정ID>`). 키는 서버가 만든 것만 쓴다."""
+    """개인 문서 버킷 (`team07-career-docs-<계정ID>`). 키는 서버가 만든 것만 쓴다 (Requirement 2 기준 4).
+    URL과 키는 로그·오류·DynamoDB 항목에 남기지 않는다 (Requirement 3 기준 6)."""
 
     def put_text(self, key: str, text: str) -> None: ...
 
     def get_text(self, key: str) -> str | None: ...
+
+    def get_bytes(self, key: str) -> bytes | None: ...
+
+    def presign_put(self, key: str, *, content_type: str, size_bytes: int, expires_in: int) -> str:
+        """브라우저가 바로 올릴 PUT presigned URL. 형식과 크기를 서명에 넣는다 (Requirement 3 기준 3)."""
+        ...
+
+    def head(self, key: str) -> ObjectInfo | None: ...
+
+    def delete(self, key: str) -> None: ...
 
 
 class Llm(Protocol):
@@ -83,6 +100,13 @@ class TaskDispatcher(Protocol):
     """비동기 작업 보내기. 운영은 Lambda 비동기 자기 호출(D-19), 테스트는 대기열."""
 
     def dispatch(self, message: dict) -> None: ...
+
+
+class DocumentExtractor(Protocol):
+    """PDF → 정규화 텍스트 (Requirement 5). 구현은 `core/pdf_extractor.py`가 #41 `extract_document`를 감싼다.
+    key는 OCR이 S3에서 직접 읽을 원본 PDF 위치다."""
+
+    def extract(self, pdf_bytes: bytes, key: str) -> Any: ...
 
 
 class ReferenceLookup(Protocol):

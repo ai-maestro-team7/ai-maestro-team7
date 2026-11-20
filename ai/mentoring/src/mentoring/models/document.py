@@ -15,6 +15,11 @@ class DocumentVersion(MentoringModel):
     source: DocumentSource
     title: str | None = None
     workspace_id: str | None = None
+    file_name: str | None = None            # 업로드한 파일 이름. 로그에 남기지 않는다
+    original_key: str | None = None         # S3 개인 문서 버킷의 원본 PDF 키 (업로드만)
+    content_type: str | None = None         # 업로드 URL 발급 때 받은 형식
+    size_bytes: int | None = None           # 업로드 URL 발급 때 받은 크기
+    extraction_method: str | None = None    # TEXT_LAYER 또는 OCR
     text_key: str | None = None             # S3 개인 문서 버킷의 정규화 텍스트 키
     char_count: int | None = None
     page_count: int | None = None

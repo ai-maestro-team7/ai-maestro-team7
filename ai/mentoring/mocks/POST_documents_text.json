@@ -1,0 +1,21 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/documents/text",
+    "body": {
+      "text": "[학력]\n가상대학교 통계학과 졸업 예정 (2027년 2월)\n\n[프로젝트]\n부산 버스 이용 데이터 분석 프로젝트 (2025.03~2025.06)\n- 팀원 4명 중 데이터 전처리와 시각화를 맡았습니다.\n- Python pandas로 결측치를 처리하고 정류장별 이용량을 집계했습니다.\n- 분석 결과를 Tableau 대시보드로 만들어 발표했습니다.\n\n[활동]\n교내 데이터 분석 동아리에서 SQL 스터디를 1년 동안 운영했습니다.\n\n[자격]\nADsP(데이터분석 준전문가) 취득\n\n[기타]\n머신러닝에 관심이 있어 온라인 강의를 듣고 있습니다.",
+      "documentType": "RESUME",
+      "title": "가상 데이터 분석 이력서"
+    }
+  },
+  "response": {
+    "status": 202,
+    "body": {
+      "documentId": "doc-0001",
+      "version": 1,
+      "taskId": "task-0002",
+      "status": "PENDING",
+      "extractionStatus": "EXTRACTED"
+    }
+  }
+}
