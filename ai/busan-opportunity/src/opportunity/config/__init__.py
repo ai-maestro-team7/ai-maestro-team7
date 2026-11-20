@@ -90,8 +90,10 @@ class MatchConfig(OppModel):
 
 
 class CandidateTopK(OppModel):
-    busan: int
+    busan: int  # 부산 대안 후보를 미리 계산할 때 받는 수 (precompute_alternatives)
     all: int
+    # 공고 피드가 벡터 질의 하나에서 받는 후보 수. S3 Vectors는 한 번에 100개까지 준다 (2026-11-21 확인)
+    feed: int = Field(default=30, ge=1, le=100)
 
 
 class RankingConfig(OppModel):
