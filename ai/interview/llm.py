@@ -66,6 +66,22 @@ def extract_json(raw: object) -> object:
     return json.loads(text)
 
 
+def _failure_kind(exc: Exception) -> str:
+    """출력 검사가 실패한 종류. 로그용이라 값은 넣지 않고 필드 이름만 넣는다.
+
+    schema:필드,필드 = 스키마 검사 실패 · json = JSON으로 읽지 못함 · no_json = JSON이 없음(빈 출력 포함) · check = 스키마 밖 검사 실패
+    """
+    if isinstance(exc, ValidationError):
+        fields = sorted({".".join(str(part) for part in e["loc"]) or "(root)"
+                         for e in exc.errors(include_input=False, include_url=False)})
+        return "schema:" + ",".join(fields)
+    if isinstance(exc, json.JSONDecodeError):
+        return "json"
+    if str(exc) in ("not text", "no json object"):
+        return "no_json"
+    return "check"
+
+
 def _ms(started: float) -> int:
     return int((time.monotonic() - started) * 1000)
 
@@ -105,9 +121,11 @@ def _call_with_retry(invoke: Callable[[], str], *, schema: type[S], stage: str,
             parsed = schema.model_validate(extract_json(raw))
             if check is not None:
                 check(parsed)
-        except (ValueError, ValidationError):
-            logger.warning("stage=%s attempt=%d errorCode=%s durationMs=%d",
-                           stage, attempt, AI_OUTPUT_INVALID, _ms(started))
+        except (ValueError, ValidationError) as exc:
+            # 왜 어긋났는지 알 수 있게 종류와 필드 이름, 출력 길이만 남긴다. 출력 내용은 남기지 않는다 (#121)
+            logger.warning("stage=%s attempt=%d errorCode=%s kind=%s outputChars=%d durationMs=%d",
+                           stage, attempt, AI_OUTPUT_INVALID, _failure_kind(exc),
+                           len(raw) if isinstance(raw, str) else -1, _ms(started))
             continue
         logger.info("stage=%s attempt=%d durationMs=%d", stage, attempt, _ms(started))
         return parsed
