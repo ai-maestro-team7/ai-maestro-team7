@@ -12,6 +12,7 @@ from ..models.posting import PostingLatest
 from . import facts, policies, regions
 from .alternatives import alternatives_for
 from .context import freshness, load_context
+from .local_life import build_local_life
 from .ranking import cosine_similarity, is_open, match_level, profile_vector, score_posting
 
 
@@ -33,6 +34,7 @@ def get_posting(deps: Deps, user_id: str, job_posting_id: str, *,
 
     필수 조건을 못 맞춘 공고도 숨기지 않고 이유를 붙여 보여 준다. 마감된 공고는 오류가 아니라 closed=true.
     출처·기준일이 없는 배지는 뺀다 (T-08). 없는 공고는 POSTING_NOT_FOUND.
+    부산 근무 공고에만 "이 동네에서 일하면"(localLife: 축제·대중교통·통근)을 붙인다 (`core.local_life`).
     """
     cfg = deps.config
     ctx = load_context(deps, user_id, as_of)
@@ -66,7 +68,9 @@ def get_posting(deps: Deps, user_id: str, job_posting_id: str, *,
         is_busan=regions.is_busan(cfg, snapshot.work_region), is_capital_area=is_capital,
         closed=not is_open(latest, ctx.as_of), is_sample=latest.is_sample,
         match_level=match_level(cfg, match.score), eligibility=result, badges=badges, regional_talent=talent,
-        related_policies=related, alternatives_preview=preview, facts=fact_list, data_as_of=data_as_of,
+        related_policies=related, alternatives_preview=preview,
+        local_life=build_local_life(deps, ctx.profile, snapshot, as_of=ctx.as_of),
+        facts=fact_list, data_as_of=data_as_of,
     )
 
 

@@ -1,8 +1,11 @@
 """공고 상세 (B-04)와 지역인재. T-08, T-21."""
 
+from pathlib import Path
+
 import pytest
 
 from opportunity.core import copy_rules, policies, posting_detail
+from opportunity.ingest.local_data import load_local_life, parse_festivals
 from opportunity.models import EligibilityStatus, OppError, PolicyBrief, RegionalTalentStatus
 from opportunity.seeds import demo_world as w
 
@@ -109,3 +112,36 @@ def test_regional_talent_message_has_no_forbidden_copy(deps, as_of):
     for pid in (w.BUSAN_DATA_PUBLIC, w.BUSAN_FINANCE_PUBLIC, w.BUSAN_ADMIN_PUBLIC):
         view = detail(deps, as_of, pid, "demo3").regional_talent
         assert view is not None and not copy_rules.find_forbidden(view.message or "")
+
+
+# ---------------------------------------------------------------- 이 동네에서 일하면
+LOCAL_FIXTURES = Path(__file__).parents[1] / "unit" / "ingest" / "fixtures"
+
+
+def _with_local_life(deps):
+    deps.local_life = load_local_life({
+        "festivals": [f.to_api() for f in parse_festivals((LOCAL_FIXTURES / "local_festival_p01.json").read_bytes(),
+                                                          as_of="2026-11-20")],
+        "transit": [{"label": "부산 도시철도", "value": "4개 노선", "source": "부산교통공사 도시철도노선정보",
+                     "asOf": "2021-04-14"}],
+    })
+    return deps
+
+
+def test_local_life_only_on_busan_detail(deps, as_of):
+    _with_local_life(deps)
+    busan = detail(deps, as_of, w.BUSAN_DATA)  # 해운대구
+    assert busan.local_life is not None
+    assert len(busan.local_life.festivals) <= deps.config.local_life.festival_max
+    assert busan.local_life.festivals[0].gugun == "해운대구"
+    assert busan.local_life.transit[0].label == "부산 도시철도"
+    assert "localLife" in busan.to_api()
+    for pid in (w.SEOUL_DATA, w.DATA_UNKNOWN_REGION):
+        other = detail(deps, as_of, pid)
+        assert other.local_life is None and "localLife" not in other.to_api()
+
+
+def test_local_life_does_not_change_other_detail_fields(deps, as_of):
+    before = detail(deps, as_of, w.SEOUL_DATA).to_api()
+    after = detail(_with_local_life(deps), as_of, w.SEOUL_DATA).to_api()
+    assert before == after
