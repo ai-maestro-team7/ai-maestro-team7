@@ -53,6 +53,22 @@
   --text-small: 13px;
   --text-small--line-height: 20px;
 
+  /* 홈 첫 화면 제목 */
+  --text-hero: 36px;
+  --text-hero--line-height: 48px;
+
+  /* 홈 첫 화면 카드가 천천히 떠 있는 움직임 (움직임 줄이기 설정이면 화면 코드가 끈다) */
+  --animate-float: float 8s ease-in-out infinite;
+  @keyframes float {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-8px);
+    }
+  }
+
   /* 모서리: 버튼 M·Chip·검색 8, 버튼 L·입력칸 10, 상자 12 */
   --radius-control: 8px;
   --radius-field: 10px;
