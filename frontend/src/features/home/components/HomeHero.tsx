@@ -48,9 +48,6 @@ export function HomeHero() {
 
       <section className="relative mx-auto flex w-full max-w-main flex-col items-center gap-8 text-center">
         <div className="flex flex-col items-center gap-3">
-          <span className="rounded-full bg-white px-3 py-1 text-small font-bold text-blue-500 shadow-sm ring-1 ring-blue-500/15">
-            AI 취업 멘토
-          </span>
           <h1 ref={title} data-intro="pending" className="hero-title text-title font-bold text-grey-900 xl:text-hero">
             <span className="sr-only">{HEADLINE}</span>
             {/* 글자마다 나눠 등장과 커서 물결을 준다. 화면 읽기 프로그램은 위의 한 줄만 읽는다 */}
