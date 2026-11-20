@@ -147,11 +147,12 @@ def generate_story_questions(
 
     statuses = dict(current.field_status)
     for field in _FIELDS:
-        value = values[field]
-        if value:
-            statuses[field] = "VERIFIED" if field in current.confirmed_fields else "NEEDS_CONFIRMATION"
-        else:
-            statuses[field] = "NEEDS_CONFIRMATION"
+        if field in current.confirmed_fields or statuses.get(field) == "VERIFIED":
+            # 사용자가 확인·수정한 값은 모델 출력으로 덮어쓰지 않는다 (Requirement 9 기준 5)
+            values[field] = getattr(current, field)
+            statuses[field] = "VERIFIED"
+            continue
+        statuses[field] = "NEEDS_CONFIRMATION"
 
     story = current.model_copy(
         update={

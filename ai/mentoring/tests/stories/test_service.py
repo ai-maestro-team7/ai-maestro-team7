@@ -166,3 +166,23 @@ def test_invalid_model_output_retries_once_then_fails():
         generate_story_questions(deps, repo, "user-1", story.story_id)
     assert caught.value.code == "AI_OUTPUT_INVALID"
     assert len(deps.llm.calls) == 2
+
+
+def test_regenerating_questions_keeps_user_confirmed_and_edited_values():
+    raw = "학교 팀 프로젝트를 진행했고 고객 인터뷰를 직접 진행했습니다."
+    deps, repo, story = _make(
+        {"situation": "학교 팀 프로젝트를 진행했고", "actions": [], "questions": ["역할은?"],
+         "competencyCandidates": [], "fieldStatus": {}},
+        raw,
+    )
+    generated = generate_story_questions(deps, repo, "user-1", story.story_id)
+    answered = answer_story(deps, repo, "user-1", story.story_id, answer_request(
+        baseVersion=generated.version, answers=[], confirmFields=["situation"],
+        edits={"task": "인터뷰 질문지를 만드는 일을 맡았습니다."}))
+    # 다음 생성에서 모델이 확인·수정한 필드를 다른 값이나 빈 값으로 돌려줘도 덮어쓰지 않는다
+    deps.llm = MockLlm([{"situation": None, "task": None, "actions": [], "questions": [],
+                         "competencyCandidates": [], "fieldStatus": {}}])
+    again = generate_story_questions(deps, repo, "user-1", story.story_id)
+    assert again.situation == answered.situation and again.field_status["situation"] == "VERIFIED"
+    assert again.task == "인터뷰 질문지를 만드는 일을 맡았습니다." and again.field_status["task"] == "VERIFIED"
+    assert again.confirmed_fields == ["situation"]

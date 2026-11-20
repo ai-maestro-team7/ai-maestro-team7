@@ -125,7 +125,7 @@ def test_idempotency_header_replays(deps):
 
 
 def test_routes_not_built_yet_are_501(deps):
-    for method, path in [("POST", "/stories"), ("POST", "/analyses"), ("POST", "/agent/chat")]:
+    for method, path in [("POST", "/analyses"), ("POST", "/reviews"), ("POST", "/agent/chat")]:
         assert_error(*call(deps, method, path), 501, "NOT_IMPLEMENTED")
 
 

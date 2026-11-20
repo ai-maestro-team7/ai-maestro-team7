@@ -52,3 +52,10 @@ def test_factory_wires_pdf_extractor_with_textract_ocr(monkeypatch):
     assert isinstance(deps.extractor, PdfExtractor)
     assert isinstance(deps.extractor.ocr, TextractOcr)
     assert deps.extractor.bucket == "bucket"
+
+
+def test_factory_wires_story_repo(monkeypatch):
+    from mentoring.stories.dynamo import DynamoStoryRepo
+
+    _set_required_env(monkeypatch)
+    assert isinstance(build_aws_deps().stories, DynamoStoryRepo)

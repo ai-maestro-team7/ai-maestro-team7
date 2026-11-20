@@ -108,7 +108,7 @@ def build() -> dict[str, dict]:
             f"/profiles/{profile['profileId']}/confirm",
             {"baseVersion": 1, "decisions": []},
         ),
-        ("ERROR_501_NOT_IMPLEMENTED", "POST", "/stories", {}),
+        ("ERROR_501_NOT_IMPLEMENTED", "POST", "/analyses", {}),
     ]
     for name, method, path, body in error_cases:
         request, response = _call(deps, method, path, body)
