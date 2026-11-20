@@ -1,0 +1,12 @@
+{
+  "answerId": "a-q1-1",
+  "timeLimitReached": false,
+  "transcription": {
+    "status": "COMPLETED",
+    "text": "그냥 열심히 자료를 정리했고 팀원들과 잘 협력해서 잘 마무리했습니다.",
+    "words": [
+      {"word": "그냥", "start": 0.5, "end": 0.8},
+      {"word": "열심히", "start": 0.9, "end": 1.4}
+    ]
+  }
+}

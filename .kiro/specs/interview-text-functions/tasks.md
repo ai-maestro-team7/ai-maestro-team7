@@ -61,8 +61,8 @@
     - 데이터 안 `</resume>` 무력화, 완성된 프롬프트에 06 제약·데이터 규칙 문장이 들어 있는지, `profile` JSON이 `<profile>` 안에 들어가는지, `PROMPT_VERSION` 값
     - _Requirements: 6.2, 6.3, 6.4, 6.5, 6.7_
 
-- [ ] 6. 샘플 데이터
-  - [ ] 6.1 `samples/`를 만든다 (design §13)
+- [x] 6. 샘플 데이터
+  - [x] 6.1 `samples/`를 만든다 (design §13)
     - 데이터 분석 가상 자소서(실명·연락처·실제 학교·회사 이름 없음), `profile_data_analysis.json`(계약 예시 `data-analysis-demo`와 같은 내용), 답변 4종, LLM 응답 7종
     - _Requirements: 13.1, 13.2, 13.3, 13.4, 13.5_
 

@@ -1,0 +1,5 @@
+{"questions": [
+  {"questionType": "experience", "question": "부산 관광 수요 분석 프로젝트에서 관광지 이름이 자료마다 달랐던 문제를 어떻게 해결했는지 설명해 주세요."},
+  {"questionType": "knowledge", "question": "서로 다른 출처의 데이터를 합칠 때 누락 값과 형식 차이를 처리하는 방법을 설명해 주세요."},
+  {"questionType": "situation", "question": "분석 결과가 팀의 예상과 다르게 나왔을 때 어떻게 하시겠어요?"}
+]}
