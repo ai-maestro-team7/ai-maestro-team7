@@ -2,8 +2,8 @@ import type { DiagnosisGuideItem, DiagnosisResult } from "./types";
 
 /** 진단 입력 화면 기본값 (시연용 이력서 파일 이름, 목표 직무). 데모 직무는 데이터 분석이다 (D-37). */
 export const diagnosisDefaults = {
-  fileName: "김하늘_데이터분석_이력서.pdf",
-  fileNote: "시연용 이력서예요",
+  fileName: "",
+  fileNote: "PDF · 최대 10MB",
   targetRole: "데이터 분석",
 } as const;
 

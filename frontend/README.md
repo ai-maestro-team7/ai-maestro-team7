@@ -1,7 +1,7 @@
 # frontend
 
 부산커리어 화면. Figma "v2 · AI 티 걷어낸 버전"(파일 `orxq9z9EWqrYDNVviAG1aW`, 페이지 `27:1331`)을 Next.js로 옮겼다.
-지금은 UI 단계라 백엔드 API를 부르지 않고, 화면 데이터는 `src/features/*/data.ts`의 Mock 데이터에서 읽는다.
+진단·첨삭·학습 로드맵은 실제 `/api/v1/mentoring` API를 부른다. 채용·정책·면접 화면 일부는 아직 `src/features/*/data.ts`의 Mock 데이터를 사용한다.
 요구사항·설계·작업 목록은 `.kiro/specs/frontend-ui/`에 있다.
 
 ## 실행
@@ -14,6 +14,10 @@ npm run lint
 npm run typecheck  # next typegen && tsc --noEmit
 npm run build      # 정적 파일을 out/ 에 만든다 (S3 + CloudFront 배포용)
 ```
+
+- 배포에서는 CloudFront가 같은 주소의 `/api/*`를 API Gateway로 넘긴다.
+- 로컬에서는 `frontend/.env.local`에 `NEXT_PUBLIC_API_BASE=<API Gateway 주소>`를 설정한다. 주소와 토큰은 커밋하지 않는다.
+- 멘토링 화면은 로그인 작업과 같은 `team07.session` 계약을 읽으며, 이력서·자기소개서 원문은 브라우저 저장소에 보관하지 않는다.
 
 - 정적 내보내기(`output: "export"`, `trailingSlash: true`)라 `next start`는 쓰지 않는다. `out/`을 아무 정적 서버로 열면 된다.
 - 녹음·카메라는 HTTPS에서만 동작하므로 API 연동 뒤에는 CloudFront 주소로 확인한다 (AGENTS.md).
