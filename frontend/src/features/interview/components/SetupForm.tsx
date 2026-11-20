@@ -12,6 +12,7 @@ import { TextArea } from "@/components/ui/TextArea";
 import { TextField } from "@/components/ui/TextField";
 import { loginHref } from "@/features/auth/lib";
 import { useSessionOwner } from "@/features/auth/useSessionOwner";
+import { fetchPosting } from "@/features/jobs/data";
 import { parseHandoff, readHandoffRaw, subscribeHandoff } from "@/features/chat/lib";
 import { createPdfDocument, errorMessage, waitForDocumentText } from "@/features/mentoring/api";
 import { ApiError, AUTH_REQUIRED } from "@/lib/api";
@@ -21,8 +22,14 @@ import { interviewDefaults, MODE_OPTIONS, RULES, TYPE_OPTIONS } from "../data";
 import { interviewQuery, modeLabel, parseMode, readJob, typeLabel } from "../lib";
 import type { InterviewMode, InterviewType } from "../types";
 import { DocumentUpload, type UploadedDocument } from "./DocumentUpload";
+import { type JobPostingDraft, JobPostingField, type LinkedJobPosting } from "./JobPostingField";
 
-type Errors = { job?: string; coverLetter?: string; document?: string };
+type Errors = { job?: string; coverLetter?: string; document?: string; posting?: string };
+
+/** 주소의 공고 ID (B 공고). `#`이나 이상한 값이면 없는 것으로 본다 */
+function parsePostingId(value: string | null): string | null {
+  return value && /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$/.test(value) ? value : null;
+}
 
 /** 서류를 넣는 방법: 직접 입력 또는 PDF 올리기 */
 type DocumentSource = "text" | "pdf";
@@ -69,6 +76,28 @@ function InterviewSetup({ owner }: { owner: string | null }) {
   // undefined: 아직 고르지 않음(채팅 인계 문서를 쓴다) · null: 뺐음
   const [pickedPdf, setPdf] = useState<UploadedDocument | null | undefined>(undefined);
   const pdf = pickedPdf === undefined ? handoffDocument : pickedPdf;
+  // 채팅·공고 상세에서 공고와 함께 오면 주소에 ?posting=이 붙는다. 그때만 그 공고로 질문을 만들고 공고 올리기를 끈다.
+  // 메뉴로 바로 들어오면 공고가 없으니 붙여넣기·PDF 올리기를 켠다 (#167)
+  const postingId = parsePostingId(params.get("posting"));
+  const handoffPosting = handoff?.posting?.jobPostingId === postingId ? handoff?.posting : undefined;
+  const hasHandoffPosting = handoffPosting !== undefined;
+  const [fetchedPosting, setFetchedPosting] = useState<LinkedJobPosting | null>(null);
+  useEffect(() => {
+    if (!postingId || hasHandoffPosting) return;
+    let active = true;
+    // 공고 상세에서 오면 제목·기관을 B 공고 상세에서 읽는다. 못 읽어도 공고 ID로 면접은 시작할 수 있다
+    fetchPosting(postingId).then(
+      ({ posting }) => active && setFetchedPosting({ jobPostingId: postingId, title: posting.title, organization: posting.organization }),
+      () => undefined,
+    );
+    return () => {
+      active = false;
+    };
+  }, [postingId, hasHandoffPosting]);
+  const linkedPosting: LinkedJobPosting | null = postingId
+    ? (handoffPosting ?? (fetchedPosting?.jobPostingId === postingId ? fetchedPosting : { jobPostingId: postingId }))
+    : null;
+  const [postingDraft, setPostingDraft] = useState<JobPostingDraft>({ title: "", company: "", text: "" });
   // 올리는 중에 파일을 빼거나 바꾸면 앞의 요청 결과를 버린다
   const upload = useRef<AbortController | null>(null);
   useEffect(() => () => upload.current?.abort(), []);
@@ -94,6 +123,11 @@ function InterviewSetup({ owner }: { owner: string | null }) {
       next.document = `PDF에서 읽은 글이 ${RULES.resumeMin}자보다 적어요. 다른 파일을 올리거나 직접 입력해 주세요.`;
     else if (pdf.charCount !== undefined && pdf.charCount > RULES.resumeMax)
       next.document = `PDF 글이 ${RULES.resumeMax.toLocaleString()}자를 넘어요. 면접에 쓸 부분만 직접 입력해 주세요.`;
+    const postingText = postingDraft.text.trim();
+    if (!linkedPosting && postingText && postingText.length < RULES.postingMin)
+      next.posting = `공고 내용을 ${RULES.postingMin}자 이상 넣거나 비워 두세요.`;
+    else if (!linkedPosting && postingText.length > RULES.postingMax)
+      next.posting = `공고 내용은 ${RULES.postingMax.toLocaleString()}자까지 넣을 수 있어요.`;
     return next;
   }
 
@@ -137,6 +171,17 @@ function InterviewSetup({ owner }: { owner: string | null }) {
       const { sessionId } = await startInterview({
         job: job.trim(),
         ...(source === "pdf" && pdf?.documentId ? { documentId: pdf.documentId } : { resumeText: coverLetter }),
+        ...(linkedPosting
+          ? { jobPostingId: linkedPosting.jobPostingId }
+          : postingDraft.text.trim()
+            ? {
+                jobPosting: {
+                  title: postingDraft.title.trim() || null,
+                  company: postingDraft.company.trim() || null,
+                  text: postingDraft.text.trim(),
+                },
+              }
+            : {}),
         interviewType,
         // 카메라 방식이고 동의했을 때만 시선을 본다. 그 밖에는 태도가 측정되지 않는다
         cameraConsent: nextMode === "camera" && consent,
@@ -180,8 +225,18 @@ function InterviewSetup({ owner }: { owner: string | null }) {
         source === "text"
           ? `직접 입력 · ${coverLetter.length.toLocaleString()}자`
           : pdf?.status === "ready"
-            ? `${KIND_OPTIONS.find((option) => option.value === kind)?.label} PDF`
+            ? pdf.saved
+              ? "채팅에서 고른 서류"
+              : `${KIND_OPTIONS.find((option) => option.value === kind)?.label} PDF`
             : "PDF 올리기 전",
+    },
+    {
+      label: "채용 공고",
+      value: linkedPosting
+        ? (linkedPosting.title ?? "선택한 공고")
+        : postingDraft.text.trim()
+          ? `직접 입력 · ${postingDraft.text.trim().length.toLocaleString()}자`
+          : "없음",
     },
     { label: "질문", value: `${RULES.baseQuestions}개 + 꼬리질문` },
     { label: "진행 방식", value: modeLabel(mode) },
@@ -239,6 +294,16 @@ function InterviewSetup({ owner }: { owner: string | null }) {
               </>
             )}
           </fieldset>
+          <JobPostingField
+            linked={linkedPosting}
+            draft={postingDraft}
+            onChange={(draft) => {
+              setPostingDraft(draft);
+              setErrors((prev) => (prev.posting ? { ...prev, posting: undefined } : prev));
+            }}
+            error={errors.posting}
+            disabled={pending}
+          />
           <fieldset className="flex w-full flex-col">
             <legend className="mb-2 text-small font-medium text-grey-700">면접 유형</legend>
             <div className="flex flex-wrap gap-2">
@@ -273,7 +338,7 @@ function InterviewSetup({ owner }: { owner: string | null }) {
           </dl>
           <hr className="border-grey-200" />
           <p className="text-small text-grey-600">
-            질문은 자기소개서·이력서와 희망 직무로 만들어요. 답변은 질문마다 {RULES.answerLimitSec / 60}분까지 할 수 있어요.
+            질문은 자기소개서·이력서와 희망 직무{linkedPosting || postingDraft.text.trim() ? ", 채용 공고" : ""}로 만들어요. 답변은 질문마다 {RULES.answerLimitSec / 60}분까지 할 수 있어요.
           </p>
           {/* 버튼은 왼쪽 form 밖에 있어 form 속성으로 이어 준다 */}
           <div className="flex flex-col gap-1.5 pt-1.5">

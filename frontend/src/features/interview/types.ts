@@ -92,8 +92,18 @@ export type InterviewStatusBody = {
 };
 
 /** 자소서는 글(resumeText) 또는 저장된 A 문서(documentId) 가운데 하나 (`/start`, 개발계획서3 §5.2) */
+/** 채용공고 글 (C #158). 본문 30~4,000자, 제목 200자·회사 100자까지 */
+export type JobPostingInput = { title?: string | null; company?: string | null; text: string };
+
 export type StartInterviewInput = {
   job: string;
   interviewType: InterviewType;
   cameraConsent: boolean;
-} & ({ resumeText: string; documentId?: never } | { documentId: string; resumeText?: never });
+} & ({ resumeText: string; documentId?: never } | { documentId: string; resumeText?: never }) &
+  /** 채용공고는 글이나 B 공고 ID 가운데 하나만 (#167) */
+  ({ jobPosting?: JobPostingInput; jobPostingId?: never } | { jobPostingId: string; jobPosting?: never });
+
+export type StartInterviewResponse = { sessionId: string; jobPostingUsed?: boolean };
+
+/** `POST /interview/job-posting/text`: PDF에서 읽은 공고 글 (4,000자까지) */
+export type JobPostingText = { text: string; charCount: number; truncated: boolean; pageCount: number };

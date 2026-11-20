@@ -41,6 +41,11 @@ export const RULES = {
   frameFlushMs: 3000,
   resumeMin: 50,
   resumeMax: 5000,
+  /** 채용공고 (C #158 settings.JOB_POSTING_*) */
+  postingMin: 30,
+  postingMax: 4000,
+  postingTitleMax: 200,
+  postingCompanyMax: 100,
   jobMax: 50,
   answerTextMax: 3000,
 } as const;
