@@ -1,0 +1,56 @@
+# PR마다 테스트. AWS 자격 증명은 가짜 값이라 테스트가 실제 계정에 닿을 수 없다 (moto로 흉내).
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_call: {}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      AWS_DEFAULT_REGION: ap-northeast-2
+      AWS_REGION: ap-northeast-2
+      AWS_ACCESS_KEY_ID: testing
+      AWS_SECRET_ACCESS_KEY: testing
+      UV_PYTHON: "3.13"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: 계약 패키지 (contracts/)
+        working-directory: contracts
+        run: uv run --no-project --with-requirements requirements.txt --with-requirements ../tools/test-tools.txt python -m pytest -q -p no:cacheprovider
+
+      - name: 백엔드 (backend/)
+        working-directory: backend
+        run: |
+          uv run --no-project --with boto3 python test_app.py
+          uv run --no-project python test_eligibility.py
+          uv run --no-project --with boto3 --with "moto[dynamodb]" python test_me.py
+          uv run --no-project --with boto3 --with "moto[dynamodb,s3]" python test_interview.py
+          uv run --no-project --with boto3 --with "moto[dynamodb,s3]" --with pydantic --with aws-lambda-powertools python test_opportunities.py
+
+      - name: 부산 기회 추천 (ai/busan-opportunity/)
+        working-directory: ai/busan-opportunity
+        run: uv run --no-project --with-requirements requirements.txt --with-requirements requirements-dev.txt python -m pytest -q -p no:cacheprovider
+
+      - name: 모의면접 (ai/interview/, 테스트가 있을 때만)
+        working-directory: ai/interview
+        run: |
+          if [ -d tests ]; then
+            REQ=""; [ -f requirements.txt ] && REQ="--with-requirements requirements.txt"
+            uv run --no-project $REQ --with-requirements ../../tools/test-tools.txt --with boto3 --with moto python -m pytest -q -p no:cacheprovider
+          else
+            echo "테스트 없음"
+          fi
+
+      - name: 배포 묶음 만들기 (Linux arm64 의존성)
+        run: infra/package.sh
