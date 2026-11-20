@@ -59,3 +59,24 @@ def test_factory_wires_story_repo(monkeypatch):
 
     _set_required_env(monkeypatch)
     assert isinstance(build_aws_deps().stories, DynamoStoryRepo)
+
+
+def test_factory_wires_job_fit_dependencies_only_when_configured(monkeypatch):
+    from mentoring.fit.store import DynamoAnalysisStore, DynamoCatalogReader
+    from mentoring.knowledge import KnowledgeRetriever
+    from mentoring.reference import DynamoReferenceLookup
+
+    _set_required_env(monkeypatch)
+    for name in ("TABLE_REFERENCE", "TABLE_CATALOG", "KB_ID"):
+        monkeypatch.delenv(name, raising=False)
+    deps = build_aws_deps()
+    assert isinstance(deps.analyses, DynamoAnalysisStore)
+    assert deps.catalog is None and deps.ncs is None and deps.knowledge is None and deps.eligibility is None
+
+    monkeypatch.setenv("TABLE_REFERENCE", "reference")
+    monkeypatch.setenv("TABLE_CATALOG", "catalog")
+    monkeypatch.setenv("KB_ID", "kb-test")
+    deps = build_aws_deps()
+    assert isinstance(deps.catalog, DynamoCatalogReader)
+    assert isinstance(deps.ncs, DynamoReferenceLookup)
+    assert isinstance(deps.knowledge, KnowledgeRetriever)

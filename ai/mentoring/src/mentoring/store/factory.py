@@ -12,6 +12,8 @@ from mentoring.config import MentoringConfig, get_config, require_env
 from mentoring.core.pdf_extractor import PdfExtractor
 from mentoring.deps import Deps
 from mentoring.extract import TextractOcr
+from mentoring.fit.store import DynamoAnalysisStore, DynamoCatalogReader
+from mentoring.knowledge import KnowledgeRetriever
 from mentoring.llm.bedrock import BedrockLlm
 from mentoring.reference import DynamoReferenceLookup
 from mentoring.stories.dynamo import DynamoStoryRepo
@@ -68,10 +70,17 @@ def build_aws_deps(
 
     dynamodb = _dynamodb_resource(region)
     table = dynamodb.Table(table_name)
-    reference = None
+    # 선택 자원: 환경변수가 없으면 그 기능만 꺼진다 (NCS 코드 미부착, 공고·NCS 분석 501, KB 근거 없음)
+    reference = ncs = catalog = knowledge = None
     reference_table = os.environ.get("TABLE_REFERENCE", "").strip()
     if reference_table:
-        reference = ReferenceUnitAdapter(DynamoReferenceLookup(dynamodb.Table(reference_table)))
+        ncs = DynamoReferenceLookup(dynamodb.Table(reference_table))
+        reference = ReferenceUnitAdapter(ncs)
+    catalog_table = os.environ.get("TABLE_CATALOG", "").strip()
+    if catalog_table:
+        catalog = DynamoCatalogReader(dynamodb.Table(catalog_table))
+    if os.environ.get("KB_ID", "").strip():
+        knowledge = KnowledgeRetriever.from_environment()
 
     return Deps(
         config=config or get_config(),
@@ -83,6 +92,11 @@ def build_aws_deps(
         hash_user_id=hash_user_id or _hash_user_id_not_set,
         reference=reference,
         stories=DynamoStoryRepo(table),
+        analyses=DynamoAnalysisStore(table),
+        catalog=catalog,
+        ncs=ncs,
+        knowledge=knowledge,
+        # eligibility는 백엔드가 backend/eligibility.py의 evaluate_eligibility로 넣는다 (BE-8, D-11)
         # 텍스트 레이어 먼저, 부족할 때만 Textract OCR (이슈 #41 결정). OCR은 career-docs 원본을 직접 읽는다
         extractor=PdfExtractor(ocr=TextractOcr(_client("textract", region)), bucket=bucket),
     )

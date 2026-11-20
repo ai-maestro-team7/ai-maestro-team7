@@ -10,6 +10,7 @@ METRIC_UNITS = {
     "EvidenceValidationFailure": "Count",
     "LLMSchemaFailure": "Count",
     "AnalysisLatency": "Milliseconds",
+    "KbNoEvidence": "Count",  # KB 검색 결과를 근거로 하나도 쓰지 못함 (mentoring-fit-review-learning Requirement 16)
 }
 
 
