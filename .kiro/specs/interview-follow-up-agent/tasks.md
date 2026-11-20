@@ -34,12 +34,15 @@
     - _Requirements: 1.2~1.7, 2.1~2.5, 3.1~3.6, 8.1~8.2_
   - 커밋: `feat: 꼬리질문 판단을 툴 쓰는 에이전트로 보강` (641 passed 5 skipped)
 
-- [ ] 4. 수동 확인 준비 (실행은 나중, 사람이)
-  - [ ] 4.1 `test_bedrock_manual.py`에 꼬리질문 판단 테스트 추가 (`RUN_BEDROCK=1`일 때만)
-    - 샘플: 자소서와 모순된 답변, 지식 질문에 원리를 설명한 답변, 추상적인 경험 답변
-    - 출력: 판단 결과, 시간, 턴·툴 호출, 꼬리질문 길이
+- [ ] 4. 수동 확인 (실행은 나중, 사람이)
+  - [x] 4.1 `test_bedrock_manual.py`에 꼬리질문 판단 테스트 추가 (`RUN_BEDROCK=1`일 때만, `FOLLOW_UP_RUNS`로 반복)
+    - 시나리오 4개: q1 경험·추상적(ABSTRACT), q1 경험·자소서와 모순(INCONSISTENT), q2 지식·원리 설명(SUFFICIENT), q2 지식·용어만(ABSTRACT)
+    - 출력: 기대·결과·MATCH/DIFF, 시간, 판단·에이전트 로그(시도·툴 호출·stopReason), 꼬리질문 문장과 길이, 요약(일치 수, 평균·최대 시간)
+    - 가짜 클라이언트로 오프라인 실행해 출력 형식 확인 (AWS 호출 없음)
+    - `samples/session_after_start.json` promptVersion을 A-v2/B-v2로
+  - [ ] 4.2 실제 Bedrock 실행 결과를 PR 참고 사항에 적는다 (판단 일치 수, 시간, 턴·툴 호출)
     - _Requirements: 8.3_
-  - 커밋: `test: 꼬리질문 판단 수동 확인 테스트 추가`
+  - 커밋: `test: 꼬리질문 판단 수동 확인 테스트 추가` (641 passed 6 skipped)
 
 - [ ] 5. 문서와 PR
   - [ ] 5.1 `docs/개발계획서3.md` ★·§2.3·§4.1 F-07·§4.2·§7 (design §11)
