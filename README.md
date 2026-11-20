@@ -41,7 +41,7 @@ infra/deploy.sh
 uv run --python 3.13 --with strands-agents --with "botocore[crt]" examples/strands_hello.py
 ```
 
-처음 한 번만: `infra/setup-role.sh` → `infra/setup-data.sh` → `infra/setup-api.sh` → `infra/setup-auth.sh` → `uv run --python 3.13 --with boto3 --with "botocore[crt]" infra/seed_demo.py` (모두 실행됨)
+처음 한 번만: `infra/setup-role.sh` → `infra/setup-data.sh` → `infra/setup-api.sh` → `infra/setup-auth.sh` → `uv run --python 3.13 --with boto3 --with "botocore[crt]" infra/seed_demo.py` (모두 실행됨). A Knowledge Base는 `infra/setup-kb.sh --upload <지식패키지>/bedrock/documents --sync` (실행됨, `docs/team-guide.md` §3)
 
 ## 보안
 
