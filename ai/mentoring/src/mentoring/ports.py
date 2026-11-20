@@ -86,6 +86,10 @@ class ObjectStore(Protocol):
 
     def head(self, key: str) -> ObjectInfo | None: ...
 
+    def copy(self, source_key: str, target_key: str) -> None:
+        """같은 버킷 안에서 복사한다. 형식(Content-Type)도 그대로 옮긴다."""
+        ...
+
     def delete(self, key: str) -> None: ...
 
 

@@ -28,6 +28,8 @@ class DocumentVersion(MentoringModel):
     task_id: str | None = None
     error_code: str | None = None
     review_reason: str | None = None
+    # 업로드 완료 전(PENDING)에만 둔다. DynamoDB TTL 속성(epoch 초). 완료되면 빼서 TTL 대상에서 벗어난다
+    expires_at: int | None = None
     created_at: str
     updated_at: str
 
@@ -41,6 +43,7 @@ class DocumentLatest(MentoringModel):
     latest_version: int = Field(ge=1)
     extraction_status: ExtractionStatus
     task_id: str | None = None
+    expires_at: int | None = None  # DocumentVersion.expires_at과 같은 값
     created_at: str
     updated_at: str
 
@@ -49,7 +52,7 @@ class DocumentLatest(MentoringModel):
         return cls(document_id=version.document_id, owner_user_id=version.owner_user_id,
                    document_type=version.document_type, title=version.title, latest_version=version.version,
                    extraction_status=version.extraction_status, task_id=version.task_id,
-                   created_at=created_at, updated_at=version.updated_at)
+                   expires_at=version.expires_at, created_at=created_at, updated_at=version.updated_at)
 
 
 class DocumentView(MentoringModel):

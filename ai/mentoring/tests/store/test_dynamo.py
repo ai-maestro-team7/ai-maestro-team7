@@ -97,6 +97,20 @@ def test_document_create_save_and_duplicate(table):
     assert repo.get_document_version("user-1", "doc-0001", 1).extraction_status == ExtractionStatus.COMPLETED
 
 
+def test_document_ttl_is_numeric_and_removed_on_save(table):
+    repo = DynamoUserRepo(table)
+    _, version = _document()
+    pending = version.model_copy(update={"extraction_status": ExtractionStatus.PENDING, "expires_at": 1795309200})
+    repo.create_document(DocumentLatest.of(pending, pending.created_at), pending)
+    for sk in ("DOC_LATEST#doc-0001", "DOC#doc-0001#V#0001"):
+        assert table.get_item(Key={"PK": "USER#user-1", "SK": sk})["Item"]["expiresAt"] == 1795309200
+
+    done = pending.model_copy(update={"extraction_status": ExtractionStatus.UPLOADED, "expires_at": None})
+    repo.save_document(DocumentLatest.of(done, done.created_at), done)
+    for sk in ("DOC_LATEST#doc-0001", "DOC#doc-0001#V#0001"):
+        assert "expiresAt" not in table.get_item(Key={"PK": "USER#user-1", "SK": sk})["Item"]
+
+
 def test_profile_version_condition(table):
     repo = DynamoUserRepo(table)
     repo.put_profile_version(_profile(1), expected_version=None)

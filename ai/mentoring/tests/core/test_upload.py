@@ -1,4 +1,6 @@
 """PDF 업로드와 텍스트 추출 작업 (Requirement 3·4·5·12, 개발계획서1 §13 UT-20·INT-01)."""
+from dataclasses import replace
+from datetime import timedelta
 from io import BytesIO
 
 import pytest
@@ -11,7 +13,7 @@ from mentoring.core.upload import complete_upload, create_upload_url
 from mentoring.errors import MentoringError
 from mentoring.extract import ExtractThresholds
 from mentoring.models import UploadUrlRequest
-from support.factory import make_deps, metric_values, run_pending, small_config
+from support.factory import FIXED_NOW, make_deps, metric_values, run_pending, small_config
 
 USER = "user-a"
 
@@ -108,7 +110,8 @@ def test_upload_url_is_signed_with_type_and_size_and_not_stored():
     assert body["status"] == "PENDING" and body["expiresInSeconds"] == deps.config.upload.presign_expires_seconds
     signed = deps.objects.presigned[-1]
     assert (signed["contentType"], signed["sizeBytes"]) == ("application/pdf", 1234)
-    assert signed["key"].startswith(f"users/{deps.hash_user_id(USER)}/documents/{body['documentId']}/v1/")
+    # 완료 전에는 수명 주기 규칙이 지우는 임시 경로에 올린다
+    assert signed["key"].startswith(f"pending/users/{deps.hash_user_id(USER)}/documents/{body['documentId']}/v1/")
     stored = str(deps.users.items)
     assert body["uploadUrl"] not in stored  # URL은 DB·멱등 결과에 남기지 않는다 (Requirement 3 기준 6)
     view = get_document(deps, USER, body["documentId"])
@@ -139,7 +142,98 @@ def test_upload_url_rejects_bad_requests(kwargs, status, code):
     assert (error.value.status, error.value.code) == (status, code)
 
 
+def test_pending_document_records_expire_after_ttl():
+    deps = make()
+    body = create_upload_url(deps, USER, request())
+    expected = int((FIXED_NOW + timedelta(hours=deps.config.upload.pending_ttl_hours)).timestamp())
+    assert deps.users.get_document_version(USER, body["documentId"], 1).expires_at == expected
+    assert deps.users.get_document_latest(USER, body["documentId"]).expires_at == expected
+
+
+def test_upload_url_replay_after_record_expired_is_404():
+    deps = make()
+    body = create_upload_url(deps, USER, request(), "idem-1")
+    # DynamoDB TTL이 PENDING 기록을 지웠다고 친다 (멱등 키는 남아 있다)
+    for sk in (f"DOC_LATEST#{body['documentId']}", f"DOC#{body['documentId']}#V#0001"):
+        deps.users.items.pop((f"USER#{USER}", sk))
+    with pytest.raises(MentoringError) as error:
+        create_upload_url(deps, USER, request(), "idem-1")
+    assert error.value.code == "DOCUMENT_NOT_FOUND"
+
+
 # ---------------------------------------------------------------- 업로드 완료
+def test_complete_moves_original_out_of_pending_and_clears_ttl():
+    deps = make()
+    data = pdf()
+    body = upload(deps, data)
+    staged = deps.users.get_document_version(USER, body["documentId"], 1).original_key
+    complete_upload(deps, USER, body["documentId"])
+    version = deps.users.get_document_version(USER, body["documentId"], 1)
+    assert version.original_key == f"users/{deps.hash_user_id(USER)}/documents/{body['documentId']}/v1/original.pdf"
+    assert version.expires_at is None
+    assert deps.users.get_document_latest(USER, body["documentId"]).expires_at is None
+    assert deps.objects.get_bytes(version.original_key) == data
+    assert deps.objects.get_bytes(staged) is None
+
+
+def test_complete_after_pending_ttl_is_400():
+    deps = make()
+    body = upload(deps, pdf())
+    late = replace(deps, now=lambda: FIXED_NOW + timedelta(hours=deps.config.upload.pending_ttl_hours))
+    with pytest.raises(MentoringError) as error:
+        complete_upload(late, USER, body["documentId"])
+    assert error.value.status == 400 and deps.tasks.sent == []
+
+
+def test_complete_succeeds_when_pending_cleanup_fails():
+    deps = make()
+    body = upload(deps, pdf())
+
+    def broken_delete(key):
+        raise RuntimeError("S3 unavailable")
+
+    deps.objects.delete = broken_delete
+    result = complete_upload(deps, USER, body["documentId"])
+    assert result["extractionStatus"] == "UPLOADED" and len(deps.tasks.sent) == 1
+
+
+def test_complete_retry_after_copy_without_record_update_still_works():
+    deps = make()
+    body = upload(deps, pdf())
+    original_save = deps.users.save_document
+    calls = []
+
+    def fail_once(latest, version):
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError("DynamoDB unavailable")
+        original_save(latest, version)
+
+    deps.users.save_document = fail_once
+    with pytest.raises(RuntimeError):
+        complete_upload(deps, USER, body["documentId"])
+    # 복사는 됐지만 기록은 아직 PENDING이라 다시 부르면 이어서 끝난다
+    result = complete_upload(deps, USER, body["documentId"])
+    assert result["extractionStatus"] == "UPLOADED"
+    assert deps.users.get_document_version(USER, body["documentId"], 1).original_key.startswith("users/")
+
+
+def test_complete_keeps_documents_issued_before_pending_prefix():
+    deps = make()
+    data = pdf()
+    body = create_upload_url(deps, USER, request(sizeBytes=len(data)))
+    # 이 변경 전에 발급된 문서: 정식 키에 바로 올렸고 expiresAt이 없다
+    version = deps.users.get_document_version(USER, body["documentId"], 1)
+    final = version.original_key.removeprefix("pending/")
+    legacy = version.model_copy(update={"original_key": final, "expires_at": None})
+    deps.users.save_document(deps.users.get_document_latest(USER, body["documentId"]).model_copy(
+        update={"expires_at": None}), legacy)
+    deps.objects.upload(final, data, "application/pdf")
+    complete_upload(deps, USER, body["documentId"])
+    assert deps.objects.get_bytes(final) == data
+    assert deps.users.get_document_version(USER, body["documentId"], 1).original_key == final
+
+
 def test_complete_without_uploaded_file_is_400_and_creates_no_task():
     deps = make()
     body = create_upload_url(deps, USER, request())
