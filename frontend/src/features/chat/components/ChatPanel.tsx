@@ -20,6 +20,7 @@ const EXAMPLES = [
   "내가 받을 수 있는 청년정책 알려줘",
 ];
 const PENDING_ID = "pending";
+const POLL_FAILED = "POLL_FAILED";
 
 function errorText(error: unknown): string {
   if (error instanceof ApiError) return error.message;
@@ -56,16 +57,21 @@ function Conversation() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  // sessionStorage 조회는 마운트 후에 하므로, 복원 여부를 확인할 때까지 전송을 잠근다.
+  const [restoring, setRestoring] = useState(true);
   const [resumeOpen, setResumeOpen] = useState(false);
   // 서류를 올려 글자·역량을 찾는 중. 이때 보내면 끝난 서류가 대화에 붙지 못하므로 보내기를 막는다
   const [docBusy, setDocBusy] = useState(false);
-  const locked = busy || docBusy;
+  const locked = busy || docBusy || restoring;
   const abort = useRef<AbortController | null>(null);
 
   // 새로 고침 뒤 같은 대화를 다시 그린다 (대화 ID만 탭에 기억)
   useEffect(() => {
     const saved = readChatSessionId();
-    if (!saved) return;
+    if (!saved) {
+      setRestoring(false);
+      return;
+    }
     let active = true;
     const controller = new AbortController();
     getChatSession(saved).then(
@@ -73,6 +79,7 @@ function Conversation() {
         if (!active) return;
         setSessionId(session.sessionId);
         setMessages(session.messages);
+        setRestoring(false);
         // 답을 만드는 중에 새로 고침했으면 그 답을 다시 기다린다
         const pending = [...session.messages]
           .reverse()
@@ -82,11 +89,24 @@ function Conversation() {
         waitForReply(session.sessionId, pending.messageId, controller.signal)
           .then(
             (reply) => active && setMessages((prev) => prev.map((m) => (m.messageId === reply.messageId ? reply : m))),
-            () => undefined,
+            (error: unknown) => {
+              if (!active || (error instanceof DOMException && error.name === "AbortError")) return;
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.messageId === pending.messageId
+                    ? { ...m, status: "FAILED", error: { code: POLL_FAILED, message: errorText(error), retryable: true } }
+                    : m,
+                ),
+              );
+            },
           )
           .finally(() => active && setBusy(false));
       },
-      () => active && saveChatSessionId(null),
+      () => {
+        if (!active) return;
+        saveChatSessionId(null);
+        setRestoring(false);
+      },
     );
     return () => {
       active = false;
@@ -98,7 +118,7 @@ function Conversation() {
 
   async function send(text: string, attachments?: { documentId: string }[]) {
     const message = text.trim();
-    if (!message || busy) return;
+    if (!message || busy || restoring) return;
     setBusy(true);
     setDraft("");
     setMessages((prev) => [
@@ -149,6 +169,31 @@ function Conversation() {
   /** 실패한 답 바로 앞의 사용자 메시지를 다시 보낸다. 새로 고침 뒤 복원한 대화에서도 동작한다 */
   function retry(failedId: string) {
     const index = messages.findIndex((m) => m.messageId === failedId);
+    if (index < 0) return;
+    if (messages[index].error?.code === POLL_FAILED && sessionId) {
+      // 조회만 실패했을 수 있으므로 같은 답을 다시 확인한다. 새 사용자 메시지를 보내지 않는다.
+      setBusy(true);
+      setMessages((prev) => prev.map((m) => (m.messageId === failedId ? { ...m, status: "PROCESSING", error: undefined } : m)));
+      abort.current?.abort();
+      const controller = new AbortController();
+      abort.current = controller;
+      void waitForReply(sessionId, failedId, controller.signal)
+        .then(
+          (reply) => setMessages((prev) => prev.map((m) => (m.messageId === failedId ? reply : m))),
+          (error: unknown) => {
+            if (error instanceof DOMException && error.name === "AbortError") return;
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.messageId === failedId
+                  ? { ...m, status: "FAILED", error: { code: POLL_FAILED, message: errorText(error), retryable: true } }
+                  : m,
+              ),
+            );
+          },
+        )
+        .finally(() => setBusy(false));
+      return;
+    }
     const question = messages
       .slice(0, index)
       .reverse()
@@ -197,7 +242,7 @@ function Conversation() {
       {resumeOpen ? (
         <ResumeForm onReady={onResumeReady} onCancel={() => setResumeOpen(false)} onProcessingChange={setDocBusy} />
       ) : (
-        <PdfDropZone disabled={busy} onReady={onPdfReady} onProcessingChange={setDocBusy}>
+        <PdfDropZone disabled={locked} onReady={onPdfReady} onProcessingChange={setDocBusy}>
           <AskBox value={draft} onChange={setDraft} onSubmit={() => void send(draft)} disabled={locked} />
         </PdfDropZone>
       )}
@@ -261,7 +306,7 @@ function AssistantMessage({
         <p className="text-body text-grey-900">{message.error?.message ?? "답을 만들지 못했어요."}</p>
         {latest && (message.error?.retryable ?? true) && (
           <Button size="M" variant="line" onClick={onRetry} disabled={busy}>
-            다시 보내기
+            {message.error?.code === POLL_FAILED ? "다시 확인하기" : "다시 보내기"}
           </Button>
         )}
       </div>
