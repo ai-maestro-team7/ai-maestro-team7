@@ -312,7 +312,7 @@ mentoring-fit-review-learning은 A 파트(`docs/개발계획서1.md`)의 둘째 
 | ID | 항목 | 선택지 | 관련 |
 | --- | --- | --- | --- |
 | M-8 | 점수의 "관련 경험 근거"(0.1) 분류에 무엇을 넣을지 | **결정 (2026-11-20, A, #88): MVP에서는 비워 두고 재정규화.** 이후 선택지: 사용자가 확인한 Story_Item 중 요건과 연결된 것 / Career_Profile `experiences` | Requirement 5 기준 2·3. A F-02는 가중치만 있고 항목의 원천이 없다. 공고 `requirements[].kind`에는 경험 분류가 없다 (D-10) |
-| M-9 | 고용24 훈련과정·국가자격 시험일정을 MVP에서 실제로 연결할지 | 둘 다 연결 / 시험일정만 / MVP는 미연결(`SCHEDULE_UNVERIFIED`·`NO_LIVE_COURSES` + 공식 안내 링크) | Requirement 13, BE-9. 시험일정 키는 발급됨(하루 1,000건). 훈련과정 승인 상태는 노션 표에서 확인 필요 |
-| M-10 | 부산 청년지원 프로그램 안내 (A F-05 처리 10단계) | B 정책 지갑 화면 링크만 / `team07-catalog` `POLICY#`를 A가 읽어 교육 관련 정책만 붙임 | 정책 데이터와 정책 지갑은 B 소유 (B-08). A가 같은 기능을 다시 만들지 않는다 |
-| M-11 | 학습 진행 체크·수정 기록 저장 경로 | `PATCH /learning-paths/{id}`로 새 버전 / MVP에서 뺌 | Requirement 14 기준 2. A §6.1에 경로가 없다 |
-| M-12 | 첨삭 `inputText` 원문 저장 위치 | `POST /documents/text`와 같은 Document로 저장(첫 스펙 경로 재사용, 역량 추출은 하지 않음) / 첨삭 결과와 함께 `users/{hashedUserId}/reviews/` 아래에만 저장 | Requirement 9 기준 2. 원문은 S3에만 둔다 (db §0 원칙 7) |
+| M-9 | 고용24 훈련과정·국가자격 시험일정을 MVP에서 실제로 연결할지 | **결정 (2026-11-20, A, #113): 시험일정만, 요청 때 공공 API를 부르지 않고 #95가 매일 모은 `team07-cache` `EXAM#{code}#{year}`를 읽는다. 훈련과정은 미연결(`NO_LIVE_COURSES`).** BE-9(키 등록)는 #95 수집 배치가 이미 Secrets Manager 키를 쓰고 있어 필요 없다 | Requirement 13, BE-9. 시험일정 키는 발급됨(하루 1,000건). 훈련과정 승인 상태는 노션 표에서 확인 필요 |
+| M-10 | 부산 청년지원 프로그램 안내 (A F-05 처리 10단계) | **결정 (2026-11-20, A, #113): B 정책 지갑 화면 링크만 (`relatedLinks`).** 대안: `team07-catalog` `POLICY#`를 A가 읽어 교육 관련 정책만 붙임 | 정책 데이터와 정책 지갑은 B 소유 (B-08). A가 같은 기능을 다시 만들지 않는다 |
+| M-11 | 학습 진행 체크·수정 기록 저장 경로 | **결정 (2026-11-20, A, #113): MVP에서 뺌.** 이후: `PATCH /learning-paths/{id}`로 새 버전 | Requirement 14 기준 2. A §6.1에 경로가 없다 |
+| M-12 | 첨삭 `inputText` 원문 저장 위치 | **결정 (2026-11-20, A, #113): 첨삭 결과와 함께 `users/{hashedUserId}/reviews/{reviewId}/input.txt`에만 저장.** 대안: `POST /documents/text`와 같은 Document로 저장 | Requirement 9 기준 2. 원문은 S3에만 둔다 (db §0 원칙 7) |

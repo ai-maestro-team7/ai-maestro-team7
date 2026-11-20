@@ -5,7 +5,7 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from .models import BasicSkill, CompetencyUnit, JobProfile, QualificationLink
+from .models import BasicSkill, CompetencyUnit, JobProfile, Qualification, QualificationLink
 
 FILES = {
     "profiles": "selected_job_profiles.csv",
@@ -84,10 +84,18 @@ class CsvData:
             )
 
         links: dict[tuple[str, str, str], QualificationLink] = {}
+        self.qualifications: dict[str, Qualification] = {}
         for row in rows["qualifications"]:
             unit_code = _value(row, "competency_unit_code", "unit_code")
             qualification_code = _value(row, "qualification_code", "qual_code")
             unit_type = _value(row, "unit_type", "qualification_unit_type", "link_type")
+            self.qualifications.setdefault(qualification_code, Qualification(
+                qualification_code=qualification_code,
+                name=_value(row, "qualification_name", "qual_name", "name"),
+                exam_agency=_value(row, "exam_agency", required=False) or None,
+                source_url=_value(row, "source_url", required=False) or None,
+                collected_at=_value(row, "collected_at", required=False) or None,
+            ))
             key = (unit_code, qualification_code, unit_type)
             if key not in links:
                 links[key] = QualificationLink(

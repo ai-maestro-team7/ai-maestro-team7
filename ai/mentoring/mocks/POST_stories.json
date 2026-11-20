@@ -1,0 +1,50 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/stories",
+    "body": {
+      "rawExperience": "학교 팀 프로젝트에서 고객 인터뷰를 직접 진행했습니다.",
+      "targetRole": "데이터 분석"
+    }
+  },
+  "response": {
+    "status": 201,
+    "body": {
+      "storyId": "story-0001",
+      "version": 2,
+      "status": "QUESTIONS_READY",
+      "title": "가상 고객 인터뷰 프로젝트",
+      "rawExperience": "학교 팀 프로젝트에서 고객 인터뷰를 직접 진행했습니다.",
+      "targetRole": "데이터 분석",
+      "situation": "학교 팀 프로젝트에서",
+      "actions": [
+        "고객 인터뷰를 직접 진행했습니다."
+      ],
+      "fieldStatus": {
+        "situation": "NEEDS_CONFIRMATION",
+        "task": "NEEDS_CONFIRMATION",
+        "actions": "NEEDS_CONFIRMATION",
+        "result": "NEEDS_CONFIRMATION",
+        "learning": "NEEDS_CONFIRMATION"
+      },
+      "confirmedFields": [],
+      "questions": [
+        "인터뷰 대상은 몇 명이었나요?",
+        "본인이 맡은 역할은 무엇이었나요?",
+        "인터뷰 결과를 어디에 썼나요?"
+      ],
+      "answers": [],
+      "competencyCandidates": [
+        {
+          "name": "고객 조사",
+          "evidenceAction": "고객 인터뷰를 직접 진행했습니다.",
+          "strength": "EVIDENCED"
+        }
+      ],
+      "modelId": "mock-llm",
+      "promptVersion": "story-v1",
+      "createdAt": "2026-11-21T10:00:00+09:00",
+      "updatedAt": "2026-11-21T10:00:00+09:00"
+    }
+  }
+}

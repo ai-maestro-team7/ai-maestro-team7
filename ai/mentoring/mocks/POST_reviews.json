@@ -1,0 +1,20 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/reviews",
+    "body": {
+      "inputText": "데이터 분석 동아리에서 SQL 스터디를 1년 동안 운영했습니다. 스터디에서 다양한 데이터를 다뤘고 팀원들과 함께 성장했습니다. 결과가 좋았습니다.",
+      "analysisId": "analysis-0001",
+      "questionText": "직무 관련 경험을 설명해 주세요",
+      "maxCharacters": 500
+    }
+  },
+  "response": {
+    "status": 202,
+    "body": {
+      "reviewId": "review-0002",
+      "taskId": "task-review-0002",
+      "status": "PENDING"
+    }
+  }
+}

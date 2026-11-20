@@ -59,6 +59,8 @@ class TaskType(str, Enum):
     DOCUMENT_EXTRACT = "DOCUMENT_EXTRACT"  # 업로드한 PDF → 정규화 텍스트
     PROFILE_EXTRACT = "PROFILE_EXTRACT"    # 정규화 텍스트 → 역량 프로필
     JOB_FIT = "JOB_FIT"                    # 역량 프로필 + 공고(또는 NCS 직무) → 적합도 분석
+    REVIEW = "REVIEW"                      # 자기소개서·이력서 첨삭
+    LEARNING_PATH = "LEARNING_PATH"        # 역량 격차 → 학습·자격 경로
 
 
 class ConfirmAction(str, Enum):

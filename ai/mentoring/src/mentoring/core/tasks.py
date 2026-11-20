@@ -44,6 +44,14 @@ def run_task(deps, message: TaskMessage) -> dict:
             outcome = run_document_extraction(deps, claimed)
         elif claimed.task_type == TaskType.JOB_FIT:
             outcome = run_job_fit(deps, claimed)
+        elif claimed.task_type == TaskType.REVIEW:
+            from ..review.service import run_review
+
+            outcome = run_review(deps, claimed)
+        elif claimed.task_type == TaskType.LEARNING_PATH:
+            from ..learning.service import run_learning_path
+
+            outcome = run_learning_path(deps, claimed)
         else:
             raise MentoringError(500, "INTERNAL_ERROR", "알 수 없는 작업이에요.", False)
         final = claimed.model_copy(update={
@@ -69,6 +77,14 @@ def _failed(deps, task: Task, code: str, retryable: bool) -> Task:
         from ..fit.analysis import mark_failed
 
         mark_failed(deps, task, code)
+    elif task.task_type == TaskType.REVIEW:
+        from ..review.service import mark_failed as mark_review_failed
+
+        mark_review_failed(deps, task, code)
+    elif task.task_type == TaskType.LEARNING_PATH:
+        from ..learning.service import mark_failed as mark_path_failed
+
+        mark_path_failed(deps, task, code)
     else:
         from .documents import set_document_status
 

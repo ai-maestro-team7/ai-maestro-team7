@@ -1,0 +1,18 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/analyses",
+    "body": {
+      "profileId": "profile-1",
+      "jobPostingId": "job-demo-busan-001"
+    }
+  },
+  "response": {
+    "status": 202,
+    "body": {
+      "analysisId": "analysis-0001",
+      "taskId": "task-analysis-0001-fit",
+      "status": "PENDING"
+    }
+  }
+}

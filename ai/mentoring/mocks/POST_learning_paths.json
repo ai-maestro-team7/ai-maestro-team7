@@ -1,0 +1,20 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/learning-paths",
+    "body": {
+      "analysisId": "analysis-0001",
+      "weeklyStudyHours": 8,
+      "preferredFormat": "HYBRID",
+      "targetDate": "2027-01-16"
+    }
+  },
+  "response": {
+    "status": 202,
+    "body": {
+      "learningPathId": "path-0003",
+      "taskId": "task-path-0003",
+      "status": "PENDING"
+    }
+  }
+}

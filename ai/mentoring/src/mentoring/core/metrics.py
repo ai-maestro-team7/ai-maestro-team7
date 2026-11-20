@@ -11,6 +11,8 @@ METRIC_UNITS = {
     "LLMSchemaFailure": "Count",
     "AnalysisLatency": "Milliseconds",
     "KbNoEvidence": "Count",  # KB 검색 결과를 근거로 하나도 쓰지 못함 (mentoring-fit-review-learning Requirement 16)
+    "FactCheckRejected": "Count",       # 첨삭 사실 검사로 뺀 수정 예시 수
+    "OfficialSourceFailure": "Count",   # 시험일정 같은 공식 자료를 읽지 못함
 }
 
 

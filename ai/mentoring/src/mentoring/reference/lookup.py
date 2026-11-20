@@ -7,7 +7,7 @@ from collections.abc import Mapping
 from typing import Any, Protocol
 
 from .csv_data import CsvData
-from .models import BasicSkill, CompetencyUnit, JobProfile, QualificationLink
+from .models import BasicSkill, CompetencyUnit, JobProfile, Qualification, QualificationLink
 
 
 class ReferenceLookup(Protocol):
@@ -20,6 +20,8 @@ class ReferenceLookup(Protocol):
     def get_unit(self, ncs_code: str, unit_code: str) -> CompetencyUnit | None: ...
 
     def list_qualification_links(self, unit_code: str) -> list[QualificationLink]: ...
+
+    def get_qualification(self, qualification_code: str) -> Qualification | None: ...
 
     def list_basic_skills(self) -> list[BasicSkill]: ...
 
@@ -45,6 +47,9 @@ class CsvReferenceLookup:
 
     def list_qualification_links(self, unit_code: str) -> list[QualificationLink]:
         return [item for item in self._data.qualification_links if item.unit_code == unit_code]
+
+    def get_qualification(self, qualification_code: str) -> Qualification | None:
+        return self._data.qualifications.get(qualification_code)
 
     def list_basic_skills(self) -> list[BasicSkill]:
         return sorted(self._data.basic_skills, key=lambda item: item.skill_id)
@@ -136,6 +141,18 @@ class DynamoReferenceLookup:
         return sorted(
             (self._link(item) for item in items),
             key=lambda item: (item.qualification_code, item.unit_type),
+        )
+
+    def get_qualification(self, qualification_code: str) -> Qualification | None:
+        item = self._table.get_item(Key={"PK": f"QUAL#{qualification_code}", "SK": "META"}).get("Item")
+        if not item:
+            return None
+        return Qualification(
+            qualification_code=str(item["qualificationCode"]),
+            name=str(item["qualificationName"]),
+            exam_agency=str(item["examAgency"]) if item.get("examAgency") else None,
+            source_url=str(item["sourceUrl"]) if item.get("sourceUrl") else None,
+            collected_at=str(item["collectedAt"]) if item.get("collectedAt") else None,
         )
 
     def list_basic_skills(self) -> list[BasicSkill]:

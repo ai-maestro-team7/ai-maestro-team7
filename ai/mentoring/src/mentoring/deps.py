@@ -3,7 +3,7 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from .config import MentoringConfig
 from .ports import DocumentExtractor, Llm, ObjectStore, ReferenceLookup, TaskDispatcher, UserRepo
@@ -45,6 +45,9 @@ class Deps:
     ncs: "NcsLookup | None" = None              # NCS 정확 조회. 없으면 NCS 기준 분석이 501
     knowledge: "KnowledgeSearch | None" = None  # Bedrock KB. 없으면 출처 없이 분석하고 경고를 남긴다
     eligibility: "EligibilityFn | None" = None  # 백엔드가 evaluate_eligibility를 넣는다 (BE-8). 없으면 확인 필요
+    # 첨삭·학습 경로 (#113). results가 없으면 /reviews·/learning-paths가 501
+    results: Any = None  # REVIEW#·PATH# 저장소 (store/results.py)
+    exams: Any = None    # 시험일정 캐시 읽기 (team07-cache, #95 수집). 없으면 일정은 SCHEDULE_UNVERIFIED
     now: Callable[[], datetime] = field(default=now_kst)
     new_id: Callable[[str], str] = field(default=new_id)
 
