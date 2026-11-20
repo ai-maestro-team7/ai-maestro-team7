@@ -285,3 +285,56 @@ def test_search_tells_model_when_conditions_can_be_saved():
     ask(deps)
     assert seen["new"]["canSaveConditions"] == ["연봉 3,000만 원 이상"]
     assert "canSaveConditions" not in seen["same"]
+
+
+# ---------------------------------------------------------------- 채팅으로 저장 (D-40)
+def test_reply_yes_saves_previous_question_and_shows_saved():
+    def first(tools):
+        tools["search_job_postings"](min_salary=3000)
+        return reply("공고를 찾았어요. 이 조건(연봉 3,000만 원 이상)을 저장할까요?")
+
+    def second(tools):
+        out = tools["save_search_conditions"]()
+        return reply("저장했어요. 다음 검색부터 연봉 3,000만 원 이상으로 찾을게요." if out.get("saved") else "저장할 조건이 없어요.")
+
+    deps = build_deps(ScriptedRunner(first, second))
+    started, _, message = ask(deps)
+    assert [a["type"] for a in message["actions"]][0] == "SAVE_CONDITIONS"
+    deps.clock["now"] = NOW + timedelta(seconds=20)
+    again = service.start_turn(deps, "demo1", {"sessionId": started["sessionId"], "message": "응 저장해 줘"})
+    service.run_turn(deps, deps.dispatcher.events[-1]["agentTask"])
+    saved = service.get_message(deps, "demo1", started["sessionId"], again["messageId"])
+    assert deps.profiles.updates == [("demo1", {"desiredSalaryMin": 3000})]
+    assert saved["actions"] == [{"type": "CONDITIONS_SAVED", "conditions": ["연봉 3,000만 원 이상"]}]
+    assert saved["reply"].startswith("저장했어요")
+
+
+def test_old_question_is_not_saved_after_another_turn():
+    def ask_save(tools):
+        tools["search_job_postings"](min_salary=3000)
+        return reply("저장할까요?")
+
+    def other(tools):
+        return reply("청년정책을 알려 드릴게요.")
+
+    def try_save(tools):
+        out = tools["save_search_conditions"]()
+        return reply("저장할 조건이 없어요." if "error" in out else "저장했어요.")
+
+    deps = build_deps(ScriptedRunner(ask_save, other, try_save))
+    started, _, _ = ask(deps)
+    for i, text in enumerate(["정책은?", "저장해 줘"], start=1):
+        deps.clock["now"] = NOW + timedelta(seconds=20 * i)
+        service.start_turn(deps, "demo1", {"sessionId": started["sessionId"], "message": text})
+        service.run_turn(deps, deps.dispatcher.events[-1]["agentTask"])
+    assert deps.profiles.updates == []  # 바로 앞 답의 질문만 승낙 대상이다
+
+
+def test_prompt_v3_rules():
+    deps = build_deps(ScriptedRunner(lambda tools: reply()))
+    ask(deps)
+    prompt = deps.runner.runs[-1]["system_prompt"]
+    for rule in ("공식 데이터에는 조건에 맞는 공고가 없어요", "teamDataNote", "save_search_conditions",
+                 "`saved=true`일 때만", "묻지 않았는데 저장하지 않는다", "실시간으로 부르지 않는다"):
+        assert rule in prompt
+    assert deps.config.prompt_version == "chat-v3"

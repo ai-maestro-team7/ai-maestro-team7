@@ -113,7 +113,11 @@ def h_get_profile(event, user_id, params):
 
 
 def h_put_profile(event, user_id, params):
-    data = parse_json(event)
+    return 200, update_profile(user_id, parse_json(event))
+
+
+def update_profile(user_id, data):
+    """기본 프로필 부분 수정. PUT /me/profile과 채팅 Agent의 조건 저장 도구(D-40)가 같이 쓴다."""
     data = {k: v for k, v in data.items() if k not in ("userId", *SYSTEM_FIELDS)}  # 본문의 userId 등은 무시
     unknown = sorted(set(data) - set(PROFILE_FIELDS))
     if unknown:
@@ -139,7 +143,7 @@ def h_put_profile(event, user_id, params):
     expr = "SET " + ", ".join(sets) + (" REMOVE " + ", ".join(removes) if removes else "")
     item = table().update_item(Key={"PK": f"USER#{user_id}", "SK": "PROFILE#BASIC"}, UpdateExpression=expr,
                                ExpressionAttributeNames=names, ExpressionAttributeValues=values, ReturnValues="ALL_NEW")["Attributes"]
-    return 200, public_profile(item)
+    return public_profile(item)
 
 
 # ---------------------------------------------------------------- 워크스페이스

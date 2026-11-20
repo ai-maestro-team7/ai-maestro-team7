@@ -48,7 +48,9 @@ export type ChatAction =
   | { type: "SAVE_CONDITIONS"; conditions: string[]; profilePatch: Record<string, unknown> }
   | { type: "SUGGEST_INTERVIEW"; job: string }
   | { type: "START_INTERVIEW"; job: string; documentId: string; title?: string }
-  | { type: "REQUEST_COVER_LETTER"; job: string; minChars: number; maxChars: number };
+  | { type: "REQUEST_COVER_LETTER"; job: string; minChars: number; maxChars: number }
+  /** 사용자가 채팅으로 저장을 승낙해 Agent가 저장했다 (D-40) */
+  | { type: "CONDITIONS_SAVED"; conditions: string[] };
 
 export type ChatError = { code: string; message: string; retryable: boolean };
 

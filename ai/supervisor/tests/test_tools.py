@@ -15,7 +15,7 @@ def test_s04_tools_have_no_user_id_parameter():
     deps = build_deps(None)
     _, tools = tools_for(deps)
     assert set(tools) == {"get_my_status", "search_job_postings", "find_youth_policies", "ask_youth_policy",
-                          "prepare_mock_interview"}
+                          "save_search_conditions", "prepare_mock_interview"}
     for fn in tools.values():
         params = inspect.signature(fn).parameters
         assert not any("user" in p.lower() for p in params), fn.__name__
@@ -28,6 +28,8 @@ def test_s04_ports_get_backend_user_only():
     tools["search_job_postings"](job_name="데이터 분석")
     tools["find_youth_policies"]()
     assert {call[1] for call in deps.opportunities.calls} == {"demo2"}
+    tools["save_search_conditions"]()
+    assert {u for u, _ in deps.profiles.updates} == {"demo2"}
 
 
 def test_search_uses_saved_conditions_when_not_given():
@@ -48,9 +50,9 @@ def test_search_chat_conditions_override_and_are_recorded():
     turn, tools = tools_for(deps)
     out = tools["search_job_postings"](job_name="  데이터  분석 ", region="서울", min_salary=3000, career_type="new",
                                        organization="가상")
-    kwargs = deps.opportunities.calls[-1][2]
+    kwargs = next(c[2] for c in deps.opportunities.calls if c[0] == "search")
     assert kwargs == {"job_name": "데이터 분석", "keyword": None, "organization": "가상", "region": "서울",
-                      "min_salary": 3000, "career_type": "NEW", "query_terms": None}
+                      "min_salary": 3000, "career_type": "NEW", "query_terms": None, "scope": "OFFICIAL"}
     assert turn.record.search.chat_conditions == {"jobName": "데이터 분석", "region": "서울", "minSalary": 3000,
                                                   "careerType": "NEW"}
     assert out["items"][0]["jobPostingId"] == "demo-busan-data"
@@ -125,3 +127,72 @@ def test_status_reports_documents_and_resume_terms():
 
 def test_reply_helper_is_valid():
     assert reply().reply
+
+
+# ---------------------------------------------------------------- 데이터 순서 (개발계획서4 §9.1)
+def test_official_first_and_no_team_lookup_when_found():
+    deps = build_deps(None)
+    _, tools = tools_for(deps)
+    out = tools["search_job_postings"](job_name="데이터 분석")
+    assert out["officialFound"] is True and out["dataSource"].startswith("공식 데이터")
+    assert [c[2]["scope"] for c in deps.opportunities.calls] == ["OFFICIAL"]
+    assert "officialNote" not in out
+
+
+def test_team_data_when_official_is_empty_is_labelled():
+    deps = build_deps(None)
+    deps.opportunities.feeds["OFFICIAL"] = {**deps.opportunities.feeds["OFFICIAL"], "items": []}
+    turn, tools = tools_for(deps)
+    out = tools["search_job_postings"](job_name="데이터 분석")
+    assert [c[2]["scope"] for c in deps.opportunities.calls] == ["OFFICIAL", "TEAM"]
+    assert out["officialFound"] is False and "공식 데이터" in out["officialNote"]
+    assert out["dataSource"] == deps.config.team_data.label and deps.config.team_data.label in out["teamDataNote"]
+    assert out["items"][0]["jobPostingId"] == "demo-team-1"
+    assert turn.record.search.feed["items"][0]["isSample"] is True  # 카드에도 팀 데이터 표시가 남는다
+
+
+def test_team_fallback_can_be_turned_off():
+    deps = build_deps(None)
+    deps.config = deps.config.model_copy(update={"team_data": deps.config.team_data.model_copy(update={"fallback": False})})
+    deps.opportunities.feeds["OFFICIAL"] = {**deps.opportunities.feeds["OFFICIAL"], "items": []}
+    _, tools = tools_for(deps)
+    out = tools["search_job_postings"]()
+    assert out["items"] == [] and out["officialFound"] is False and "teamDataNote" not in out
+
+
+def test_company_name_looks_up_company_data():
+    deps = build_deps(None)
+    _, tools = tools_for(deps)
+    found = tools["search_job_postings"](organization="가상데이터")
+    assert found["companies"] == [{"name": "(주)가상데이터", "industry": "데이터 분석업", "source": "부산광역시 (데모)",
+                                   "asOf": "2026-06-30"}]
+    missing = tools["search_job_postings"](organization="없는회사")
+    assert missing["companies"] == [] and "없는회사" in missing["companiesNote"]
+
+
+# ---------------------------------------------------------------- 채팅으로 저장 (D-40)
+def test_save_uses_this_turn_search_conditions():
+    deps = build_deps(None)
+    turn, tools = tools_for(deps)
+    tools["search_job_postings"](min_salary=3000, career_type="NEW")
+    out = tools["save_search_conditions"]()
+    assert out["saved"] is True and out["conditions"] == ["연봉 3,000만 원 이상", "신입"]
+    assert deps.profiles.updates == [("demo1", {"desiredSalaryMin": 3000, "desiredCareerType": "NEW"})]
+    assert turn.record.saved_conditions == ["연봉 3,000만 원 이상", "신입"]
+
+
+def test_save_uses_previous_question_and_only_allowed_fields():
+    deps = build_deps(None)
+    pending = {"conditions": ["연봉 3,000만 원 이상"], "profilePatch": {"desiredSalaryMin": 3000, "birthYear": 1990}}
+    turn = TurnTools(deps, "demo1", pending_save=pending)
+    out = {f.__name__: f for f in turn.functions()}["save_search_conditions"]()
+    assert out["saved"] is True and deps.profiles.updates == [("demo1", {"desiredSalaryMin": 3000})]
+
+
+def test_save_without_candidate_is_error_and_writes_nothing():
+    deps = build_deps(None)
+    _, tools = tools_for(deps)
+    assert tools["save_search_conditions"]()["error"]["code"] == "NOTHING_TO_SAVE"
+    tools["search_job_postings"](job_name="데이터 분석", region="26")  # 저장된 조건과 같다
+    assert tools["save_search_conditions"]()["error"]["code"] == "NOTHING_TO_SAVE"
+    assert deps.profiles.updates == []

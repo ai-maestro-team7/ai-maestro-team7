@@ -263,6 +263,12 @@ function AssistantMessage({
         if (action.type === "SAVE_CONDITIONS") return <SaveConditions key={key} action={action} />;
         if (action.type === "START_INTERVIEW") return <StartInterview key={key} action={action} />;
         if (action.type === "REQUEST_COVER_LETTER") return <CoverLetterForm key={key} action={action} />;
+        if (action.type === "CONDITIONS_SAVED")
+          return (
+            <p key={key} className="text-small text-grey-800">
+              내 프로필에 저장했어요: {action.conditions.join(" · ")}
+            </p>
+          );
         return latest ? (
           <div key={key}>
             <Chip onClick={() => onAsk(`${action.job} 직무로 모의면접 체험해 볼래요`)} disabled={busy}>

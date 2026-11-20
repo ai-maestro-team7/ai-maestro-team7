@@ -141,7 +141,8 @@ A의 REST 요청은 백엔드에서 확인한 사용자 ID를 `mentoring.api.res
 ### 6.6 에이전트
 
 - 통합 Agent (D-38): Strands Agents를 `team07-api` 안에서 돌린다 (`ai/supervisor/` → `supervisor` 패키지, 입구 `/api/v1/agent/chat`). 도구는 B `agent_feed`·`agent_policies`·`ask_policies`(Bedrock Action Group 경로와 같은 함수)와 A 문서·프로필을 부른다. C 면접관은 Strands이고 Agent끼리 직접 부르지 않는다 (면접 화면 이동, `docs/개발계획서4.md` §10).
-- 채팅 조건 저장 (D-40): 화면 버튼을 누를 때만 `PUT /api/v1/me/profile`. 기본 프로필에 `desiredSalaryMin`(만 원/년), `desiredCareerType` 추가.
+- 채팅 조건 저장 (D-40): Agent가 말로 묻고, 사용자가 채팅으로 승낙하면 저장 도구가(`me_api.update_profile`), [저장하기]를 누르면 화면이 `PUT /api/v1/me/profile`로 저장. 기본 프로필에 `desiredSalaryMin`(만 원/년), `desiredCareerType` 추가.
+- 채팅 공고 검색 순서 (`docs/개발계획서4.md` §9.1): 공식 데이터(공공 API 수집) → 없으면 그렇다고 말하고 팀 데이터. 시연 중 공공 API 실시간 호출은 없다.
 - 모델: `global.anthropic.claude-haiku-5-5`, `global.anthropic.claude-sonnet-5-5` (서울 리전에서 호출 확인). 모델 ID는 환경 변수·설정 파일로.
 
 ### 6.7 배포

@@ -13,7 +13,7 @@ export function PostingCard({ posting }: { posting: ChatPosting }) {
         <div className="flex min-w-0 flex-col gap-0.5">
           <p className="text-small text-grey-600">
             {posting.organization}
-            {posting.isSample && " · 시연용 공고"}
+            {posting.isSample && " · 팀이 넣어 둔 데이터 (공식 공고 아님)"}
           </p>
           <p className="text-body font-bold text-grey-900">{posting.title}</p>
           <p className="text-small text-grey-600">{meta}</p>

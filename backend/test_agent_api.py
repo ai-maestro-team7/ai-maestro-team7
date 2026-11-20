@@ -166,6 +166,41 @@ def main():
     check("CHAT_MODEL_ID가 있으면 그 값", agent_api.model_id() == "chat-model")
     os.environ.pop("CHAT_MODEL_ID")
 
+    # 5-2. 데이터 순서: 공식 데이터에 없으면 팀 데이터 (데모 공고는 모두 팀 데이터). 회사 이름은 기업 데이터도 본다
+    seen = {}
+
+    def tiered(tools):
+        seen["out"] = tools["search_job_postings"](job_name="데이터 분석", organization="가상")
+        return "공식 데이터에는 조건에 맞는 공고가 없어요. 팀이 넣어 둔 시연용 데이터에서 찾았어요."
+
+    runner.script = tiered
+    call("POST", "/api/v1/agent/chat", {"sessionId": sid, "message": "가상 회사 데이터 분석 공고"})
+    out = seen["out"]
+    check("공식 데이터에 없으면 officialFound=false + 팀 데이터", out["officialFound"] is False and out["items"]
+          and all(i["isSample"] for i in out["items"]) and "teamDataNote" in out)
+    check("회사 이름은 기업 데이터에서도 찾는다 (출처·기준일)", "companies" in out and all(c["source"] and c["asOf"] for c in out["companies"]))
+
+    # 5-3. 말로 묻고 승낙하면 저장 도구가 실제로 저장한다 (D-40)
+    def ask_save(tools):
+        tools["search_job_postings"](min_salary=2500)
+        return "공고를 찾았어요. 이 조건을 저장할까요?"
+
+    runner.script = ask_save
+    s, b = call("POST", "/api/v1/agent/chat", {"sessionId": sid, "message": "연봉 2500 이상으로 다시 찾아줘"})
+    s, m = call("GET", f"/api/v1/agent/chat/{sid}/messages/{b['messageId']}")
+    check("저장 묻기 카드", m["actions"][0]["type"] == "SAVE_CONDITIONS")
+
+    def do_save(tools):
+        res = tools["save_search_conditions"]()
+        return "저장했어요." if res.get("saved") else "저장하지 못했어요."
+
+    runner.script = do_save
+    s, b = call("POST", "/api/v1/agent/chat", {"sessionId": sid, "message": "응 저장해 줘"})
+    s, m = call("GET", f"/api/v1/agent/chat/{sid}/messages/{b['messageId']}")
+    basic = table.get_item(Key={"PK": "USER#demo1", "SK": "PROFILE#BASIC"})["Item"]
+    check("채팅 승낙 → PROFILE#BASIC 저장", int(basic["desiredSalaryMin"]) == 2500 and m["reply"] == "저장했어요.")
+    check("저장 완료 카드", m["actions"] == [{"type": "CONDITIONS_SAVED", "conditions": ["연봉 2,500만 원 이상"]}])
+
     # 6. 비동기 이벤트 입구 (같은 작업 두 번 → 한 번만)
     out = lambda_handler({"agentTask": {"userId": "demo1", "sessionId": sid, "messageId": mid}}, None)
     check("agentTask 이벤트: 끝난 턴은 SKIPPED", out["status"] == "SKIPPED")

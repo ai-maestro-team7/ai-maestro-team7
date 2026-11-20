@@ -28,16 +28,26 @@ class FakeError(Exception):
         self.code, self.message = code, message
 
 
+TEAM_POSTING = {**POSTING, "jobPostingId": "demo-team-1", "title": "[시연] 데이터 분석 인턴", "isSample": True}
+COMPANY = {"name": "(주)가상데이터", "industry": "데이터 분석업", "source": "부산광역시 (데모)", "asOf": "2026-06-30"}
+
+
 class FakeOpportunities:
     def __init__(self):
         self.calls = []
         self.search_error = None
+        self.feeds = {"OFFICIAL": dict(FEED), "TEAM": {**FEED, "items": [TEAM_POSTING]}}
+        self.companies = [COMPANY]
 
     def search_postings(self, user_id, **kwargs):
         self.calls.append(("search", user_id, kwargs))
         if self.search_error:
             raise self.search_error
-        return dict(FEED)
+        return dict(self.feeds[kwargs["scope"]])
+
+    def find_companies(self, user_id, name):
+        self.calls.append(("companies", user_id, {"name": name}))
+        return [c for c in self.companies if name.replace(" ", "") in c["name"].replace(" ", "")]
 
     def match_policies(self, user_id, *, stage):
         self.calls.append(("policies", user_id, {"stage": stage}))
@@ -70,9 +80,15 @@ class FakeDocs:
 class FakeProfiles:
     def __init__(self, profiles=None):
         self.profiles = dict(profiles or {})
+        self.updates = []
 
     def get_basic_profile(self, user_id):
         return self.profiles.get(user_id)
+
+    def update_basic_profile(self, user_id, patch):
+        self.updates.append((user_id, dict(patch)))
+        self.profiles[user_id] = {**self.profiles.get(user_id, {}), **patch}
+        return self.profiles[user_id]
 
 
 class ScriptedRunner:

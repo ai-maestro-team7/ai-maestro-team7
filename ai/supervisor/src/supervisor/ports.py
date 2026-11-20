@@ -44,7 +44,13 @@ class OpportunityPort(Protocol):
 
     def search_postings(self, user_id: str, *, job_name: str | None, keyword: str | None, organization: str | None,
                         region: str | None, min_salary: int | None, career_type: str | None,
-                        query_terms: list[str] | None) -> dict: ...
+                        query_terms: list[str] | None, scope: str) -> dict:
+        """scope: OFFICIAL(공공 API로 모은 공고) 또는 TEAM(팀이 넣어 둔 공고)."""
+        ...
+
+    def find_companies(self, user_id: str, name: str) -> list[dict]:
+        """회사 이름으로 우리 기업 데이터(부산 청끌·강소·이전기관). 회사 정보만, 출처·기준일 포함."""
+        ...
 
     def match_policies(self, user_id: str, *, stage: str | None) -> dict: ...
 
@@ -76,6 +82,10 @@ class CareerDocsPort(Protocol):
 class ProfilePort(Protocol):
     def get_basic_profile(self, user_id: str) -> dict | None:
         """`PROFILE#BASIC` (카멜 키). 없으면 None."""
+        ...
+
+    def update_basic_profile(self, user_id: str, patch: dict) -> dict:
+        """보낸 항목만 바꾼다 (`PUT /api/v1/me/profile`과 같은 검사). 바뀐 프로필을 돌려준다."""
         ...
 
 

@@ -36,6 +36,7 @@ class ActionType(StrEnum):
     SUGGEST_INTERVIEW = "SUGGEST_INTERVIEW"        # "이 직무로 모의면접 체험하기" 칩
     START_INTERVIEW = "START_INTERVIEW"            # 저장된 자소서로 면접 화면 이동
     REQUEST_COVER_LETTER = "REQUEST_COVER_LETTER"  # 자소서 입력 받기 → 면접 화면 이동
+    CONDITIONS_SAVED = "CONDITIONS_SAVED"          # 사용자가 채팅으로 저장을 승낙해 저장 도구가 저장함
 
 
 # ---------------------------------------------------------------- 요청

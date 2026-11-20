@@ -26,6 +26,11 @@ class CoverLetterLimits(_Model):
     max_chars: int = Field(gt=0)
 
 
+class TeamData(_Model):
+    fallback: bool  # 공식 데이터에 없을 때 팀 데이터에서 찾을지
+    label: str      # 팀 데이터 이름 (시연용 목업인지 크롤링한 실제 데이터인지 정해지면 바꾼다)
+
+
 class Thinking(_Model):
     family: str
     thinking: dict
@@ -47,6 +52,9 @@ class SupervisorConfig(_Model):
     reply: ReplyLimits
     cover_letter: CoverLetterLimits
     interview_job_max_chars: int = Field(gt=0)
+    team_data: TeamData
+    max_companies: int = Field(ge=0)
+    savable_profile_fields: tuple[str, ...]
     banned_phrases: tuple[str, ...]
     allowed_phrases: tuple[str, ...] = ()
     thinking_by_model: tuple[Thinking, ...] = ()

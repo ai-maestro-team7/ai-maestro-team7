@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 
 _DIR = Path(__file__).parent
-_FILES = {"chat-v1": "system_v1.md", "chat-v2": "system_v2.md"}
+_FILES = {"chat-v1": "system_v1.md", "chat-v2": "system_v2.md", "chat-v3": "system_v3.md"}
 
 
 @lru_cache(maxsize=None)

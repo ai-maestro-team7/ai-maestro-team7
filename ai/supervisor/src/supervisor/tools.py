@@ -1,5 +1,8 @@
 """한 턴의 Agent 도구 (개발계획서4 §4).
 
+공고는 공식 데이터(공공 API로 모은 공고)에서 먼저 찾고, 없으면 그렇다고 알린 뒤 팀이 넣어 둔 데이터에서 찾는다 (§9.1).
+조건 저장 도구는 인자가 없다. 저장할 값은 코드가 만든 것(이번 검색 또는 바로 앞 답의 저장 묻기)만 쓴다 (D-40).
+
 도구는 턴마다 새로 만든다. 사용자 ID는 도구 인자가 아니라 백엔드가 확인한 값을 클로저로 넣는다 (B T-20과 같은 규칙).
 도구 결과는 사실 목록(dict)이고, 카드·행동은 `compose.py`가 여기 남은 기록으로 만든다. 모델이 만든 숫자는 쓰지 않는다.
 도구 오류는 예외 대신 `{"error": {code, message}}`로 돌려준다. 메시지는 오류 객체가 가진 사용자용 문장만 쓴다.
@@ -20,6 +23,7 @@ CAREER_TYPES = ("NEW", "EXPERIENCED", "ANY")
 CAREER_WORDS = {"NEW": "신입", "EXPERIENCED": "경력", "ANY": "경력 무관"}
 TEXT_STATUSES = {"EXTRACTED", "ANALYZING", "REQUIRES_USER_REVIEW", "COMPLETED"}  # 정규화 텍스트가 있는 A 문서 상태
 GENERIC_ERROR = "지금은 이 정보를 가져오지 못했어요."
+OFFICIAL, TEAM = "OFFICIAL", "TEAM"
 
 
 @dataclass
@@ -46,6 +50,7 @@ class TurnRecord:
     interview: InterviewRecord | None = None
     saved_profile: dict | None = None
     profile_loaded: bool = False
+    saved_conditions: list[str] | None = None  # 이번 턴에 저장 도구가 저장한 조건 (보여 줄 말)
 
 
 def _clean(value: str | None, max_chars: int = 50) -> str | None:
@@ -66,9 +71,12 @@ def won_label(manwon: int) -> str:
 
 
 class TurnTools:
-    def __init__(self, deps: Deps, user_id: str, *, attachments: list[str] | None = None):
+    def __init__(self, deps: Deps, user_id: str, *, attachments: list[str] | None = None,
+                 pending_save: dict | None = None):
+        """pending_save: 바로 앞 답의 저장 묻기 {conditions, profilePatch}. 사용자가 이번 말로 승낙하면 이것을 저장한다."""
         self.deps, self.user_id = deps, user_id
         self.attachments = list(attachments or [])
+        self.pending_save = pending_save
         self.record = TurnRecord()
 
     # ------------------------------------------------------------ 공통
@@ -147,6 +155,11 @@ class TurnTools:
             """
             return tools._call("ask_youth_policy", lambda: tools._ask(question))
 
+        def save_search_conditions() -> dict:
+            """검색 조건을 사용자 기본 프로필에 저장한다. 사용자가 이번 말에서 저장하겠다고 분명히 답했을 때만 쓴다
+            (예: "응 저장해 줘", "저장할래"). 입력은 없다. 저장할 값은 바로 앞 검색에서 정해진 조건이다."""
+            return tools._call("save_search_conditions", tools._save)
+
         def prepare_mock_interview(job: str) -> dict:
             """모의면접 체험을 준비한다. 저장된 자소서가 있는지 확인한다. 사용자가 면접 연습을 원할 때 쓴다.
 
@@ -155,7 +168,8 @@ class TurnTools:
             """
             return tools._call("prepare_mock_interview", lambda: tools._prepare_interview(job))
 
-        return [get_my_status, search_job_postings, find_youth_policies, ask_youth_policy, prepare_mock_interview]
+        return [get_my_status, search_job_postings, find_youth_policies, ask_youth_policy, save_search_conditions,
+                prepare_mock_interview]
 
     # ------------------------------------------------------------ 구현
     def _status(self) -> dict:
@@ -203,9 +217,19 @@ class TurnTools:
         use_salary = chat.get("minSalary", saved.get("desiredSalaryMin"))
         use_career = chat.get("careerType", saved.get("desiredCareerType"))
         terms = self.deps.docs.resume_terms(self.user_id) if use_resume else []
-        feed = self.deps.opportunities.search_postings(
-            self.user_id, job_name=job, keyword=_clean(keyword), organization=_clean(organization),
-            region=use_region, min_salary=use_salary, career_type=use_career, query_terms=terms or None)
+        org = _clean(organization)
+
+        def find(scope: str) -> dict:
+            return self.deps.opportunities.search_postings(
+                self.user_id, job_name=job, keyword=_clean(keyword), organization=org, region=use_region,
+                min_salary=use_salary, career_type=use_career, query_terms=terms or None, scope=scope)
+
+        # 1. 공식 데이터 → 2. 없으면 팀 데이터 (§9.1). 공식 데이터에 없다는 사실은 모델에 그대로 준다
+        team = self.deps.config.team_data
+        feed, source = find(OFFICIAL), OFFICIAL
+        official_found = bool(feed.get("items"))
+        if not official_found and team.fallback:
+            feed, source = find(TEAM), TEAM
 
         applied = [f"직무 {job}" if job else "직무 저장된 희망 직무"]
         applied.append(f"지역 {place}" if place else ("지역 저장된 희망 지역" if saved.get("desiredRegion") else "지역 전국"))
@@ -219,7 +243,17 @@ class TurnTools:
             applied.append("이력서 역량 함께 사용" if terms else "이력서 역량 없음 (분석 전이거나 이력서가 없어요)")
         saved_job = next((j.get("name") for j in saved.get("desiredJobs") or [] if j.get("name")), None)
         self.record.search = SearchRecord(feed=feed, chat_conditions=chat, job_name=job or saved_job)
-        result = {**feed, "appliedConditions": applied}
+        result = {**feed, "appliedConditions": applied, "officialFound": official_found,
+                  "dataSource": "공식 데이터 (공공 API로 모은 공고)" if source == OFFICIAL else team.label}
+        if not official_found:
+            result["officialNote"] = "공식 데이터(공공 API로 모은 공고)에는 조건에 맞는 공고가 없어요"
+            if source == TEAM:
+                result["teamDataNote"] = f"아래 공고는 {team.label}예요. 실제 채용 여부는 회사에 확인해야 해요"
+        if org and self.deps.config.max_companies:
+            companies = self.deps.opportunities.find_companies(self.user_id, org)[:self.deps.config.max_companies]
+            result["companies"] = companies or []
+            if not companies:
+                result["companiesNote"] = f"우리 기업 데이터(부산 청끌·강소·이전기관)에 '{org}'이 없어요"
         from .compose import profile_patch  # 순환 import 방지
 
         patch, labels = profile_patch(self.deps, chat, saved) if chat else ({}, [])
@@ -240,6 +274,25 @@ class TurnTools:
         if not text:
             return {"error": {"code": "INVALID_INPUT", "message": "질문을 알려 주세요."}}
         return self.deps.opportunities.ask_policies(self.user_id, text)
+
+    def _save(self) -> dict:
+        """이번 턴 검색의 저장 대상, 없으면 바로 앞 답의 저장 묻기를 저장한다. 값은 코드가 만든 것만 쓴다."""
+        from .compose import profile_patch  # 순환 import 방지
+
+        patch, labels = {}, []
+        if self.record.search and "error" not in self.record.search.feed and self.record.search.chat_conditions:
+            patch, labels = profile_patch(self.deps, self.record.search.chat_conditions, self.saved_profile())
+        if not patch and self.pending_save:
+            patch = dict(self.pending_save.get("profilePatch") or {})
+            labels = list(self.pending_save.get("conditions") or [])
+        allowed = set(self.deps.config.savable_profile_fields)
+        patch = {k: v for k, v in patch.items() if k in allowed}
+        if not patch:
+            return {"error": {"code": "NOTHING_TO_SAVE", "message": "저장할 검색 조건이 없어요. 먼저 조건을 말해 주세요."}}
+        self.deps.profiles.update_basic_profile(self.user_id, patch)
+        self.record.saved_conditions = labels
+        self.record.profile_loaded = False  # 다음에 읽을 때 저장된 값을 다시 읽는다
+        return {"saved": True, "conditions": labels, "next": "다음 검색부터 이 조건을 써요"}
 
     def _prepare_interview(self, job: str) -> dict:
         name = _clean(job, 200)

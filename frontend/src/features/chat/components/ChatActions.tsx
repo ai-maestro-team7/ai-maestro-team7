@@ -35,6 +35,7 @@ export function SaveConditions({ action }: { action: SaveAction }) {
   return (
     <div className="flex flex-col gap-2.5 rounded-field bg-grey-50 p-4">
       <p className="text-body font-bold text-grey-900">이 조건을 내 프로필에 저장할까요?</p>
+      <p className="text-small text-grey-600">채팅으로 &quot;저장해 줘&quot;라고 답해도 돼요.</p>
       <p className="text-small text-grey-600">{action.conditions.join(" · ")}</p>
       {error && (
         <p role="alert" className="text-small text-red-500">

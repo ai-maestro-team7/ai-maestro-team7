@@ -79,11 +79,15 @@ class OpportunityAdapter:
         return opportunities_api.deps(), agent_handler
 
     def search_postings(self, user_id, *, job_name, keyword, organization, region, min_salary, career_type,
-                        query_terms):
+                        query_terms, scope):
         deps, handler = self._b()
         return handler.agent_feed(deps, user_id, keyword=keyword, region=region, job_name=job_name,
                                   query_terms=query_terms, min_salary=min_salary, career_type=career_type,
-                                  organization=organization).to_api()
+                                  organization=organization, scope=scope).to_api()
+
+    def find_companies(self, user_id, name):
+        deps, handler = self._b()
+        return handler.agent_company_lookup(deps, name)
 
     def match_policies(self, user_id, *, stage):
         deps, handler = self._b()
@@ -191,6 +195,12 @@ class CareerDocsAdapter:
 
 
 class ProfileAdapter:
+    def update_basic_profile(self, user_id, patch):
+        """PUT /api/v1/me/profile과 같은 검사·저장 (me_api.update_profile)."""
+        import me_api
+
+        return me_api.update_profile(user_id, patch)
+
     def get_basic_profile(self, user_id):
         item = table().get_item(Key={"PK": pk(user_id), "SK": "PROFILE#BASIC"}).get("Item")
         if not item:

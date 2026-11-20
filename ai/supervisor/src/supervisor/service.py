@@ -24,7 +24,7 @@ from .errors import (
     session_not_found,
     turn_in_progress,
 )
-from .models import ChatMessage, ChatReply, ChatRequest, ChatSession, ErrorInfo, MessageStatus, Role
+from .models import ActionType, ChatMessage, ChatReply, ChatRequest, ChatSession, ErrorInfo, MessageStatus, Role
 from .prompts import system_prompt
 from .tools import TurnTools
 
@@ -118,8 +118,19 @@ def _model_message(user_message: ChatMessage, context: str) -> str:
     return f"{context}\n\n<user_message>\n{text}\n</user_message>"
 
 
-def _run_once(deps: Deps, user_id: str, history: list[dict], user_message: ChatMessage) -> tuple[ChatReply, TurnTools]:
-    tools = TurnTools(deps, user_id, attachments=[a.document_id for a in user_message.attachments])
+def _pending_save(messages: list[ChatMessage], user_message: ChatMessage) -> dict | None:
+    """바로 앞 Agent 답의 저장 묻기. 더 오래된 답의 것은 쓰지 않는다 (사용자가 무엇에 승낙했는지 분명하게)."""
+    before = [m for m in messages if m.message_id < user_message.message_id and m.role == Role.ASSISTANT]
+    if not before or before[-1].status != MessageStatus.COMPLETED:
+        return None
+    action = next((a for a in before[-1].actions if a.type == ActionType.SAVE_CONDITIONS), None)
+    return {"conditions": action.conditions, "profilePatch": action.profile_patch} if action else None
+
+
+def _run_once(deps: Deps, user_id: str, history: list[dict], user_message: ChatMessage,
+              pending_save: dict | None = None) -> tuple[ChatReply, TurnTools]:
+    tools = TurnTools(deps, user_id, attachments=[a.document_id for a in user_message.attachments],
+                      pending_save=pending_save)
     context = context_block(build_user_context(tools))  # 이력서·경험 요약. 저장하지 않고 턴마다 새로 만든다
     reply = deps.runner.run(system_prompt=system_prompt(deps.config.prompt_version), history=history,
                             message=_model_message(user_message, context), tools=tools.functions(),
@@ -151,9 +162,10 @@ def run_turn(deps: Deps, task: dict) -> dict:
         history, user_message = _history(messages, message_id, deps.config.history_messages)
         if user_message is None:
             raise SupervisorError(500, "INTERNAL_ERROR", "대화를 읽지 못했어요.", True)
+        pending = _pending_save(messages, user_message)
         for attempt in range(1, MAX_ATTEMPTS + 1):
             try:
-                reply, tools = _run_once(deps, user_id, history, user_message)
+                reply, tools = _run_once(deps, user_id, history, user_message, pending)
                 break
             except OutputInvalid as invalid:
                 logger.warning("stage=chat.check attempt=%d userHash=%s reason=%s", attempt, user_hash, invalid.reason)

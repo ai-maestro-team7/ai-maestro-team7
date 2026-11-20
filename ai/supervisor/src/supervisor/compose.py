@@ -54,7 +54,9 @@ def actions(deps: Deps, record: TurnRecord) -> list[ChatAction]:
     out: list[ChatAction] = []
     search = record.search
     found = bool(search and "error" not in search.feed and search.feed.get("items"))
-    if search and "error" not in search.feed and search.chat_conditions:
+    if record.saved_conditions is not None:
+        out.append(ChatAction(type=ActionType.CONDITIONS_SAVED, conditions=record.saved_conditions))
+    elif search and "error" not in search.feed and search.chat_conditions:
         patch, labels = profile_patch(deps, search.chat_conditions, record.saved_profile or {})
         if patch:
             out.append(ChatAction(type=ActionType.SAVE_CONDITIONS, conditions=labels, profile_patch=patch))
