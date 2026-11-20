@@ -1,5 +1,3 @@
-import type { StatItem } from "@/components/ui/Stats";
-
 /** 진행 방식: 음성 + 카메라 / 음성만 / 텍스트 */
 export type InterviewMode = "camera" | "voice" | "text";
 
@@ -10,48 +8,92 @@ export type InterviewModeOption = {
   description: string;
 };
 
-export type FollowUpQuestion = {
-  question: string;
-  hint: string;
-  sampleAnswer: string;
-  /** "왜 이 질문인가요?" 설명 */
-  reason: string;
-};
-
-export type InterviewQuestion = {
-  id: string;
-  topic: string;
-  question: string;
-  hint: string;
-  /** 텍스트 방식에서 입력칸에 미리 채우는 예시 답변 */
-  sampleAnswer: string;
-  /** 질문당 추가 질문은 최대 1개 (C §1) */
-  followUp: FollowUpQuestion;
-};
-
-export type DeviceCheckItem = {
-  key: "mic" | "camera" | "questions";
-  title: string;
-  description: string;
-};
+/** 면접 유형 (`POST /interview/start`의 `interviewType`) */
+export type InterviewType = "PERSONALITY" | "JOB" | "MIXED";
 
 export type AnswerGuideItem = { title: string; description: string };
 
-export type QuestionFeedback = {
-  id: string;
-  label: string;
-  topic: string;
-  comment: string;
-  speakingSeconds: number;
-  frontGazeRate: number;
-  /** 정면 응시 비율을 주의 색으로 보여줄지 */
-  gazeNeedsAttention: boolean;
+// ---------------------------------------------------------------- API (docs/개발계획서3.md §5)
+
+export type InterviewStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+
+export type InterviewStage =
+  | "QUESTION_GENERATING"
+  | "NEXT_QUESTION_READY"
+  | "TRANSCRIBING"
+  | "JUDGING"
+  | "REPORT_GENERATING"
+  | "REPORT_READY";
+
+/** 지금 답할 질문. `answerId`는 답변과 캡처를 보낼 때 그대로 돌려준다. */
+export type NextQuestion = {
+  questionId: string;
+  answerId: string;
+  text: string;
+  isFollowUp: boolean;
+  /** 질문 음성 (S3 임시 주소, 10분). 음성을 만들지 못했으면 null */
+  audioUrl: string | null;
+};
+
+export type UnevaluableReason = "NO_ANSWER" | "TRANSCRIBE_FAILED";
+
+export type LastAnswer = { answerId: string; evaluable: boolean; reason: UnevaluableReason | null };
+
+export type AreaScore = { score: number | null; notMeasuredReason: string | null };
+
+export type ReportQuestion = {
+  questionId: string;
+  question: string;
+  followUp: { question: string; answerText: string | null } | null;
+  answerText: string | null;
+  evaluable: boolean;
+  reason?: UnevaluableReason | null;
+  contentScore: number | null;
+  strengths: string[];
+  improvements: string[];
+  direction: string | null;
+  metrics: {
+    /** 분당 음절 수 */
+    speechRate: number | null;
+    longPausePerMin: number | null;
+    /** 정면 응시 비율(%) */
+    frontalRatio: number | null;
+    timeLimitReached: boolean;
+  };
+  comment: string | null;
 };
 
 export type InterviewReport = {
-  summary: string;
-  stats: StatItem[];
-  statsNote: string;
-  feedback: QuestionFeedback[];
-  next: { title: string; description: string };
+  interviewDate?: string;
+  job: string;
+  interviewType: InterviewType;
+  evaluatedBaseQuestions: number;
+  totalScore: number | null;
+  grade: string | null;
+  weightBasis: string;
+  areas: { content: AreaScore; delivery: AreaScore; attitude: AreaScore };
+  notMeasuredMessages: string[];
+  questions: ReportQuestion[];
+  notice: string;
+};
+
+export type InterviewError = { code: string; message: string; requestId?: string; retryable?: boolean };
+
+/** `GET /interview/{sessionId}/status` */
+export type InterviewStatusBody = {
+  sessionId: string;
+  status: InterviewStatus;
+  stage: InterviewStage;
+  progress: { baseQuestionNo: number; totalBaseQuestions: number; isFollowUp: boolean };
+  nextQuestion: NextQuestion | null;
+  lastAnswer: LastAnswer | null;
+  report: InterviewReport | null;
+  error?: InterviewError | null;
+};
+
+export type StartInterviewInput = {
+  job: string;
+  resumeText: string;
+  interviewType: InterviewType;
+  cameraConsent: boolean;
 };
