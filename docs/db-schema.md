@@ -65,8 +65,8 @@
 | 학습 경로 | `PATH#{pathId}` | `USER#{u}#WS#{wsId}` / `PATH#{createdAt}#{pathId}` | `analysisId`, `weeks[]`, `certificates[]`, `courses[]`, `sourceVerificationStatus`, `version` |
 | 모의면접 | `INTERVIEW#{ivId}` | `USER#{u}#WS#{wsId}` / `INTERVIEW#{createdAt}#{ivId}` | §2.4 |
 | 비동기 작업 | `TASK#{taskId}` | `TASK#{status}` / `{updatedAt}#{u}#{taskId}` | §2.5 |
-| 대화 세션 | `SESSION#{sessionId}` | — | `sessionId`(`chat-…`), `workspaceId`, `title`, `pendingMessageId`, `pendingSince`, `messageCount`, `lastMessageAt` (채팅 Agent, `docs/개발계획서4.md` §8) |
-| 대화 메시지 | `CHAT#{sessionId}#{messageId}` | — | `messageId`(`{yyyyMMddTHHmmssSSS}-{16진 6자}`, 시간순 정렬), `role`, `content`, `status`, `followUps[]`, `cards[]`, `actions[]`, `toolCalls[{name, ok, durationMs}]`, `attachments[{documentId}]`, `modelId`, `promptVersion`. 도구 인자·결과 원문은 두지 않는다 |
+| 대화 세션 | `SESSION#{sessionId}` | — | `sessionId`(`chat-…`), `workspaceId`, `title`, `pendingMessageId`, `pendingSince`, `messageCount`, `lastMessageAt`, `pinned`(대화 목록 위에 고정, 기본 false) (채팅 Agent, `docs/개발계획서4.md` §8) |
+| 대화 메시지 | `CHAT#{sessionId}#{messageId}` | — | `messageId`(`{yyyyMMddTHHmmssSSS}-{16진 6자}`, 시간순 정렬), `role`, `content`, `status`(`PENDING`·`PROCESSING`·`COMPLETED`·`FAILED`·`CANCELLED`), `followUps[]`, `cards[]`, `actions[]`, `toolCalls[{name, ok, durationMs}]`, `attachments[{documentId}]`, `modelId`, `promptVersion`. 도구 인자·결과 원문은 두지 않는다 |
 | 평가 로그 (선택) | `EVAL#{analysisId}#{evaluationId}` | — | §2.7. MVP는 CloudWatch 로그만 |
 | 멱등 키 | `IDEM#{key}` | — | `requestHash`, `resultId`, `expiresAt`(24시간) |
 | 계정 상태 | `ACCOUNT` | — | `status`(`ACTIVE`/`DELETING`) (§2.6) |

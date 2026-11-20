@@ -1,8 +1,12 @@
 """채팅 Agent 백엔드 연결 — /api/v1/agent/* (D-38, docs/개발계획서4.md §7)
 
-  POST /api/v1/agent/chat                                   {sessionId?, message, attachments?} → 202 {sessionId, messageId, status}
-  GET  /api/v1/agent/chat/{sessionId}                       대화와 메시지 목록
-  GET  /api/v1/agent/chat/{sessionId}/messages/{messageId}  Agent 답 하나 (화면이 2초마다 조회)
+  POST   /api/v1/agent/chat                                   {sessionId?, message, attachments?} → 202 {sessionId, messageId, status}
+  GET    /api/v1/agent/chat                                   내 대화 목록 (고정한 대화 먼저, 최근 순)
+  GET    /api/v1/agent/chat/{sessionId}                       대화와 메시지 목록
+  PATCH  /api/v1/agent/chat/{sessionId}                       {pinned} 대화 고정·고정 해제
+  DELETE /api/v1/agent/chat/{sessionId}                       대화와 메시지 지우기
+  GET    /api/v1/agent/chat/{sessionId}/messages/{messageId}  Agent 답 하나 (화면이 2초마다 조회)
+  POST   /api/v1/agent/chat/{sessionId}/messages/{messageId}/cancel  만드는 중인 답 멈추기
   run_task                                                  `agentTask` 이벤트 (Lambda 비동기 자기 호출, D-19)
 
 역할 분담:
@@ -309,10 +313,32 @@ def h_message(event, user_id, params):
     return 200, service.get_message(deps(), user_id, params["sessionId"], params["messageId"])
 
 
+def h_sessions(event, user_id, params):
+    return 200, service.list_sessions(deps(), user_id)
+
+
+def h_update_session(event, user_id, params):
+    return 200, service.update_session(deps(), user_id, params["sessionId"], parse_json(event))
+
+
+def h_delete_session(event, user_id, params):
+    return 200, service.delete_session(deps(), user_id, params["sessionId"])
+
+
+def h_cancel(event, user_id, params):
+    return 200, service.cancel_message(deps(), user_id, params["sessionId"], params["messageId"])
+
+
+SESSION = r"/api/v1/agent/chat/(?P<sessionId>[^/]+)"
+MESSAGE = SESSION + r"/messages/(?P<messageId>[^/]+)"
 ROUTES = [
     ("POST", r"/api/v1/agent/chat", h_chat),
-    ("GET", r"/api/v1/agent/chat/(?P<sessionId>[^/]+)", h_session),
-    ("GET", r"/api/v1/agent/chat/(?P<sessionId>[^/]+)/messages/(?P<messageId>[^/]+)", h_message),
+    ("GET", r"/api/v1/agent/chat", h_sessions),
+    ("GET", SESSION, h_session),
+    ("PATCH", SESSION, h_update_session),
+    ("DELETE", SESSION, h_delete_session),
+    ("GET", MESSAGE, h_message),
+    ("POST", MESSAGE + r"/cancel", h_cancel),
 ]
 
 
