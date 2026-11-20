@@ -494,6 +494,12 @@ def _sort_key(sort: Sort):
     return lambda row: (-row["rank"], -row["match"].score, row["posting"].closes_at, row["posting"].job_posting_id)
 
 
+def _job_name_sort_key(sort: Sort):
+    """명시한 직무와의 관계를 먼저 보고, 같은 관계 안에서는 기존 정렬을 쓴다."""
+    secondary = _sort_key(sort)
+    return lambda row: (-row["job_name_hit"], -(row["match"].job_match or 0), secondary(row))
+
+
 def _neg_time(iso_text: str) -> float:
     return -clock.parse_as_of(iso_text).timestamp()
 
@@ -635,7 +641,6 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
     for pid, posting in latest_by_id.items():
         if not (is_open(posting, ctx.as_of) and _in_region(posting, region, sidos)
                 and _job_code_ok(posting, job_codes) and _keyword_ok(posting, keyword)
-                and _job_name_ok(posting, job_name, ctx.profile)
                 and _organization_ok(posting, organization)
                 and _salary_ok(posting, min_salary, org_pay_for(pay_index, posting))
                 and _career_ok(posting, career) and _scope_ok(posting, scope) and sector_ok(posting.org_type, sector)
@@ -644,10 +649,11 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
             continue
         match, result = score_posting(deps, ctx, posting, similarity[pid])
         rank = rank_score(cfg, match.score, is_busan=is_busan_posting(cfg, posting), sort=sort)
-        rows.append({"posting": posting, "match": match, "eligibility": result, "rank": rank})
+        rows.append({"posting": posting, "match": match, "eligibility": result, "rank": rank,
+                     "job_name_hit": has_job_name and _job_name_ok(posting, job_name, ctx.profile)})
 
     # 3. 정렬과 쪽 나누기
-    rows.sort(key=_sort_key(sort))
+    rows.sort(key=_job_name_sort_key(sort) if has_job_name else _sort_key(sort))
     page = rows[offset:offset + limit]
     next_cursor = _encode_cursor(offset + limit) if offset + limit < len(rows) else None
 
@@ -675,7 +681,8 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
         empty_message = copy_rules.EMPTY_BUSAN
 
     data_as_of, stale = freshness(deps, ctx.as_of)
-    ranking = Ranking(sort=sort, basis=copy_rules.RANKING_BASIS[sort],
+    basis = copy_rules.JOB_NAME_RANKING_BASIS[sort] if has_job_name else copy_rules.RANKING_BASIS[sort]
+    ranking = Ranking(sort=sort, basis=basis,
                       busan_boost=cfg.ranking.busan_boost if sort == Sort.BUSAN_FIRST else None)
     return FeedResponse(items=cards, ranking=ranking, data_as_of=data_as_of, stale=stale, next_cursor=next_cursor,
                         ask_leave_reason=ask, empty_message=empty_message)
