@@ -94,20 +94,20 @@
   - [x] 9.2 `tests/test_logging.py`를 쓴다. `caplog`으로 샘플 자소서·답변·질문 문장·`profile` 항목이 로그에 없는지, `print`를 쓰지 않는지(AST) 확인한다
     - _Requirements: 12.1, 12.2, 12.3, 14.5_
 
-- [ ] 10. 실제 Bedrock 확인
+- [x] 10. 실제 Bedrock 확인
   - [x] 10.1 `tests/test_bedrock_manual.py`를 쓴다. `RUN_BEDROCK=1`과 `MODEL_ID`가 있을 때만 실행하고 기본은 건너뛴다
     - _Requirements: 14.6_
-  - [ ] 10.2 사용자 확인 후 `aws login` 상태에서 `MODEL_ID=global.anthropic.claude-haiku-5-5`(`infra/config.sh` 기본값)로 10.1을 실행하고, 질문 3개가 샘플 자소서 내용을 반영하는지 본다. 결과 문장은 커밋하지 않고 PR 본문에 요약만 적는다
+  - [x] 10.2 사용자 확인 후 `aws login` 상태에서 `MODEL_ID=global.anthropic.claude-haiku-5-5`(`infra/config.sh` 기본값)로 10.1을 실행하고, 질문 3개가 샘플 자소서 내용을 반영하는지 본다. 결과 문장은 커밋하지 않고 PR 본문에 요약만 적는다
     - _Requirements: 14.6_
 
-- [ ] 11. 명세 문서 (`docs/개발계획서3.md`, design §14)
-  - [ ] 11.1 ★ 주요 데이터 형식의 `session` 예시에 `modelId`, `promptVersion`, `currentQuestion`을 넣고 `job`을 데이터 분석으로 바꾼다
+- [x] 11. 명세 문서 (`docs/개발계획서3.md`, design §14)
+  - [x] 11.1 ★ 주요 데이터 형식의 `session` 예시에 `modelId`, `promptVersion`, `currentQuestion`을 넣고 `job`을 데이터 분석으로 바꾼다
     - _Requirements: 15.1, 15.2_
-  - [ ] 11.2 §5.2 `/start` 요청 예시의 `job`·`targetJob`, §5.4 리포트 예시의 `job`을 데이터 분석으로 바꾼다
+  - [x] 11.2 §5.2 `/start` 요청 예시의 `job`·`targetJob`, §5.4 리포트 예시의 `job`을 데이터 분석으로 바꾼다
     - _Requirements: 15.2_
-  - [ ] 11.3 §3 시연 행과 §7 질문 품질 문장을 데이터 분석으로 고친다
+  - [x] 11.3 §3 시연 행과 §7 질문 품질 문장을 데이터 분석으로 고친다
     - _Requirements: 15.3, 15.4_
-  - [ ] 11.4 §5.2 `/start` 요청 예시의 `profile`을 계약 `CareerProfileSummary` 형식(`projects`, `skills`, `needsConfirmation`, 계약 예시 `data-analysis-demo`와 같은 내용)으로 바꾸고, 필드 규칙 표의 `profile` 행을 계약 이름으로 고친다
+  - [x] 11.4 §5.2 `/start` 요청 예시의 `profile`을 계약 `CareerProfileSummary` 형식(`projects`, `skills`, `needsConfirmation`, 계약 예시 `data-analysis-demo`와 같은 내용)으로 바꾸고, 필드 규칙 표의 `profile` 행을 계약 이름으로 고친다
     - _Requirements: 15.5_
 
 - [ ] 12. 마무리
