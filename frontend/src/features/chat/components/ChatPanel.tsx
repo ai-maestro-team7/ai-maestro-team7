@@ -10,7 +10,7 @@ import { loginHref } from "@/features/auth/lib";
 import { useSessionOwner } from "@/features/auth/useSessionOwner";
 import { ApiError } from "@/lib/api";
 import { sendChat } from "../api";
-import { CHAT_EXAMPLES, chatHref } from "../lib";
+import { chatHref, HOME_EXAMPLES } from "../lib";
 import { AttachButton, PdfDropZone } from "./PdfAttach";
 import { ResumeForm } from "./ResumeForm";
 
@@ -102,7 +102,7 @@ function Launcher({ guest }: { guest: boolean }) {
         </p>
       )}
       <div className="flex flex-wrap items-center justify-center gap-2">
-        {CHAT_EXAMPLES.map((example) => (
+        {HOME_EXAMPLES.map((example) => (
           <Chip key={example} onClick={() => void start(example)} disabled={locked}>
             {example}
           </Chip>
