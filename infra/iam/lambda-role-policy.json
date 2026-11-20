@@ -1,0 +1,117 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Logs",
+      "Effect": "Allow",
+      "Action": [
+        "logs:CreateLogGroup",
+        "logs:CreateLogStream",
+        "logs:PutLogEvents"
+      ],
+      "Resource": "arn:aws:logs:ap-northeast-2:${ACCOUNT_ID}:log-group:/aws/lambda/team07-*"
+    },
+    {
+      "Sid": "DynamoDB",
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:Query",
+        "dynamodb:Scan",
+        "dynamodb:BatchGetItem",
+        "dynamodb:BatchWriteItem"
+      ],
+      "Resource": "arn:aws:dynamodb:ap-northeast-2:${ACCOUNT_ID}:table/team07-*"
+    },
+    {
+      "Sid": "S3Uploads",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::team07-uploads-${ACCOUNT_ID}/*",
+        "arn:aws:s3:::team07-career-docs-${ACCOUNT_ID}/*",
+        "arn:aws:s3:::team07-opp-data-${ACCOUNT_ID}/*"
+      ]
+    },
+    {
+      "Sid": "AsyncSelfInvoke",
+      "Effect": "Allow",
+      "Action": "lambda:InvokeFunction",
+      "Resource": "arn:aws:lambda:ap-northeast-2:${ACCOUNT_ID}:function:team07-*"
+    },
+    {
+      "Sid": "OppVectors",
+      "Effect": "Allow",
+      "Action": [
+        "s3vectors:QueryVectors",
+        "s3vectors:GetVectors",
+        "s3vectors:PutVectors",
+        "s3vectors:DeleteVectors"
+      ],
+      "Resource": "arn:aws:s3vectors:ap-northeast-2:${ACCOUNT_ID}:bucket/team07-opp-vectors/index/*"
+    },
+    {
+      "Sid": "OppDataList",
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::team07-opp-data-${ACCOUNT_ID}"
+    },
+    {
+      "Sid": "KnowledgeBaseRetrieve",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:Retrieve",
+        "bedrock:RetrieveAndGenerate"
+      ],
+      "Resource": "arn:aws:bedrock:ap-northeast-2:${ACCOUNT_ID}:knowledge-base/*"
+    },
+    {
+      "Sid": "Textract",
+      "Effect": "Allow",
+      "Action": [
+        "textract:DetectDocumentText",
+        "textract:StartDocumentTextDetection",
+        "textract:GetDocumentTextDetection"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Bedrock",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:InvokeModel",
+        "bedrock:InvokeModelWithResponseStream"
+      ],
+      "Resource": [
+        "arn:aws:bedrock:*:${ACCOUNT_ID}:inference-profile/global.anthropic.*",
+        "arn:aws:bedrock:*::foundation-model/anthropic.*",
+        "arn:aws:bedrock:ap-northeast-2::foundation-model/cohere.embed-*",
+        "arn:aws:bedrock:ap-northeast-2::foundation-model/amazon.titan-embed-*"
+      ]
+    },
+    {
+      "Sid": "InterviewAI",
+      "Effect": "Allow",
+      "Action": [
+        "polly:SynthesizeSpeech",
+        "rekognition:DetectFaces",
+        "transcribe:StartTranscriptionJob",
+        "transcribe:GetTranscriptionJob"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "SecretsRead",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": "arn:aws:secretsmanager:ap-northeast-2:${ACCOUNT_ID}:secret:team07/*"
+    }
+  ]
+}

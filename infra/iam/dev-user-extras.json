@@ -1,0 +1,141 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SecretsTeam07",
+      "Effect": "Allow",
+      "Action": "secretsmanager:*",
+      "Resource": "arn:aws:secretsmanager:ap-northeast-2:${ACCOUNT_ID}:secret:team07/*"
+    },
+    {
+      "Sid": "SqsTeam07",
+      "Effect": "Allow",
+      "Action": "sqs:*",
+      "Resource": "arn:aws:sqs:ap-northeast-2:${ACCOUNT_ID}:team07-*"
+    },
+    {
+      "Sid": "SchedulerTeam07",
+      "Effect": "Allow",
+      "Action": "scheduler:*",
+      "Resource": [
+        "arn:aws:scheduler:ap-northeast-2:${ACCOUNT_ID}:schedule-group/team07-*",
+        "arn:aws:scheduler:ap-northeast-2:${ACCOUNT_ID}:schedule/team07-*/*"
+      ]
+    },
+    {
+      "Sid": "CognitoCreateTagged",
+      "Effect": "Allow",
+      "Action": "cognito-idp:CreateUserPool",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/team": "team07"
+        }
+      }
+    },
+    {
+      "Sid": "CognitoManageTagged",
+      "Effect": "Allow",
+      "Action": "cognito-idp:*",
+      "Resource": "arn:aws:cognito-idp:ap-northeast-2:${ACCOUNT_ID}:userpool/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/team": "team07"
+        }
+      }
+    },
+    {
+      "Sid": "SesTeam07",
+      "Effect": "Allow",
+      "Action": [
+        "ses:CreateEmailIdentity",
+        "ses:GetEmailIdentity",
+        "ses:DeleteEmailIdentity",
+        "ses:SendEmail",
+        "ses:TagResource"
+      ],
+      "Resource": "arn:aws:ses:ap-northeast-2:${ACCOUNT_ID}:identity/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:ResourceTag/team": "team07"
+        }
+      }
+    },
+    {
+      "Sid": "SesCreateTagged",
+      "Effect": "Allow",
+      "Action": [
+        "ses:CreateEmailIdentity",
+        "ses:TagResource"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestTag/team": "team07"
+        }
+      }
+    },
+    {
+      "Sid": "CloudWatchTeam07",
+      "Effect": "Allow",
+      "Action": [
+        "cloudwatch:PutDashboard",
+        "cloudwatch:GetDashboard",
+        "cloudwatch:DeleteDashboards",
+        "cloudwatch:PutMetricAlarm",
+        "cloudwatch:DeleteAlarms"
+      ],
+      "Resource": [
+        "arn:aws:cloudwatch::${ACCOUNT_ID}:dashboard/team07-*",
+        "arn:aws:cloudwatch:ap-northeast-2:${ACCOUNT_ID}:alarm:team07-*"
+      ]
+    },
+    {
+      "Sid": "LogsReadTeam07",
+      "Effect": "Allow",
+      "Action": [
+        "logs:FilterLogEvents",
+        "logs:GetLogEvents",
+        "logs:DescribeLogStreams",
+        "logs:StartQuery",
+        "logs:GetQueryResults"
+      ],
+      "Resource": "arn:aws:logs:ap-northeast-2:${ACCOUNT_ID}:log-group:/aws/lambda/team07-*"
+    },
+    {
+      "Sid": "BudgetsTeam07",
+      "Effect": "Allow",
+      "Action": [
+        "budgets:ViewBudget",
+        "budgets:ModifyBudget"
+      ],
+      "Resource": "arn:aws:budgets::${ACCOUNT_ID}:budget/team07-*"
+    },
+    {
+      "Sid": "ReadOnlyLists",
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:ListSecrets",
+        "sqs:ListQueues",
+        "scheduler:ListSchedules",
+        "scheduler:ListScheduleGroups",
+        "cognito-idp:ListUserPools",
+        "sesv2:GetAccount",
+        "ses:GetAccount",
+        "ses:ListEmailIdentities",
+        "cloudwatch:ListDashboards",
+        "cloudwatch:DescribeAlarms",
+        "cloudwatch:GetMetricData",
+        "cloudwatch:ListMetrics",
+        "logs:DescribeLogGroups"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "BudgetsList",
+      "Effect": "Allow",
+      "Action": "budgets:ViewBudget",
+      "Resource": "arn:aws:budgets::${ACCOUNT_ID}:budget/*"
+    }
+  ]
+}

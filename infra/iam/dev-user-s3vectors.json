@@ -1,0 +1,20 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Team07VectorBuckets",
+      "Effect": "Allow",
+      "Action": "s3vectors:*",
+      "Resource": [
+        "arn:aws:s3vectors:ap-northeast-2:${ACCOUNT_ID}:bucket/team07-*",
+        "arn:aws:s3vectors:ap-northeast-2:${ACCOUNT_ID}:bucket/team07-*/index/*"
+      ]
+    },
+    {
+      "Sid": "ListOnly",
+      "Effect": "Allow",
+      "Action": "s3vectors:ListVectorBuckets",
+      "Resource": "*"
+    }
+  ]
+}
