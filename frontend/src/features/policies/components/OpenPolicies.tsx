@@ -9,7 +9,7 @@ import { PolicyTable, PolicyTableSkeleton } from "./PolicyTable";
 
 const HOME_COUNT = 3;
 
-/** 홈 "부산 청년 지원 정책": 지금 신청할 수 있는 정책 3개 */
+/** 홈 "지금 신청할 수 있는 청년 정책": 내 기본 정보로 지금 신청할 수 있는 정책 3개 (부산·전국) */
 export function OpenPolicies() {
   const username = useUsername();
   const [state, reload] = useApi<PolicyWalletResponse>(`${username}|home`, fetchPolicies);
