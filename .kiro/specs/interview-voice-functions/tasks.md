@@ -1,0 +1,53 @@
+# Implementation Plan
+
+기준: 이 폴더의 `requirements.md`, `design.md`, 이슈 #74. 브랜치 `feat/be/#74-interview-voice` (최신 `main` `a24e3a9`에서). 테스트는 저장소 루트에서 `uv run --no-project --python 3.13 --with-requirements ai/interview/requirements-dev.txt pytest ai/interview/tests -q`. 실패하면 실패한 테스트만 다시 돌린다.
+
+- [ ] 1. 설정 파일과 모델
+  - [ ] 1.1 `config/scoring_v1.json`(design §9)과 `config.py`의 `load_scoring_config()`를 만든다. 값은 노션 6-⑤와 대조한다
+    - `tests/test_config.py`: 읽기, 버전 일치, 깨진 값 → `AWS_SERVICE_ERROR`
+    - _Requirements: 6.1, 6.2, 6.3_
+  - [ ] 1.2 `models.py`에 `DeliveryMetrics`를 만들고 `AnswerRecord.delivery`(기본 None)를 추가한다. 평가 불가인데 `delivery`가 있으면 거절. 실수 필드는 int도 받는다
+    - `test_models.py`: 1차 형식 Session 통과, 카멜 키, int로 돌아온 측정값 통과
+    - _Requirements: 5.2, 5.3, 5.4_
+  - 커밋: `feat: 전달력 설정 파일과 측정값 모델 추가`
+
+- [ ] 2. 전달력 측정
+  - [ ] 2.1 `delivery.py`에 `measure_delivery`를 만든다 (design §7). 항목마다 자기 `min_answer_sec`를 쓴다
+  - [ ] 2.2 `tests/test_delivery.py`: 300음절/60초, 10초 `TOO_SHORT`, 영문 30% `NON_HANGUL_HEAVY`, 2초 공백 경계(1.9·2.0), 단어 없음
+    - _Requirements: 4.1~4.8_
+  - [ ] 2.3 `flow.py` `process_answer`에서 평가 가능 답변만 측정해 기록한다. `test_flow.py`에 정상·무응답·변환 실패·시간 초과 케이스 추가
+    - _Requirements: 5.1, 5.2, 5.5, 5.6_
+  - 커밋: `feat: 전달력 측정 추가`
+
+- [ ] 3. 질문 음성
+  - [ ] 3.1 `settings.py`에 Polly·Transcribe 상수(#69의 생각 끄기 설정은 그대로), `voice.py`에 클라이언트 함수 3개와 `synthesize_question`을 만든다 (design §3, §4)
+  - [ ] 3.2 `tests/fakes.py`에 `FakePolly`, `tests/test_voice.py`에 Polly 테스트(인자, 빈 문장, 실패 → None)
+    - _Requirements: 1.1~1.4_
+  - 커밋: `feat: 질문 음성 생성 함수 추가`
+
+- [ ] 4. 답변 변환
+  - [ ] 4.1 `voice.py`에 `start_transcription`, `get_transcription_result`, `_split_s3_uri`, `parse_transcript`를 만든다 (design §5, §6)
+  - [ ] 4.2 `samples/transcribe/` 4개 파일을 만든다
+  - [ ] 4.3 `FakeTranscribe`, `FakeS3.get_object`를 추가하고 `test_voice.py`에 design §12 표의 변환 케이스를 쓴다
+    - _Requirements: 2.1~2.6, 3.1~3.8_
+  - 커밋: `feat: 답변 음성 변환 함수 추가`
+
+- [ ] 5. 실제 음성 함수 연결
+  - [ ] 5.1 `__init__.py`를 `voice.py`에서 import하도록 바꾸고, `placeholders.py`에서 음성 함수 3개·`_s3_client`를 지운다. 모듈 설명의 "6개"를 "3개"로 고친다
+  - [ ] 5.2 `test_package.py`(시그니처 그대로, `import interview`가 boto3 없이도 성공), `test_placeholders.py`, `test_logging.py`, `test_backend_flow.py`를 고친다 (design §12)
+    - _Requirements: 7.1~7.3, 8.3, 8.4_
+  - 커밋: `feat: 음성 함수를 실제 구현으로 연결` (백엔드가 부르는 동작이 바뀌므로 `refactor`가 아님)
+
+- [ ] 6. 수동 확인 (실제 AWS, 사람이 실행)
+  - [ ] 6.1 `tests/test_voice_manual.py`를 만든다 (design §12). 기본 실행에서는 건너뛴다
+  - [ ] 6.2 백엔드 담당에게 수동 테스트 경로(`uploads/interview/manual-check/`) 사용을 확인받는다
+  - [ ] 6.3 프론트에서 받은 webm 녹음 1개와 2분 녹음 1개로 실행한다 (`botocore[crt]` 포함, design §12). 변환 시간이 240초·300초 안인지, 발화 속도를 PR 참고 사항에 적는다. mp3를 들어 보고 Polly 엔진을 정한다
+    - _Requirements: 8.5_
+  - 커밋: `test: 음성 함수 수동 확인 테스트 추가`
+
+- [ ] 7. 문서와 PR
+  - [ ] 7.1 `docs/개발계획서3.md` ★ `answers[]` 예시·`promptVersion`과 §11 체크 갱신 (design §14)
+  - [ ] 7.2 전체 테스트 통과 확인, PR 본문 참고 사항에 design §13 내용 정리
+  - [ ] 7.3 Session 형식 변경이라 백엔드 담당에게 리뷰를 요청하고 PR 링크를 팀 채널에 알린다
+  - 커밋: `docs: 음성 단계 명세 반영`
+  - PR 제목 `feat: 모의면접 음성 질문·답변 변환과 전달력 측정 구현`, 라벨 `feat`·`be`, 본문 `Closes #74`
