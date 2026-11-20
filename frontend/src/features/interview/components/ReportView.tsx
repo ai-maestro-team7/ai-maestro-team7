@@ -128,17 +128,9 @@ export function ReportView() {
             title={next.title}
             description={next.description}
             actions={
-              <>
-                <Button href={`/interview?${interviewQuery({ job, mode })}`} fullWidth>
-                  다시 연습하기
-                </Button>
-                <Button href="/review" variant="secondary" fullWidth>
-                  자소서 보완하기
-                </Button>
-                <Button href="/roadmap" variant="secondary" fullWidth>
-                  부족한 역량 학습하기
-                </Button>
-              </>
+              <Button href={`/interview?${interviewQuery({ job, mode })}`} fullWidth>
+                다시 연습하기
+              </Button>
             }
           />
         }

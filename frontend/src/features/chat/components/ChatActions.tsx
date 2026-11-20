@@ -5,7 +5,6 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { TextArea } from "@/components/ui/TextArea";
 import { ApiError, saveMyProfile } from "@/lib/api";
-import { saveFlow } from "@/features/mentoring/api";
 import type { BasicProfileInput } from "@/features/profile/types";
 import { interviewHref, writeHandoff } from "../lib";
 import type { ChatAction } from "../types";
@@ -13,46 +12,6 @@ import type { ChatAction } from "../types";
 type SaveAction = Extract<ChatAction, { type: "SAVE_CONDITIONS" }>;
 type StartAction = Extract<ChatAction, { type: "START_INTERVIEW" }>;
 type RequestAction = Extract<ChatAction, { type: "REQUEST_COVER_LETTER" }>;
-type DiagnosisAction = Extract<ChatAction, { type: "OPEN_DIAGNOSIS" }>;
-
-/** A 이력서·직무 진단을 시작했다. 진단 흐름을 저장하고 결과 화면(→ 첨삭·학습 로드맵)으로 간다 */
-export function OpenDiagnosis({ action }: { action: DiagnosisAction }) {
-  const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  function open() {
-    try {
-      saveFlow({
-        targetRole: action.job,
-        targetNcsCode: action.targetNcsCode ?? "",
-        documentId: action.documentId,
-        profileId: action.profileId,
-        profileVersion: action.profileVersion,
-        analysisId: action.analysisId,
-      });
-      router.push("/diagnosis/result");
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "진단 결과를 열지 못했어요.");
-    }
-  }
-  return (
-    <div className="flex flex-col gap-2.5 rounded-field bg-grey-50 p-4">
-      <p className="text-body font-bold text-grey-900">‘{action.job}’ 이력서·직무 진단</p>
-      <p className="text-small text-grey-600">
-        내 이력서와 비교해 강점과 보완할 역량을 찾고 있어요. 1분쯤 걸려요. 결과에서 AI 서류 첨삭과 학습 로드맵으로 이어 갈 수 있어요.
-      </p>
-      {error && (
-        <p role="alert" className="text-small text-red-500">
-          {error}
-        </p>
-      )}
-      <div>
-        <Button size="M" onClick={open}>
-          진단 결과 보기
-        </Button>
-      </div>
-    </div>
-  );
-}
 
 /** 대화 조건 저장 묻기 (D-40). 누를 때만 기본 프로필에 쓴다. */
 export function SaveConditions({ action }: { action: SaveAction }) {
