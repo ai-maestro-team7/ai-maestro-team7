@@ -55,6 +55,9 @@ export function subscribeHandoff(onChange: () => void): () => void {
 }
 
 /** 홈과 새 대화에서 보여 주는 예시 질문 */
+/** 홈 채팅창 예시. "이력서 붙여넣고 찾기"와 함께 세 개가 한 줄에 들어가게 둘만 둔다 */
+export const HOME_EXAMPLES = ["부산 데이터 분석 신입 공고 찾아줘", "내가 받을 수 있는 청년정책 알려줘"];
+
 export const CHAT_EXAMPLES = [
   "부산 데이터 분석 신입 공고 찾아줘",
   "연봉 3천 이상 부산 공기업 공고 알려줘",

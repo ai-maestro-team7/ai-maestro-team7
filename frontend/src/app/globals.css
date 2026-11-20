@@ -57,18 +57,6 @@
   --text-hero: 36px;
   --text-hero--line-height: 48px;
 
-  /* 홈 첫 화면 카드가 천천히 떠 있는 움직임 (움직임 줄이기 설정이면 화면 코드가 끈다) */
-  --animate-float: float 8s ease-in-out infinite;
-  @keyframes float {
-    0%,
-    100% {
-      transform: translateY(0);
-    }
-    50% {
-      transform: translateY(-8px);
-    }
-  }
-
   /* 모서리: 버튼 M·Chip·검색 8, 버튼 L·입력칸 10, 상자 12 */
   --radius-control: 8px;
   --radius-field: 10px;
@@ -101,3 +89,72 @@
     outline-offset: 2px;
   }
 }
+
+/*
+ * 홈 첫 화면 (HomeHero). 색은 위 토큰만 쓴다.
+ * - 커서를 따라 움직이는 옅은 파란 빛(.hero-glow)과, 커서 둘레에만 비치는 점 무늬(.hero-dots).
+ *   위치는 화면 코드가 --hero-x, --hero-y로 넣는다.
+ * - 제목 글자 물결(.wave-char): 커서가 지나가는 글자가 파랗게 떠오르고 양옆 글자가 따라 뜬다. 처음엔 차례로 올라온다.
+ * 움직임 줄이기 설정이면 글자는 움직이지 않고 색만 바뀐다.
+ */
+@layer components {
+  .hero-glow {
+    background: radial-gradient(
+      560px circle at var(--hero-x, 50%) var(--hero-y, 20%),
+      var(--color-blue-50),
+      transparent 70%
+    );
+  }
+
+  .hero-dots {
+    background-image: radial-gradient(var(--color-grey-300) 1.2px, transparent 1.6px);
+    background-size: 22px 22px;
+    -webkit-mask-image: radial-gradient(260px circle at var(--hero-x, 50%) var(--hero-y, 20%), black, transparent 72%);
+    mask-image: radial-gradient(260px circle at var(--hero-x, 50%) var(--hero-y, 20%), black, transparent 72%);
+  }
+
+  .wave-char {
+    display: inline-block;
+    transition:
+      transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+      color 0.2s ease;
+    /* backwards: 등장이 끝나면 애니메이션 값이 남지 않아 커서 효과가 그대로 먹는다 */
+    animation: hero-rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+    animation-delay: calc(var(--i, 0) * 35ms);
+  }
+
+  .wave-char:hover {
+    transform: translateY(-10px);
+    color: var(--color-blue-500);
+  }
+
+  .wave-char:hover + .wave-char,
+  .wave-char:has(+ .wave-char:hover) {
+    transform: translateY(-5px);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .wave-char {
+      animation: none;
+      transition: color 0.2s ease;
+    }
+
+    .wave-char:hover,
+    .wave-char:hover + .wave-char,
+    .wave-char:has(+ .wave-char:hover) {
+      transform: none;
+    }
+  }
+}
+
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
