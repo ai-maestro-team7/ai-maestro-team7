@@ -32,6 +32,7 @@ uv run --no-project --python 3.13 --with boto3 python test_app.py
 uv run --no-project --python 3.13 python test_eligibility.py
 uv run --no-project --python 3.13 --with boto3 --with "moto[dynamodb]" python test_me.py
 uv run --no-project --python 3.13 --with boto3 --with "moto[dynamodb,s3]" python test_interview.py
+uv run --no-project --python 3.13 --with boto3 --with "moto[dynamodb,scheduler]" --with-requirements ../ai/busan-opportunity/requirements.txt python test_opportunities.py
 
 # 코드 배포 (Lambda만)
 infra/deploy.sh

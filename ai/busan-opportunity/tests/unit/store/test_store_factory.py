@@ -77,7 +77,7 @@ def test_builds_every_part_from_env(env, config):
     assert isinstance(deps.events, EmfEvents)
     assert isinstance(deps.llm, FakeLlm) and deps.llm.kwargs["model_id"] == "global.test-llm"
     assert isinstance(deps.embedder, FakeEmbedder)
-    assert deps.embedder.kwargs["model_id"] == "test.embed" and deps.embedder.kwargs["dim"] == config.models.embed_dim
+    assert deps.embedder.kwargs["model_id"] == "test.embed" and deps.embedder.kwargs["config"] is config
     assert deps.llm.kwargs["client"] is deps.embedder.kwargs["client"]  # bedrock-runtime 클라이언트는 하나만
     assert deps.mailer is None  # 메일 설정이 없으면 알림함만
     assert deps.region_stats.rent == {} and deps.region_stats.commute == {}

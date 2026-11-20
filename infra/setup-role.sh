@@ -16,3 +16,14 @@ else
 fi
 aws iam put-role-policy --role-name "$ROLE" --policy-name ${PREFIX}-lambda-policy --policy-document "$POLICY"
 echo "  정책 적용: $(aws iam get-role-policy --role-name "$ROLE" --policy-name ${PREFIX}-lambda-policy --query 'PolicyDocument.Statement[].Sid' --output text)"
+
+# B 알림 일정용 역할: EventBridge Scheduler가 team07-api 를 부를 때 쓴다
+if aws iam get-role --role-name "$SCHEDULER_ROLE_NAME" >/dev/null 2>&1; then
+  echo "= $SCHEDULER_ROLE_NAME (이미 있음)"
+else
+  aws iam create-role --role-name "$SCHEDULER_ROLE_NAME" --assume-role-policy-document file://iam/scheduler-trust-policy.json \
+    --tags Key=team,Value=$PREFIX >/dev/null
+  echo "+ $SCHEDULER_ROLE_NAME"
+fi
+aws iam put-role-policy --role-name "$SCHEDULER_ROLE_NAME" --policy-name ${PREFIX}-scheduler-policy \
+  --policy-document "$(sed "s/\${ACCOUNT_ID}/$ACCOUNT_ID/g" iam/scheduler-role-policy.json)"

@@ -11,7 +11,7 @@ A(멘토링), B(부산 기회 추천), C(AI 모의면접) 명세의 공통 부�
 |---|---|---|
 | `/api/v1/interview/*` | C 모의면접 | ✅ 배포 (면접 함수는 대역, `interview/` 패키지가 들어오면 교체) |
 | `/api/v1/mentoring/*` | A 멘토링 (`/profiles/me`는 **역량 프로필**) | 연결 예정 (501) |
-| `/api/v1/opportunities/*` | B 부산 기회 추천 | 연결 예정 (501) |
+| `/api/v1/opportunities/*` | B 부산 기회 추천 | 연결됨 (`backend/opportunities_api.py`). 배포는 백엔드 담당 확인 후 |
 | `/api/v1/me/profile` (GET, PUT) | 공통 **기본 프로필** (`PROFILE#BASIC`). PUT은 보낸 필드만 수정, `null`이면 삭제 | ✅ |
 | `/api/v1/me/workspaces` (GET `?status=`, POST) · `/api/v1/me/workspaces/{wsId}` (GET, PATCH) | 워크스페이스 목록·생성(중복이면 기존 것)·상세(연결된 분석·첨삭·학습·면접)·상태와 문서 버전 변경 | ✅ |
 | `/api/v1/auth/*`, `/api/v1/me` | 로그인 | ✅ |

@@ -127,7 +127,7 @@ def test_scheduler_create_once_request(sched):
         "ScheduleExpressionTimezone": "Asia/Seoul", "ActionAfterCompletion": "DELETE",
         "FlexibleTimeWindow": {"Mode": "OFF"},
         "Target": {"Arn": ARN, "RoleArn": ROLE,
-                   "Input": json.dumps(payload, ensure_ascii=False, separators=(",", ":"))}})
+                   "Input": json.dumps({"oppSchedule": payload}, ensure_ascii=False, separators=(",", ":"))}})
     assert scheduler.create_once("opp-abc", clock.parse_as_of("2026-11-23T09:00:00+09:00"), payload) is True
     stub.assert_no_pending_responses()
 
@@ -138,7 +138,7 @@ def test_scheduler_converts_other_zones_to_seoul_time(sched):
     stub.add_response("create_schedule", {"ScheduleArn": "a"}, expected_params={
         "Name": "n", "ScheduleExpression": "at(2026-11-23T09:30:00)", "ScheduleExpressionTimezone": "Asia/Seoul",
         "ActionAfterCompletion": "DELETE", "FlexibleTimeWindow": {"Mode": "OFF"},
-        "Target": {"Arn": ARN, "RoleArn": ROLE, "Input": "{}"}})
+        "Target": {"Arn": ARN, "RoleArn": ROLE, "Input": "{\"oppSchedule\":{}}"}})
     assert scheduler.create_once("n", utc, {}) is True
 
 
@@ -174,7 +174,7 @@ def test_scheduler_group_name_is_passed_when_given():
         stub.add_response("create_schedule", {"ScheduleArn": "a"}, expected_params={
             "Name": "n", "GroupName": "team07-opp", "ScheduleExpression": "at(2026-11-23T09:00:00)",
             "ScheduleExpressionTimezone": "Asia/Seoul", "ActionAfterCompletion": "DELETE",
-            "FlexibleTimeWindow": {"Mode": "OFF"}, "Target": {"Arn": ARN, "RoleArn": ROLE, "Input": "{}"}})
+            "FlexibleTimeWindow": {"Mode": "OFF"}, "Target": {"Arn": ARN, "RoleArn": ROLE, "Input": "{\"oppSchedule\":{}}"}})
         scheduler.create_once("n", clock.parse_as_of("2026-11-23T09:00:00+09:00"), {})
         stub.add_response("delete_schedule", {}, expected_params={"Name": "n", "GroupName": "team07-opp"})
         scheduler.delete("n")

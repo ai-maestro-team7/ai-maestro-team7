@@ -13,14 +13,21 @@ CAREER_DOCS_BUCKET=${PREFIX}-career-docs-${ACCOUNT_ID}   # 명세 §7.2 개인 �
 KB_SOURCE_BUCKET=${PREFIX}-kb-source-${ACCOUNT_ID}       # 명세 §7.2 KB 원천 (docs/ 13쌍만)
 OPP_DATA_BUCKET=${PREFIX}-opp-data-${ACCOUNT_ID}         # B: raw/, normalized/, seed/, snapshots/, runs/
 OPP_VECTOR_BUCKET=${PREFIX}-opp-vectors                  # B: S3 Vectors, 인덱스 postings-v1
+OPP_VECTOR_INDEX=postings-v1
+CATALOG_TABLE=${PREFIX}-catalog
+
+# Bedrock 모델 (docs/team-guide.md). 코드에는 환경변수로만 넣는다
+MODEL_ID=${MODEL_ID:-global.anthropic.claude-haiku-5-5}
+EMBEDDING_MODEL_ID=${EMBEDDING_MODEL_ID:-cohere.embed-v4:0}
+
+# B 알림 일정: EventBridge Scheduler가 이 역할로 Lambda를 부른다 (infra/setup-role.sh 가 만든다)
+SCHEDULER_ROLE_NAME=${PREFIX}-scheduler-role
+SCHEDULER_ROLE_ARN=arn:aws:iam::${ACCOUNT_ID}:role/${SCHEDULER_ROLE_NAME}
 
 # Lambda 실행 역할 (infra/setup-role.sh 가 만든다)
 
 ROLE_ARN=${ROLE_ARN:-arn:aws:iam::${ACCOUNT_ID}:role/${PREFIX}-lambda-role}
 
-# Bedrock 모델 (코드에 넣지 않고 Lambda 환경 변수로, AGENTS.md "코딩 규칙"). 서울 리전은 global. 프로필로만 호출
-MODEL_ID=${MODEL_ID:-global.anthropic.claude-haiku-5-5}
-EMBEDDING_MODEL_ID=${EMBEDDING_MODEL_ID:-cohere.embed-v4:0}
 
 # 프론트 주소가 정해지면 바꾼다. 개발 중에는 * (모두 허용)
 ALLOWED_ORIGIN=${ALLOWED_ORIGIN:-*}
