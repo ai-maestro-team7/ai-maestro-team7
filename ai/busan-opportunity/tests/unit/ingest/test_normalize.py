@@ -1,6 +1,7 @@
 """normalize.py: 원본 → 스냅샷·정책·기업.
 
-공고 샘플(work24_*, alio_*)은 응답을 확인하기 전에 임시 매핑표에 맞춰 만든 가짜 데이터다.
+고용24 공고 샘플(work24_list·detail)은 응답을 확인하기 전에 임시 매핑표에 맞춰 만든 가짜 데이터다.
+잡알리오 공고(alio_*)는 `test_normalize_alio.py`에서 본다.
 정책(youthcenter_*), 강소기업(work24_gangso_*), 지역·직종 코드(work24_codes_*) 샘플은
 2026-11-20 실제 응답에서 뽑았고 담당자·대표자 이름은 비웠다.
 """
@@ -14,7 +15,6 @@ from opportunity.ingest.http import as_list, parse_body, walk
 from opportunity.ingest.normalize import (
     SkipRecord,
     compute_content_hash,
-    normalize_alio,
     normalize_gangso,
     normalize_work24,
     normalize_youthcenter,
@@ -160,20 +160,6 @@ def test_bad_or_missing_fields_skip_the_record(as_of):
     with pytest.raises(SkipRecord) as caught:
         normalize_work24({**record, "title": ""}, as_of=as_of)
     assert caught.value.reason == "missing_title"
-
-
-def test_alio_postings(as_of):
-    parsed = parse_body((FIXTURES / "alio_list_p1.json").read_bytes())
-    rows = walk(parsed, ("result",))
-    first = normalize_alio(rows[0], as_of=as_of)
-    assert first.job_posting_id == "alio-2026001" and first.source == PostingSource.ALIO
-    assert first.org_type == OrgType.PUBLIC_INSTITUTION and first.work_region.sido == "26"
-    assert first.education_min == EducationLevel.NONE and first.salary.disclosed is False
-    multi = normalize_alio(rows[1], as_of=as_of)
-    assert multi.work_region.unknown is True and "여러 곳" in multi.work_region.label
-    assert multi.employment_type == EmploymentType.UNKNOWN  # 정규직과 계약직이 함께 적혀 있다
-    with pytest.raises(SkipRecord):
-        normalize_alio(rows[2], as_of=as_of)
 
 
 @pytest.mark.parametrize("raw,kind,expected", [

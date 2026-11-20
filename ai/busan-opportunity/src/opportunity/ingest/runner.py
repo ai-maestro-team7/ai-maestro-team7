@@ -1,5 +1,7 @@
 """수집 배치 실행기. 출처마다 목록 → 정규화 → 상세 → 적재를 돌리고 결과를 `runs/{날짜}.json`에 남긴다.
 
+상세는 매핑표의 `detail.enabled`가 False면 부르지 않는다 (잡알리오는 목록에 내용이 다 온다).
+
 한 출처가 실패해도 나머지는 계속한다. 인증키와 키가 든 URL은 결과·로그·저장 경로 어디에도 남기지 않는다.
 """
 
@@ -66,6 +68,9 @@ def _run_postings(name: str, config, catalog, raw_store, keys, *, when, day, htt
     module, normalize = POSTING_SOURCES[name]
     client = module.client(keys, raw_store, day=day, http_get=http_get, sleep=sleep)
     job_codes = _load_job_codes(raw_store) if name == "work24" else {}
+    # 잡알리오는 근무지가 여러 곳이면 부산을 먼저 본다 (`normalize.parse_alio_region`)
+    extra = {"first_sido": config.data.busan_sido} if name == "alio" else {}
+    detail_on = client.spec.get("detail", {}).get("enabled", True)
 
     pages = client.fetch_list()
     skipped: dict[str, int] = {}
@@ -73,7 +78,7 @@ def _run_postings(name: str, config, catalog, raw_store, keys, *, when, day, htt
     records: dict[str, dict] = {}
     for record in pages.records:
         try:
-            snap = normalize(record, as_of=when, job_codes=job_codes)
+            snap = normalize(record, as_of=when, job_codes=job_codes, **extra)
         except SkipRecord as e:
             skipped[e.reason] = skipped.get(e.reason, 0) + 1
             continue
@@ -81,7 +86,7 @@ def _run_postings(name: str, config, catalog, raw_store, keys, *, when, day, htt
         records[snap.job_posting_id] = record
 
     fetched = failed = 0
-    for posting_id, snap in list(snapshots.items()):
+    for posting_id, snap in list(snapshots.items()) if detail_on else []:
         if fetched + failed >= DETAIL_MAX_PER_RUN:
             pages.warnings.append(f"상세 호출 상한 {DETAIL_MAX_PER_RUN}건에서 멈춤")
             break
@@ -97,7 +102,8 @@ def _run_postings(name: str, config, catalog, raw_store, keys, *, when, day, htt
             continue
         fetched += 1
         try:
-            snapshots[posting_id] = normalize(records[posting_id], as_of=when, detail=detail, job_codes=job_codes)
+            snapshots[posting_id] = normalize(records[posting_id], as_of=when, detail=detail, job_codes=job_codes,
+                                              **extra)
         except SkipRecord as e:  # 상세 때문에 정규화가 깨지면 목록 값으로 둔다
             pages.warnings.append(f"상세 정규화 건너뜀 {posting_id}: {e.reason}")
 

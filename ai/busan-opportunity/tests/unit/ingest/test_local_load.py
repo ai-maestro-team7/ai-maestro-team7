@@ -5,6 +5,7 @@ import shutil
 
 from opportunity.ingest import local_load
 from opportunity.models.policy import Policy
+from opportunity.models.posting import PostingSnapshot
 
 FIXTURES = __import__("pathlib").Path(__file__).parent / "fixtures"
 DAY = "2026-11-20"
@@ -21,6 +22,10 @@ def make_raw(tmp_path, *, with_codes=True):
     shutil.copy(FIXTURES / "work24_gangso_region26000_p1.xml", gangso / "region26000_p001.xml")
     (gangso / "region11000_p001.xml").write_bytes(b"<smallGiantsList><total>0</total></smallGiantsList>")
     (youth / "policies_p002.json").write_bytes(b"{not json")  # 깨진 파일은 세고 넘어간다
+    alio = raw / "alio" / DAY
+    alio.mkdir(parents=True)
+    shutil.copy(FIXTURES / "alio_list_p1.json", alio / "list_p001.json")
+    shutil.copy(FIXTURES / "alio_detail_307276.json", alio / "detail_307276.json")  # 상세는 읽지 않는다
     if with_codes:
         codes = raw / "work24_codes" / DAY
         codes.mkdir(parents=True)
@@ -49,6 +54,35 @@ def test_load_summarizes_counts(tmp_path):
     assert catalog.get_policy("ythc-20261106005400214758").regions[0].sigungu == "43110"
 
 
+def test_load_summarizes_postings(tmp_path):
+    catalog, summary, _, _ = local_load.load(make_raw(tmp_path), DAY)
+    a = summary["postings"]
+    assert (a["listed"], a["apiTotal"], a["normalized"], a["stored"], a["failed"]) == (6, 6, 6, 6, 0)
+    assert a["region"] == {
+        "busanAny": 3, "busanOnly": 2, "busanMulti": 1, "isBusan": 3, "isCapitalArea": 1,
+        "capitalAny": 3,  # 서울 한 곳 + 서울·인천·경기가 든 307276·307285
+        "capitalOnly": 1, "multiRegion": 2, "unknown": 1,
+        "bySido": {"11": 1, "26": 3, "27": 1, "unknown": 1}}
+    assert a["employmentType"] == {"CONTRACT": 3, "FULL_TIME": 1, "INTERN": 2}
+    assert a["educationMin"] == {"BACHELOR": 1, "NONE": 5}
+    assert a["careerType"] == {"ANY": 3, "EXPERIENCED": 1, "NEW": 2}
+    assert a["rolling"] == 1 and a["expired"] == 0 and a["withOfficialUrl"] == 6
+    assert a["upsert"] == {"created": 6, "updated": 0, "unchanged": 0, "needsEnrich": 6}
+    assert catalog.get_latest("alio-307276").is_busan
+    assert catalog.get_snapshot("alio-307276", catalog.get_latest("alio-307276").snapshot_id).documents == []
+
+
+def test_load_counts_unreadable_and_skipped_postings(tmp_path):
+    raw = make_raw(tmp_path)
+    folder = raw / "alio" / DAY
+    (folder / "list_p002.json").write_bytes(b"{broken")
+    (folder / "list_p003.json").write_text(json.dumps({"totalCount": 1, "result": [
+        {"recrutPblntSn": 1, "instNm": "기관", "recrutPbancTtl": "제목", "pbancEndYmd": ""}]}), encoding="utf-8")
+    _, summary, _, _ = local_load.load(raw, DAY)
+    assert summary["postings"]["failedBy"] == {"no_deadline": 1, "unreadable_file": 1}
+    assert summary["postings"]["stored"] == 6
+
+
 def test_load_without_code_tables(tmp_path):
     catalog, summary, _, _ = local_load.load(make_raw(tmp_path, with_codes=False), DAY)
     assert summary["codes"] == {"regions": 0, "jobs": 0} and summary["policies"]["normalized"] == 8
@@ -60,13 +94,17 @@ def test_main_writes_jsonl(tmp_path, capsys):
     assert local_load.main(["--raw", str(raw), "--day", DAY, "--out", str(tmp_path / "data")]) == 0
     printed = json.loads(capsys.readouterr().out)
     folder = tmp_path / "data" / "normalized" / DAY
-    assert printed["written"] == {"policies": 8, "companies": 3, "dir": str(folder)}
+    assert printed["written"] == {"policies": 8, "companies": 3, "postings": 6, "dir": str(folder)}
     lines = (folder / "policies.jsonl").read_text(encoding="utf-8").splitlines()
     first = json.loads(lines[0])
     assert first["policyId"].startswith("ythc-") and first["source"] == "YOUTHCENTER"  # 카멜 표기
     assert Policy.model_validate(first).verified is True  # 다시 읽으면 같은 모델
     company = json.loads((folder / "companies.jsonl").read_text(encoding="utf-8").splitlines()[0])
     assert company["companyId"].startswith("biz-") and company["highlights"][0]["asOf"] == "2024"
+    postings = [json.loads(line) for line in (folder / "postings.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert [p["jobPostingId"] for p in postings] == sorted(p["jobPostingId"] for p in postings)
+    assert postings[0]["workRegion"]["label"] and postings[0]["source"] == "ALIO"
+    assert PostingSnapshot.model_validate(postings[0]).job_posting_id == postings[0]["jobPostingId"]
 
 
 def test_main_without_out_writes_nothing(tmp_path, capsys):

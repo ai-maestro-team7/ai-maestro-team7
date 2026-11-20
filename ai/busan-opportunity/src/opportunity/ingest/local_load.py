@@ -7,8 +7,10 @@
 - `youthcenter/`: `policies_p*.json`(손으로 받은 것) 또는 `list-*.json`(수집 실행기가 남긴 것)
 - `work24_gangso/`: `region{코드}_p*.xml` 또는 `region{코드}-*.xml`
 - `work24_codes/`: `CMCD_1.xml`(지역), `CMCD_2.xml`(직종). 없으면 표 없이 정규화한다.
+- `alio/`: `list_p*.json`(손으로 받은 것) 또는 `list-*.json`(수집 실행기가 남긴 것). 상세(`detail_*.json`)는 읽지 않는다.
 
-`--out DIR`을 주면 `DIR/normalized/{day}/policies.jsonl`, `companies.jsonl`(카멜 표기 JSON 한 줄에 하나)을 쓴다.
+`--out DIR`을 주면 `DIR/normalized/{day}/policies.jsonl`, `companies.jsonl`, `postings.jsonl`
+(카멜 표기 JSON 한 줄에 하나. 공고는 최신 스냅샷)을 쓴다.
 요약에는 건수와 이유만 남긴다. 원문, 담당자 이름, 인증키는 출력하지 않는다.
 """
 
@@ -23,15 +25,17 @@ from ..config import OpportunityConfig, load_config
 from ..core import clock
 from ..models.enums import PeriodType
 from ..models.policy import ALWAYS_APPLY_END, Policy
+from ..models.posting import PostingSnapshot
 from ..store.memory import MemoryCatalog
 from . import codes
-from .field_maps import WORK24_GANGSO, YOUTHCENTER
+from .field_maps import ALIO, WORK24_GANGSO, YOUTHCENTER
 from .http import FetchError, as_list, parse_body, walk
-from .normalize import SkipRecord, normalize_gangso, normalize_youthcenter
-from .pipeline import upsert_companies, upsert_policies
+from .normalize import SkipRecord, normalize_alio, normalize_gangso, normalize_youthcenter, parse_alio_region
+from .pipeline import upsert_companies, upsert_policies, upsert_postings
 
 POLICY_PATTERNS = ("policies_p*.json", "list-*.json")
 GANGSO_PATTERNS = ("region*_p*.xml", "region*-*.xml")
+POSTING_PATTERNS = ("list_p*.json", "list-*.json")
 REGION_CODES_FILE = "CMCD_1.xml"
 JOB_CODES_FILE = "CMCD_2.xml"
 SEOUL_SIDO = "11"  # 요약에서 서울 건수를 셀 때만 쓴다
@@ -101,6 +105,80 @@ def is_open(policy: Policy, today: str) -> bool:
     return policy.apply_end == ALWAYS_APPLY_END or today <= policy.apply_end
 
 
+def stored_postings(catalog: MemoryCatalog) -> list[PostingSnapshot]:
+    """공고마다 LATEST가 가리키는 스냅샷. ID 순서다."""
+    rows = (catalog.get_snapshot(i, latest.snapshot_id) for i, latest in sorted(catalog.latest.items()))
+    return [row for row in rows if row is not None]
+
+
+def _load_postings(folder: Path, config: OpportunityConfig, catalog: MemoryCatalog, as_of) -> dict:
+    """잡알리오 목록 파일을 정규화해 넣고 건수를 센다. 부산·수도권 건수는 근무지 이름 목록 전체로도 센다."""
+    busan = config.data.busan_sido
+    capital = set(config.data.capital_area_sido)
+    failures: Counter = Counter()
+    records, totals = _read_items(_files(folder, POSTING_PATTERNS), ALIO, failures)
+    snapshots: dict[str, PostingSnapshot] = {}
+    listed_sidos: dict[str, set[str]] = {}
+    listed_count: dict[str, int] = {}
+    duplicates = 0
+    region_field = ALIO["fields"]["region_names"]
+    for record in records:
+        try:
+            snap = normalize_alio(record, as_of=as_of, first_sido=busan)
+        except SkipRecord as e:
+            failures[e.reason] += 1
+            continue
+        except ValueError:
+            failures["invalid_model"] += 1
+            continue
+        if snap.job_posting_id in snapshots:
+            duplicates += 1
+        snapshots[snap.job_posting_id] = snap
+        names = [n.strip() for n in str(record.get(region_field) or "").split(",") if n.strip()]
+        listed_count[snap.job_posting_id] = len(set(names))
+        listed_sidos[snap.job_posting_id] = {
+            r.sido for r in (parse_alio_region(n) for n in names) if r.sido and not r.unknown}
+    stats = upsert_postings(config, catalog, list(snapshots.values()), as_of=as_of)
+    stats["needsEnrich"] = len(stats["needsEnrich"])
+
+    stored = [s for s in stored_postings(catalog) if s.job_posting_id in snapshots]
+    latest = [catalog.get_latest(s.job_posting_id) for s in stored]
+    sidos = [listed_sidos.get(s.job_posting_id, set()) for s in stored]
+    counts = [listed_count.get(s.job_posting_id, 0) for s in stored]
+
+    def dist(values) -> dict:
+        return dict(sorted(Counter(values).items()))
+
+    return {
+        "listed": len(records),
+        "apiTotal": sum(totals.values()) if len(totals) == 1 else totals,
+        "normalized": len(snapshots),
+        "duplicates": duplicates,
+        "stored": len(stored),
+        "region": {
+            "busanAny": sum(busan in found for found in sidos),          # 근무지 목록에 부산이 있다
+            "busanOnly": sum(found == {busan} and n == 1 for found, n in zip(sidos, counts)),  # 부산 한 곳
+            "busanMulti": sum(busan in found and n > 1 for found, n in zip(sidos, counts)),
+            "isBusan": sum(row.is_busan for row in latest),             # LATEST 기준 (여러 곳이면 부산 우선)
+            "isCapitalArea": sum(row.is_capital_area for row in latest),
+            "capitalAny": sum(bool(found & capital) for found in sidos),
+            "capitalOnly": sum(bool(found) and found <= capital for found in sidos),
+            "multiRegion": sum(n > 1 for n in counts),
+            "unknown": sum(s.work_region.unknown for s in stored),
+            "bySido": dist(s.work_region.sido or "unknown" for s in stored),
+        },
+        "employmentType": dist(s.employment_type.value for s in stored),
+        "educationMin": dist(s.education_min.value if s.education_min else "UNKNOWN" for s in stored),
+        "careerType": dist(s.career_type.value for s in stored),
+        "rolling": sum(s.rolling for s in stored),
+        "expired": sum(row.is_expired for row in latest),
+        "withOfficialUrl": sum(s.official_url is not None for s in stored),
+        "failed": sum(failures.values()),
+        "failedBy": dict(sorted(failures.items())),
+        "upsert": stats,
+    }
+
+
 def load(raw: Path, day: str, *, config: OpportunityConfig | None = None,
          catalog: MemoryCatalog | None = None) -> tuple[MemoryCatalog, dict, list[Policy], list]:
     """원본을 읽어 정규화하고 메모리 저장소에 넣는다. (저장소, 요약, 정책 목록, 기업 목록)을 돌려준다."""
@@ -152,6 +230,9 @@ def load(raw: Path, day: str, *, config: OpportunityConfig | None = None,
         companies[company.company_id] = company
     company_stats = upsert_companies(catalog, list(companies.values()))
 
+    # 공고 (잡알리오)
+    posting_summary = _load_postings(raw / "alio" / day, config, catalog, as_of)
+
     stored = list(catalog.policies.values())
     key_counts = Counter(p.region_key() for p in stored)
     touches = Counter(s for p in stored for s in {r.sido for r in p.regions if r.sido})
@@ -188,6 +269,7 @@ def load(raw: Path, day: str, *, config: OpportunityConfig | None = None,
             "failedBy": dict(sorted(company_failures.items())),
             "upsert": company_stats,
         },
+        "postings": posting_summary,
     }
     return catalog, summary, stored, list(catalog.companies.values())
 
@@ -210,12 +292,13 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     raw = args.raw.expanduser()
-    _, summary, policies, companies = load(raw, args.day)
+    catalog, summary, policies, companies = load(raw, args.day)
     if args.out:
         folder = args.out.expanduser() / "normalized" / args.day
         summary["written"] = {
             "policies": write_jsonl(folder / "policies.jsonl", sorted(policies, key=lambda p: p.policy_id)),
             "companies": write_jsonl(folder / "companies.jsonl", sorted(companies, key=lambda c: c.company_id)),
+            "postings": write_jsonl(folder / "postings.jsonl", stored_postings(catalog)),
             "dir": str(folder),
         }
     json.dump(summary, sys.stdout, ensure_ascii=False, indent=2)

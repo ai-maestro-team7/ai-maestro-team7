@@ -47,8 +47,11 @@ class FakeApi:
             return fixture_bytes(f"work24_detail_{param(url, 'wantedAuthNo')}.xml")
         if "recruitment/list" in url:
             return fixture_bytes("alio_list_p1.json")
-        if "recruitment/detail" in url:
-            return fixture_bytes(f"alio_detail_{param(url, 'sn')}.json")
+        if "recruitment/detail" in url:  # 샘플이 없는 공고는 빈 결과를 준다
+            name = f"alio_detail_{param(url, 'sn')}.json"
+            if (FIXTURES / name).exists():
+                return fixture_bytes(name)
+            return b'{"resultCode": 200, "resultMsg": "ok", "result": null}'
         if "getPlcy" in url:
             return fixture_bytes("youthcenter_list_p1.json")
         if "callOpenApiSvcInfo216L01" in url:  # 강소기업은 부산 샘플만 있다. 다른 지역은 빈 목록

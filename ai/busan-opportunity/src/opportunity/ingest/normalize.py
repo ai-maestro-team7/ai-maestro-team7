@@ -28,6 +28,7 @@ from ..models.enums import (
     PolicyStage,
     PostingSource,
     RegionScope,
+    RuleType,
     Selection,
     SourceType,
 )
@@ -45,6 +46,7 @@ from ..models.posting import (
     Badge,
     Company,
     CompanyRecord,
+    EligibilityRule,
     Job,
     PostingSnapshot,
     Salary,
@@ -54,6 +56,14 @@ from . import codes
 from .field_maps import (
     AGE_ONLY_WHEN_LIMIT_FLAG_Y,
     ALIO,
+    ALIO_CAREER,
+    ALIO_EDUCATION,
+    ALIO_EMPLOYMENT,
+    ALIO_JOB_NAME_SHOWN,
+    ALIO_NATIONAL_NAMES,
+    ALIO_ROLLING_MIN_DAYS,
+    ALIO_ROLLING_TITLE_WORDS,
+    ALIO_URL_BLANKS,
     APPLY_PERIOD_ALWAYS,
     BLANK_CONDITION_TEXTS,
     CATEGORY_MAP,
@@ -372,11 +382,196 @@ def normalize_work24(record: Mapping, *, as_of, detail: Mapping | None = None,
                               org_type=OrgType.PRIVATE, source=PostingSource.WORK24)
 
 
-def normalize_alio(record: Mapping, *, as_of, detail: Mapping | None = None,
-                   job_codes: Mapping | None = None) -> PostingSnapshot:
-    """잡알리오 채용공시 → 스냅샷. ID는 `alio-{공시번호}`."""
-    return _normalize_posting(ALIO, record, detail, as_of=as_of, job_codes=job_codes,
-                              org_type=OrgType.PUBLIC_INSTITUTION, source=PostingSource.ALIO)
+# ---------------------------------------------------------------- 공고 (잡알리오)
+ALIO_MULTI_REGION_LABEL = "{first} 외 {rest}개 지역"
+ALIO_NATIONAL_LABEL = "전국 · 근무지 공고문 확인"
+ALIO_OTHER_REGION_LABEL = "{names} · 근무지 공고문 확인"
+ALIO_DESCRIPTION_HEADINGS = ("지원 자격", "우대", "전형 절차")
+_FILE_NUMBER = re.compile(r"^\s*\d+\s*[.)]\s*")
+_FILE_EXTENSION = re.compile(r"\.[A-Za-z0-9]{2,5}$")
+
+
+def _names(raw: str) -> list[str]:
+    """쉼표로 이은 이름 목록. 빈 칸은 버리고 처음 나온 순서대로 중복을 뺀다."""
+    return list(dict.fromkeys(part.strip() for part in (raw or "").split(",") if part.strip()))
+
+
+def _sido_by_name() -> dict[str, str]:
+    """시·도 이름 → 코드. 공용 이름표(`core/regions.SIDO_NAMES`)에 2026년 통합 시·도(전남광주)를 더한다."""
+    return {name: code for code, name in {**SIDO_NAMES, **EXTRA_SIDO_NAMES}.items()}
+
+
+def parse_alio_region(raw: str, *, first_sido: str | None = None) -> WorkRegion:
+    """잡알리오 근무지 이름 목록 → 근무지 하나. 시·군·구 코드가 없어서 sigungu는 늘 None이다.
+
+    - 한 곳이면 그 시·도. 여러 곳이면 first_sido(부산)가 들어 있을 때 그 시·도, 없으면 첫 지역을 sido로 두고
+      label에 "부산 외 3개 지역"처럼 여러 곳임을 적는다. "외 N"에는 시·도가 아닌 이름(해외)도 센다.
+    - "전국"이 있으면 근무지를 하나로 정할 수 없어 unknown이다. 시·도 이름이 하나도 없으면(해외) unknown.
+    """
+    names = _names(raw)
+    if not names:
+        return WorkRegion(unknown=True)
+    if any(name in ALIO_NATIONAL_NAMES for name in names):
+        return WorkRegion(unknown=True, label=ALIO_NATIONAL_LABEL)
+    by_name = _sido_by_name()
+    known = [(name, by_name[name]) for name in names if name in by_name]
+    if not known:
+        return WorkRegion(unknown=True, label=ALIO_OTHER_REGION_LABEL.format(names=" · ".join(names)))
+    first_name, sido = next(((n, c) for n, c in known if c == first_sido), known[0])
+    if len(names) == 1:
+        return WorkRegion(sido=sido, label=first_name)
+    return WorkRegion(sido=sido, label=ALIO_MULTI_REGION_LABEL.format(first=first_name, rest=len(names) - 1))
+
+
+def parse_alio_employment(raw: str) -> EmploymentType:
+    """고용 형태 이름 목록. 모두 같은 종류일 때만 값을 둔다 (무기계약직+비정규직 → CONTRACT, 정규직+비정규직 → UNKNOWN)."""
+    found = {ALIO_EMPLOYMENT.get(name.replace(" ", "")) or parse_employment(name) for name in _names(raw)}
+    return next(iter(found)) if len(found) == 1 else EmploymentType.UNKNOWN
+
+
+def parse_alio_career(raw: str) -> CareerType:
+    name = (raw or "").replace(" ", "")
+    return ALIO_CAREER.get(name) or parse_career(name)
+
+
+def parse_alio_education(raw: str) -> EducationLevel | None:
+    """학력 조건 이름 목록에서 가장 낮은 학력. 표에 없는 이름은 글로 읽는다 (`parse_education`)."""
+    levels = [ALIO_EDUCATION.get(name.replace(" ", "")) or parse_education(name) for name in _names(raw)]
+    levels = [level for level in levels if level is not None]
+    return min(levels, key=_EDUCATION_ORDER.index) if levels else None
+
+
+def parse_alio_job(ncs_names: str, ncs_codes: str, title: str) -> Job:
+    """NCS 분류 이름으로 직무 이름을 만든다. 고용24 직종 코드가 없어서 code·middle은 None이다."""
+    names, codes_ = _names(ncs_names), _names(ncs_codes)
+    shown = " · ".join(names[:ALIO_JOB_NAME_SHOWN])
+    if len(names) > ALIO_JOB_NAME_SHOWN:
+        shown += f" 외 {len(names) - ALIO_JOB_NAME_SHOWN}"
+    return Job(code=None, middle=None, major=names[0] if names else None, name=shown or title, ncs_codes=codes_)
+
+
+def alio_url(raw: str) -> str | None:
+    """기관 누리집 주소. "없음"·"." 같은 값은 버리고, 앞뒤 공백을 지우고, `www.`로 시작하면 https://를 붙인다."""
+    value = (raw or "").strip()
+    if not value or value in ALIO_URL_BLANKS or any(ch.isspace() for ch in value):
+        return None
+    if value.lower().startswith("www."):
+        value = "https://" + value
+    return http_url(value)
+
+
+def _paragraph(raw: str) -> str:
+    lines = [line.rstrip() for line in (raw or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+    return meaningful("\n".join(lines).strip())
+
+
+def alio_description(qualification: str, preference: str, targets: str, selection: str) -> str | None:
+    """지원 자격, 우대, 전형 글을 "[제목]" 아래에 이어 한 글로 만든다. 요건 추출(enrich)이 이 글을 읽는다.
+
+    우대 대상 목록(prefCondCn)이 우대 내용(prefCn)에 그대로 들어 있으면 한 번만 쓴다.
+    """
+    pref = _paragraph(preference)
+    target = _paragraph(targets)
+    if target and target not in pref:
+        pref = "\n".join(p for p in (f"우대 대상: {target}", pref) if p)
+    sections = zip(ALIO_DESCRIPTION_HEADINGS, (_paragraph(qualification), pref, _paragraph(selection)))
+    parts = [f"[{heading}]\n{body}" for heading, body in sections if body]
+    return "\n\n".join(parts) or None
+
+
+def alio_documents(files: Any, name_key: str) -> list[str]:
+    """첨부 파일 이름 → 서류 이름. 앞 번호("1. ")와 확장자를 뗀다. 상세에만 파일 목록이 온다."""
+    rows = [f for f in (files if isinstance(files, list) else []) if isinstance(f, Mapping)]
+    rows.sort(key=lambda f: (f.get("sortNo") is None, f.get("sortNo") or 0))
+    out: list[str] = []
+    for row in rows:
+        name = _FILE_EXTENSION.sub("", _FILE_NUMBER.sub("", text_of(row.get(name_key)))).strip()
+        if name and name not in out:
+            out.append(name)
+    return out
+
+
+def _alio_closes(raw: str) -> str | None:
+    return _ymd(raw) or next(iter(find_dates(raw or "")), None)
+
+
+def _alio_rules(education: EducationLevel | None, education_text: str, career: CareerType,
+                career_text: str) -> list[EligibilityRule]:
+    """API 값으로 만든 지원 자격 조건 (db-schema §3.2). 경력 연수는 API에 없어서 넣지 않는다."""
+    rules = []
+    if education is not None:
+        rules.append(EligibilityRule(rule_id="rule-edu", type=RuleType.EDUCATION, value=education.value,
+                                     source_quote=education_text))
+    if career != CareerType.UNKNOWN:
+        rules.append(EligibilityRule(rule_id="rule-career", type=RuleType.CAREER, value={"type": career.value},
+                                     source_quote=career_text))
+    return rules
+
+
+def normalize_alio(record: Mapping, *, as_of, detail: Mapping | None = None, job_codes: Mapping | None = None,
+                   first_sido: str | None = None) -> PostingSnapshot:
+    """잡알리오 채용공시 → 스냅샷. ID는 `alio-{recrutPblntSn}`.
+
+    - 근무지는 `parse_alio_region`. first_sido(설정의 부산 시·도 코드)가 여러 근무지 가운데 있으면 그 시·도로 둔다.
+    - 급여는 응답에 없어서 disclosed=false. 요건은 비워 두고 extractStatus=PENDING (보강이 뽑는다).
+    - rolling은 마감일이 `ALIO_ROLLING_MIN_DAYS`일 넘게 남았거나 제목에 "상시"가 있을 때. closesAt은 원문 날짜 그대로다.
+    - job_codes는 쓰지 않는다 (고용24 직종 코드가 없다). 수집 실행기가 출처마다 같은 모양으로 부르려고 받는다.
+    """
+    fields = ALIO["fields"]
+    merged = {**record, **(detail or {})}
+
+    def get(name: str) -> str:
+        return pick(merged, fields.get(name))
+
+    raw_id = get("external_id")
+    external_id = clean_id(raw_id) if raw_id else None
+    if external_id is None:
+        raise SkipRecord("missing_id" if not raw_id else "bad_id")
+    title, organization = get("title"), get("organization")
+    if not title:
+        raise SkipRecord("missing_title")
+    if not organization:
+        raise SkipRecord("missing_organization")
+    closes_at = _alio_closes(get("closes_ymd"))
+    if closes_at is None:
+        raise SkipRecord("no_deadline")
+    when = clock.parse_as_of(as_of)
+    days_left = (date.fromisoformat(closes_at) - when.date()).days
+    rolling = days_left > ALIO_ROLLING_MIN_DAYS or any(w in title for w in ALIO_ROLLING_TITLE_WORDS)
+
+    region = parse_alio_region(get("region_names"), first_sido=first_sido)
+    job = parse_alio_job(get("ncs_names"), get("ncs_codes"), title)
+    employment = parse_alio_employment(get("employment_names"))
+    career_text, education_text = get("career_name"), get("education_names")
+    career = parse_alio_career(career_text)
+    education = parse_alio_education(education_text)
+    description = alio_description(get("qualification"), get("preference"), get("preference_targets"),
+                                   get("selection"))
+    documents = alio_documents(merged.get(fields["files"]), fields["file_name"])
+    url = alio_url(get("url"))
+
+    api: dict[str, ExtractedBy] = {"title": ExtractedBy.API, "organization": ExtractedBy.API,
+                                   "closesAt": ExtractedBy.API}
+    for name, present in (("workRegion", not region.unknown), ("job", job.major is not None),
+                          ("employmentType", employment != EmploymentType.UNKNOWN),
+                          ("careerType", career != CareerType.UNKNOWN), ("educationMin", education is not None),
+                          ("jobDescription", description is not None), ("documents", bool(documents)),
+                          ("officialUrl", url is not None)):
+        if present:
+            api[name] = ExtractedBy.API
+
+    snapshot = PostingSnapshot(
+        job_posting_id=f"{POSTING_ID_PREFIX['alio']}-{external_id}", snapshot_id="pending", title=title,
+        organization=organization, job_description=description, closes_at=closes_at, official_url=url,
+        source_type=SourceType.OFFICIAL, checked_at=clock.iso(when), source=PostingSource.ALIO,
+        company=Company(name=organization), org_type=OrgType.PUBLIC_INSTITUTION, work_region=region, job=job,
+        employment_type=employment, career_type=career, education_min=education, salary=Salary(disclosed=False),
+        rolling=rolling, selection_steps=[], documents=documents,
+        eligibility_rules=_alio_rules(education, education_text, career, career_text),
+        extract_status=ExtractStatus.PENDING, extracted_by=api, content_hash="pending",
+    )
+    digest = compute_content_hash(snapshot)
+    return snapshot.model_copy(update={"content_hash": digest, "snapshot_id": snapshot_id_for(as_of, digest)})
 
 
 # ---------------------------------------------------------------- 정책 (온통청년)

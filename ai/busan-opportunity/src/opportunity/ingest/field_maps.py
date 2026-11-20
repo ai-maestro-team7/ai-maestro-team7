@@ -3,7 +3,8 @@
 확인 상태 (2026-11-20, 개발계획서2 §3.2)
 - 온통청년 청년정책, 고용24 청년일자리강소기업, 고용24 공통코드(지역·직종): 실제 응답을 받아 이 표를 맞췄다.
   원본은 `raw/{출처}/2026-11-20/`에 있다.
-- 고용24 채용정보(WORK24), 잡알리오(ALIO): 응답 미확인. 값은 응답을 보기 전에 넣은 임시 값이다.
+- 잡알리오 채용공시(ALIO): 실제 응답(목록 563건, 상세 1건)을 받아 맞췄다.
+- 고용24 채용정보(WORK24): 응답 미확인. 값은 응답을 보기 전에 넣은 임시 값이다.
 정규화 함수(`normalize.py`)는 이 표만 본다. 필드 이름을 코드 안에 박지 않는다.
 
 값 규칙
@@ -12,7 +13,7 @@
 - 값이 None이면 그 출처에는 해당 필드가 없다는 뜻이다.
 """
 
-from ..models.enums import PolicyStage
+from ..models.enums import CareerType, EducationLevel, EmploymentType, PolicyStage
 
 # 호출 정책. 명세에 정해진 값이고 설정 파일에는 아직 자리가 없다 (공용 파일 변경 요청).
 HTTP_TIMEOUT_SECONDS = 5      # 개발계획서2 §4.2 B-01, 강의 안내: 외부 API는 타임아웃 5초
@@ -66,44 +67,78 @@ WORK24 = {
     },
 }
 
-# 응답 미확인 (키 미등록): 잡알리오는 403 SERVICE_KEY_IS_NOT_REGISTERED_ERROR가 온다 (2026-11-20).
-# 아래 필드 이름은 임시 값이다.
+# 잡알리오 채용공시 (2026-11-20 응답 확인). 진행 중 공고(ongoingYn=Y)는 563건, 100건씩 6페이지다.
+# 응답: {"resultCode": 200, "resultMsg", "totalCount", "result": [...]}. 상세는 result가 목록이 아니라 객체 하나다.
+# 목록과 상세의 필드가 같고 목록에도 지원 자격·우대·전형 글이 다 온다. 다른 점은 상세에만 files·steps가 차 있다는 것.
+# 그래서 상세는 기본으로 부르지 않는다 (`detail.enabled`).
 ALIO = {
     "source": "alio",
     "secret": SECRET_DATA_GO_KR,  # 공공데이터포털 키는 URL 인코딩된 값이다. `http.encode_key`가 두 번 인코딩하지 않는다
     "key_param": "serviceKey",
     "list": {
         "url": "https://apis.data.go.kr/1051000/recruitment/list",
-        "params": {"resultType": "json"},
+        "params": {"resultType": "json", "ongoingYn": "Y"},
         "page_param": "pageNo", "size_param": "numOfRows", "page_size": 100, "first_page": 1, "max_pages": 50,
-        "items_path": ("result", "response.body.items.item", "response.body.items"),
-        "total_path": ("totalCount", "response.body.totalCount"),
+        "items_path": "result", "total_path": "totalCount",
     },
     "detail": {
+        "enabled": False,  # True로 바꾸면 수집 실행기가 부산·수도권 공고의 상세(첨부 파일 이름)를 부른다
         "url": "https://apis.data.go.kr/1051000/recruitment/detail",
         "params": {"resultType": "json"},
-        "id_param": "sn", "item_path": ("result", "response.body.items.item", "response.body.items"),
+        "id_param": "sn", "item_path": "result",
     },
     "fields": {
-        "external_id": "recrutPblntSn",
+        "external_id": "recrutPblntSn",       # 숫자로 온다 (307285)
         "title": "recrutPbancTtl",
         "organization": "instNm",
-        "region_code": None,
-        "region_text": "workRgnNmLst",
-        "job_code": None,
-        "job_name": "ncsCdNmLst",
-        "salary_kind": None,
-        "salary_text": None,
-        "employment_text": "hireTypeNmLst",
-        "career_text": "recrutSeNm",
-        "education_text": "acbgCondNmLst",
-        "closes_text": "pbancEndYmd",
-        "url": "srcUrl",
-        "description": "recrutPbancCn",
-        "selection_text": "scrnprcdrMthdExpln",
-        "documents_text": None,
+        "region_names": "workRgnNmLst",       # "대구,인천,…,전남광주". 코드(workRgnLst R3013 등)는 잡알리오 자체 코드다
+        "ncs_codes": "ncsCdLst",              # "R600001,R600002". NCS 대분류에 대응하는 잡알리오 코드
+        "ncs_names": "ncsCdNmLst",            # "사업관리,경영.회계.사무"
+        "employment_names": "hireTypeNmLst",  # "비정규직,청년인턴(체험형)"
+        "career_name": "recrutSeNm",          # 신입 / 경력 / 신입+경력
+        "education_names": "acbgCondNmLst",   # "학력무관,고졸,대졸(2~3년),대졸(4년),석사,박사"
+        "closes_ymd": "pbancEndYmd",          # "20261204"
+        "url": "srcUrl",                      # 기관 누리집. "없음", ".", "www.ex.co.kr"처럼 오기도 한다
+        "qualification": "aplyQlfcCn",        # 지원 자격
+        "preference": "prefCn",               # 우대 내용 (가점)
+        "preference_targets": "prefCondCn",   # 우대 대상 목록
+        "selection": "scrnprcdrMthdExpln",    # 전형 절차·방법
+        "files": "files",                     # 상세에만 온다. [{atchFileNm, atchFileType, url, sortNo}]
+        "file_name": "atchFileNm",
+        "steps": "steps",                     # 상세에만 온다. 아래 설명 참고
     },
 }
+# 고용 형태 이름 → EmploymentType (2026-11-20 응답의 값 5종이 전부다). 여러 개가 섞이면 UNKNOWN이다.
+ALIO_EMPLOYMENT = {
+    "정규직": EmploymentType.FULL_TIME,
+    "무기계약직": EmploymentType.CONTRACT,
+    "비정규직": EmploymentType.CONTRACT,
+    "기간제": EmploymentType.CONTRACT,
+    "청년인턴(체험형)": EmploymentType.INTERN,
+    "청년인턴(채용형)": EmploymentType.INTERN,
+}
+# 채용 구분 → CareerType (값 3종)
+ALIO_CAREER = {"신입": CareerType.NEW, "경력": CareerType.EXPERIENCED, "신입+경력": CareerType.ANY,
+               "무관": CareerType.ANY}
+# 학력 조건 이름 → EducationLevel (값 6종). 여러 개면 가장 낮은 것이 최소 학력이다.
+ALIO_EDUCATION = {
+    "학력무관": EducationLevel.NONE,
+    "고졸": EducationLevel.HIGH_SCHOOL,
+    "대졸(2~3년)": EducationLevel.ASSOCIATE,
+    "대졸(4년)": EducationLevel.BACHELOR,
+    "석사": EducationLevel.MASTER,
+    "박사": EducationLevel.DOCTOR,
+}
+# 근무지 이름 가운데 시·도가 아닌 것. "전국"은 근무지를 하나로 정할 수 없어 unknown으로 둔다.
+# 응답에 "해외"가 2건 있다. 표에 없는 이름은 시·도로 세지 않고 "외 N개 지역"의 N에만 넣는다.
+ALIO_NATIONAL_NAMES = {"전국"}
+ALIO_JOB_NAME_SHOWN = 2       # 직무 이름에 보여 줄 NCS 분류 수. 나머지는 "외 N"으로 줄인다
+ALIO_ROLLING_MIN_DAYS = 365   # 마감일이 이만큼 넘게 남았으면 상시 채용으로 본다 (응답에 20271231·20501231이 있다)
+ALIO_ROLLING_TITLE_WORDS = ("상시",)
+# steps는 분야마다 단계 행이 3개씩 오는데(recrutPbancTtl="차량", minStepSn~maxStepSn) 단계 이름이 없다.
+# 그래서 selectionSteps는 steps로 만들지 않고 전형 글(scrnprcdrMthdExpln)을 보강(enrich)이 읽게 둔다.
+# 기관 누리집 칸에서 버릴 값 (주소가 아닌 값)
+ALIO_URL_BLANKS = {"없음", "없음.", "해당없음", ".", ",", "/", "-", "com"}
 
 # 온통청년 청년정책 (2026-11-20 응답 확인). pageType=1이 없으면 e003 오류가 온다.
 # 응답: result.pagging.totCount, result.youthPolicyList[]. 3,996건이라 100건씩 40페이지다.
