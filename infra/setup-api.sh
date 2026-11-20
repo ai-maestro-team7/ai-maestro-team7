@@ -17,7 +17,7 @@ CLIENT_ID=""
 if [[ $POOL_ID != None && -n $POOL_ID ]]; then
   CLIENT_ID=$(aws cognito-idp list-user-pool-clients --user-pool-id "$POOL_ID" --query "UserPoolClients[?ClientName=='${PREFIX}-web'].ClientId | [0]" --output text)
 fi
-ENV_VARS="Variables={UPLOAD_BUCKET=$UPLOAD_BUCKET,CAREER_DOCS_BUCKET=$CAREER_DOCS_BUCKET,TABLE_CAREER_MENTOR=${PREFIX}-career-mentor,ALLOWED_ORIGIN=$ALLOWED_ORIGIN,COGNITO_CLIENT_ID=${CLIENT_ID}}"
+ENV_VARS="Variables={UPLOAD_BUCKET=$UPLOAD_BUCKET,CAREER_DOCS_BUCKET=$CAREER_DOCS_BUCKET,TABLE_CAREER_MENTOR=${PREFIX}-career-mentor,ALLOWED_ORIGIN=$ALLOWED_ORIGIN,COGNITO_CLIENT_ID=${CLIENT_ID},MODEL_ID=$MODEL_ID,EMBEDDING_MODEL_ID=$EMBEDDING_MODEL_ID}"
 
 echo "[Lambda] $FUNCTION_NAME"
 if aws lambda get-function --function-name "$FUNCTION_NAME" >/dev/null 2>&1; then

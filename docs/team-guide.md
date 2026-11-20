@@ -65,6 +65,9 @@ aws s3 cp bedrock/documents/ s3://team07-kb-source-<계정ID>/docs/ --recursive 
 
 ## 4. 배포
 
+- 모델 ID는 코드에 넣지 않고 Lambda 환경 변수 `MODEL_ID`(기본 `global.anthropic.claude-haiku-5-5`), `EMBEDDING_MODEL_ID`(기본 `cohere.embed-v4:0`)로 받는다 (`infra/config.sh`)
+- 시연 때 Sonnet으로: `MODEL_ID=global.anthropic.claude-sonnet-5-5 infra/setup-api.sh` (코드 변경 없음). 시연이 끝나면 인자 없이 다시 실행해 Haiku로 되돌린다
+
 - 백엔드 Lambda: `infra/deploy.sh` (코드만 바뀌었을 때)
 - 새 Lambda가 필요하면 백엔드 담당에게 요청 (실행 역할 `team07-lambda-role` 공용)
 

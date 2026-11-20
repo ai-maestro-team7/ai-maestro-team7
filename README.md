@@ -15,7 +15,9 @@
 | 경로 | 내용 |
 |---|---|
 | `backend/` | API Lambda: 라우터 `app.py`, 로그인 `auth_api.py`, 프로필·워크스페이스 `me_api.py`·`workspace.py`, 자격 판정 `eligibility.py`, 모의면접 `interview_api.py`, 테스트 `test_*.py` |
-| `ai/mentoring/`, `ai/busan-opportunity/`, `ai/interview/` | 파트별 AI 코드 (A·B·C). `ai/interview/`는 배포 때 `interview` 패키지로 백엔드에 함께 묶인다 |
+| `ai/mentoring/`, `ai/busan-opportunity/`, `ai/interview/` | 파트별 AI 코드 (A·B·C). 배포 때 `ai/interview/` → `interview`, `ai/busan-opportunity/src/opportunity/` → `opportunity` 패키지로 백엔드와 함께 묶인다 |
+| `contracts/` | 파트 간 데이터 계약 패키지 `team07_contracts` (스키마·예시 데이터·검사, D-18). 배포 묶음에도 들어간다 |
+| `tools/` | 개발 도구 목록 |
 | `frontend/` | 화면 |
 | `infra/` | AWS 자원 생성·배포 스크립트 (CloudFormation 권한이 없어 AWS CLI 스크립트) |
 | `examples/` | Strands Agents + Bedrock 예제 |

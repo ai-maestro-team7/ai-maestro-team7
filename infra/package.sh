@@ -16,7 +16,18 @@ if compgen -G "$ROOT/ai/interview/*.py" >/dev/null; then
   rsync -a --exclude '__pycache__' --exclude 'tests' --exclude 'samples' --exclude '.gitkeep' "$ROOT/ai/interview/" "$BUILD/interview/"
 fi
 
-for req in "$ROOT/backend/requirements.txt" "$ROOT/ai/interview/requirements.txt"; do
+# 부산 기회 추천 (B, ai/busan-opportunity/src/opportunity/) → `opportunity` 패키지
+if compgen -G "$ROOT/ai/busan-opportunity/src/opportunity/*.py" >/dev/null; then
+  rsync -a --exclude '__pycache__' "$ROOT/ai/busan-opportunity/src/opportunity/" "$BUILD/opportunity/"
+fi
+
+# 파트 간 계약 패키지 (contracts/src/team07_contracts/, D-18) → `team07_contracts`
+if [[ -d $ROOT/contracts/src/team07_contracts ]]; then
+  rsync -a --exclude '__pycache__' --exclude 'testing' "$ROOT/contracts/src/team07_contracts/" "$BUILD/team07_contracts/"
+fi
+
+for req in "$ROOT/backend/requirements.txt" "$ROOT/ai/interview/requirements.txt" \
+           "$ROOT/ai/busan-opportunity/requirements.txt" "$ROOT/contracts/requirements.txt"; do
   if [[ -s $req ]]; then
     uv pip install --quiet -r "$req" --target "$BUILD" \
       --python-platform aarch64-manylinux2014 --python-version 3.13 --only-binary=:all: >&2
