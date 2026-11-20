@@ -13,7 +13,8 @@ import json
 import logging
 import re
 import time
-from typing import Protocol, TypeVar
+from collections.abc import Callable
+from typing import Any, Protocol, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
@@ -69,11 +70,20 @@ def _ms(started: float) -> int:
     return int((time.monotonic() - started) * 1000)
 
 
-def call_json(llm: LLMClient, *, system_prompt: str, user_prompt: str, schema: type[S], stage: str) -> S:
+class ToolLLMClient(Protocol):
+    """툴을 골라 부르는 에이전트 실행 (report design §6.3). tools는 타입 힌트·설명이 있는 일반 함수다."""
+
+    def run_with_tools(self, *, system_prompt: str, user_prompt: str, tools: list[Callable[..., Any]],
+                       limits: dict[str, int]) -> str: ...
+
+
+def _call_with_retry(invoke: Callable[[], str], *, schema: type[S], stage: str,
+                     check: Callable[[S], None] | None = None) -> S:
+    """출력 검사와 재시도 규칙 (C §7). check는 스키마 밖의 검사이고, ValueError를 던지면 출력 실패로 본다."""
     for attempt in range(1, MAX_ATTEMPTS + 1):
         started = time.monotonic()
         try:
-            raw = llm.complete(system_prompt=system_prompt, user_prompt=user_prompt)
+            raw = invoke()
         except InterviewError:
             raise
         except OutputTruncated:
@@ -87,6 +97,8 @@ def call_json(llm: LLMClient, *, system_prompt: str, user_prompt: str, schema: t
             raise InterviewError(AWS_SERVICE_ERROR, SERVICE_MESSAGE) from None
         try:
             parsed = schema.model_validate(extract_json(raw))
+            if check is not None:
+                check(parsed)
         except (ValueError, ValidationError):
             logger.warning("stage=%s attempt=%d errorCode=%s durationMs=%d",
                            stage, attempt, AI_OUTPUT_INVALID, _ms(started))
@@ -96,49 +108,88 @@ def call_json(llm: LLMClient, *, system_prompt: str, user_prompt: str, schema: t
     raise InterviewError(AI_OUTPUT_INVALID, AI_OUTPUT_MESSAGE)
 
 
+def call_json(llm: LLMClient, *, system_prompt: str, user_prompt: str, schema: type[S], stage: str,
+              check: Callable[[S], None] | None = None) -> S:
+    return _call_with_retry(lambda: llm.complete(system_prompt=system_prompt, user_prompt=user_prompt),
+                            schema=schema, stage=stage, check=check)
+
+
+def call_json_with_tools(llm: ToolLLMClient, *, system_prompt: str, user_prompt: str,
+                         tools: list[Callable[..., Any]], limits: dict[str, int], schema: type[S], stage: str,
+                         check: Callable[[S], None] | None = None) -> S:
+    """call_json과 같은 규칙으로, 툴을 쓰는 에이전트의 마지막 답을 검사한다."""
+    return _call_with_retry(lambda: llm.run_with_tools(system_prompt=system_prompt, user_prompt=user_prompt,
+                                                       tools=tools, limits=limits),
+                            schema=schema, stage=stage, check=check)
+
+
 # ---------------------------------------------------------------- Strands
 
 
-_model = None  # 프로세스에서 한 번 만든다 (AGENTS.md "노션 허브 자료")
+_models: dict[int, Any] = {}  # max_tokens별로 프로세스에서 한 번 만든다 (AGENTS.md "노션 허브 자료")
 
 
-def _get_model():
-    global _model
-    if _model is None:
+def _get_model(max_tokens: int | None = None):
+    limit = settings.max_tokens() if max_tokens is None else max_tokens
+    if limit not in _models:
         model_id = settings.model_id()  # 없으면 여기서 설정 오류
         try:
             from strands.models import BedrockModel
         except ImportError:
             raise InterviewError(AWS_SERVICE_ERROR, settings.CONFIG_ERROR_MESSAGE, retryable=False) from None
-        kwargs = {"model_id": model_id, "region_name": settings.region(), "max_tokens": settings.max_tokens()}
+        kwargs = {"model_id": model_id, "region_name": settings.region(), "max_tokens": limit}
         thinking = settings.thinking_off(model_id)
         if thinking is not None:
             # strands BedrockConfig.additional_request_fields → Converse additionalModelRequestFields
             kwargs["additional_request_fields"] = {"thinking": thinking}
-        _model = BedrockModel(**kwargs)
-    return _model
+        _models[limit] = BedrockModel(**kwargs)
+    return _models[limit]
 
 
 def _reset_model() -> None:
     """테스트용. 만들어 둔 모델 클라이언트를 버린다."""
-    global _model
-    _model = None
+    _models.clear()
+
+
+def _raise_truncated_or_reraise(exc: Exception):
+    if type(exc).__name__ in _MAX_TOKENS_EXCEPTION_NAMES:
+        raise OutputTruncated() from None
+    raise exc
 
 
 class StrandsLLMClient:
-    """면접관 에이전트. 도구 없이, 호출마다 새 Agent로 부른다 (세션끼리 대화가 섞이지 않게)."""
+    """면접관 에이전트. 호출마다 새 Agent로 부른다 (세션끼리 대화가 섞이지 않게)."""
 
     def complete(self, *, system_prompt: str, user_prompt: str) -> str:
+        """도구 없이 한 번 판단 (질문 생성, 꼬리질문 판단, 내용 평가)."""
         model = _get_model()
         from strands import Agent
 
         agent = Agent(model=model, system_prompt=system_prompt, tools=[], callback_handler=None)
         try:
             return str(agent(user_prompt))
-        except Exception as exc:
-            if type(exc).__name__ in _MAX_TOKENS_EXCEPTION_NAMES:
-                raise OutputTruncated() from None
-            raise
+        except Exception as exc:  # noqa: BLE001
+            _raise_truncated_or_reraise(exc)
+
+    def run_with_tools(self, *, system_prompt: str, user_prompt: str, tools: list[Callable[..., Any]],
+                       limits: dict[str, int]) -> str:
+        """툴을 골라 부르는 에이전트 (피드백, report 결정 7).
+
+        strands 1.65 Agent.__call__(limits=…)는 상한에 닿으면 예외 없이 다음 턴 경계에서 멈춘다.
+        그때 마지막 답에 JSON이 없으면 호출한 쪽의 출력 검사가 실패로 본다.
+        """
+        model = _get_model(settings.feedback_max_tokens())
+        from strands import Agent, tool
+
+        agent = Agent(model=model, system_prompt=system_prompt, tools=[tool(f) for f in tools],
+                      callback_handler=None)
+        started = time.monotonic()
+        try:
+            result = agent(user_prompt, limits=dict(limits))
+        except Exception as exc:  # noqa: BLE001
+            _raise_truncated_or_reraise(exc)
+        logger.info("stage=agent stopReason=%s durationMs=%d", getattr(result, "stop_reason", None), _ms(started))
+        return str(result)
 
 
 def default_client() -> LLMClient:

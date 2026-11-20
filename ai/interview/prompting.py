@@ -12,7 +12,8 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from .versions import PROMPT_A_VERSION, PROMPT_B_VERSION, PROMPT_C1_VERSION, PROMPT_EVAL_SYSTEM_VERSION
+from .versions import (PROMPT_A_VERSION, PROMPT_B_VERSION, PROMPT_C1_VERSION, PROMPT_C2_VERSION,
+                       PROMPT_EVAL_SYSTEM_VERSION)
 
 PROMPT_DIR = Path(__file__).resolve().parent / "prompts"
 
@@ -32,6 +33,7 @@ QUESTIONS_FILE = _file_for(PROMPT_A_VERSION, "a_questions")
 FOLLOW_UP_FILE = _file_for(PROMPT_B_VERSION, "b_follow_up")
 EVAL_SYSTEM_FILE = _file_for(PROMPT_EVAL_SYSTEM_VERSION, "system_eval")
 CONTENT_FILE = _file_for(PROMPT_C1_VERSION, "c1_content")
+FEEDBACK_FILE = _file_for(PROMPT_C2_VERSION, "c2_feedback")
 
 
 def neutralize(text: str) -> str:
@@ -105,3 +107,9 @@ def content_prompt(job: str, resume_text: str, question_type: str, question: str
         "FOLLOW_UP_ANSWER": wrap("follow_up_answer", follow_up_answer),
         "RUBRIC": rubric,
     })
+
+
+def feedback_prompt(questions: list[tuple[str, str, str]]) -> str:
+    """C-2 사용자 메시지. (questionId, 질문 유형, 질문 문장)만 넣고 점수·답변은 에이전트가 툴로 가져온다."""
+    blocks = [f"- questionId: {qid} / 유형: {qtype}\n{wrap('question', text)}" for qid, qtype, text in questions]
+    return fill(load(FEEDBACK_FILE), {"QUESTIONS": "\n".join(blocks)})

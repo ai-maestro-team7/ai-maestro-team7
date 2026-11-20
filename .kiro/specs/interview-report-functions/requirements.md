@@ -97,7 +97,7 @@ AI 모의면접 함수의 3차 단계다 (이슈 #92). 면접이 끝나면 답�
 4. IF 툴 인자가 없는 `question_id`이거나 빈 키워드면 THEN THE 툴 SHALL 예외 대신 오류 사실(`{"error": "UNKNOWN_QUESTION"}` 등)을 돌려준다.
 5. THE 에이전트 SHALL 턴 수 상한(`settings.FEEDBACK_MAX_TURNS`), 토큰 상한(`FEEDBACK_MAX_TOTAL_TOKENS`), 툴 호출 상한(`FEEDBACK_MAX_TOOL_CALLS`), 호출당 `max_tokens`(`INTERVIEW_FEEDBACK_MAX_TOKENS`)를 둔다. 상한에 닿아 피드백 JSON을 못 쓰면 출력 실패로 본다.
 6. THE 출력 스키마 SHALL 점수 필드가 없다. 묶음 ID 집합이 평가 가능한 묶음과 같아야 한다.
-7. THE 출력 SHALL 정답 제시, 합격·불합격 가능성 언급, 답변에 없는 경험·수치를 담지 않는다. 금지 표현(`합격`, `불합격`, `확률`, `떨어`)이 있으면 검사 실패로 보고 재시도한다 (제품 원칙 4, 문구 규칙).
+7. THE 출력 SHALL 정답 제시, 합격·불합격 가능성 언급, 답변에 없는 경험·수치를 담지 않는다. 금지 표현(`합격`, `불합격`, `확률`)이 있으면 검사 실패로 보고 재시도한다 (제품 원칙 4, 문구 규칙). "떨어지다"는 일반 표현("집중이 떨어지다")에도 쓰여 넣지 않는다.
 8. THE 출력 SHALL 고정 JSON + Pydantic 검사, 1회 재시도 후 `AI_OUTPUT_INVALID`다 (1차 `call_json`과 같은 규칙). 한 리포트에 에이전트 실행은 최대 2번이다.
 9. THE 로그 SHALL 툴 이름과 호출 횟수, 턴 수, 멈춘 이유만 남긴다. 툴 입력·결과 원문은 남기지 않는다.
 

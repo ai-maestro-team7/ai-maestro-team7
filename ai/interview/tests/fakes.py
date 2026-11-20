@@ -96,6 +96,43 @@ class FakePolly:
         return {"AudioStream": io.BytesIO(self.audio), "ContentType": "audio/mpeg"}
 
 
+class FakeToolLLM:
+    """툴을 쓰는 에이전트 가짜 (피드백 C-2).
+
+    run_with_tools가 불릴 때마다 tool_calls에 적은 순서대로 툴 함수를 직접 부르고(모델이 툴을 고른 것처럼),
+    tool_responses의 다음 값을 마지막 답으로 돌려준다. 예외 객체면 그 차례에 던진다.
+    complete는 FakeLLM처럼 responses를 차례로 돌려준다 (C-1 등). 둘 다 받은 값을 기록한다.
+    """
+
+    def __init__(self, tool_responses, tool_calls=(), responses=()):
+        self.tool_responses = list(tool_responses)
+        self.tool_calls = list(tool_calls)
+        self.responses = list(responses)
+        self.runs = []
+        self.calls = []
+
+    def complete(self, *, system_prompt, user_prompt):
+        self.calls.append({"system": system_prompt, "user": user_prompt})
+        if not self.responses:
+            raise RuntimeError("FakeToolLLM: no more complete responses")
+        item = self.responses.pop(0)
+        if isinstance(item, BaseException):
+            raise item
+        return item
+
+    def run_with_tools(self, *, system_prompt, user_prompt, tools, limits):
+        by_name = {t.__name__: t for t in tools}
+        results = [(name, kwargs, by_name[name](**kwargs)) for name, kwargs in self.tool_calls]
+        self.runs.append({"system": system_prompt, "user": user_prompt, "tools": sorted(by_name),
+                          "limits": limits, "results": results})
+        if not self.tool_responses:
+            raise RuntimeError("FakeToolLLM: no more tool responses")
+        item = self.tool_responses.pop(0)
+        if isinstance(item, BaseException):
+            raise item
+        return item
+
+
 class FakeLLM:
     """정해 둔 응답을 차례로 돌려준다. 예외 객체를 넣으면 그 차례에 던진다. 받은 프롬프트를 기록한다."""
 
