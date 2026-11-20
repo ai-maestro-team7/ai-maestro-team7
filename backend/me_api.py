@@ -94,9 +94,6 @@ PROFILE_FIELDS = {
     "priorities": lambda v: isinstance(v, list) and len(v) <= 3 and all(
         p in ("SALARY", "GROWTH", "STABILITY", "WORK_LIFE", "HOUSING", "LOCATION") for p in v),
     "talentPoolConsent": lambda v: isinstance(v, bool),
-    # 채팅 조건 저장 (D-40). 사용자가 화면 버튼을 눌렀을 때만 들어온다
-    "desiredSalaryMin": int_range(0, 100_000),  # 만 원/년
-    "desiredCareerType": enum("NEW", "EXPERIENCED", "ANY"),
 }
 SYSTEM_FIELDS = {"PK", "SK", "entityType", "schemaVersion", "ownerUserId", "createdAt", "updatedAt", "isDemo"}
 
@@ -113,11 +110,7 @@ def h_get_profile(event, user_id, params):
 
 
 def h_put_profile(event, user_id, params):
-    return 200, update_profile(user_id, parse_json(event))
-
-
-def update_profile(user_id, data):
-    """기본 프로필 부분 수정. PUT /me/profile과 채팅 Agent의 조건 저장 도구(D-40)가 같이 쓴다."""
+    data = parse_json(event)
     data = {k: v for k, v in data.items() if k not in ("userId", *SYSTEM_FIELDS)}  # 본문의 userId 등은 무시
     unknown = sorted(set(data) - set(PROFILE_FIELDS))
     if unknown:
@@ -143,7 +136,7 @@ def update_profile(user_id, data):
     expr = "SET " + ", ".join(sets) + (" REMOVE " + ", ".join(removes) if removes else "")
     item = table().update_item(Key={"PK": f"USER#{user_id}", "SK": "PROFILE#BASIC"}, UpdateExpression=expr,
                                ExpressionAttributeNames=names, ExpressionAttributeValues=values, ReturnValues="ALL_NEW")["Attributes"]
-    return public_profile(item)
+    return 200, public_profile(item)
 
 
 # ---------------------------------------------------------------- 워크스페이스

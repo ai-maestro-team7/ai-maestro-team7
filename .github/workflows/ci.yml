@@ -41,7 +41,6 @@ jobs:
             uv run --no-project --with-requirements ../ai/mentoring/requirements.txt --with-requirements ../contracts/requirements.txt python -m unittest test_mentoring_api
           uv run --no-project --with boto3 --with "moto[dynamodb,s3]" --with pydantic --with aws-lambda-powertools python test_opportunities.py
           uv run --no-project --with boto3 --with pydantic --with aws-lambda-powertools python -m unittest test_opp_batch
-          uv run --no-project --with boto3 --with "moto[dynamodb]" --with-requirements ../ai/busan-opportunity/requirements.txt --with-requirements ../ai/supervisor/requirements.txt --with-requirements ../ai/mentoring/requirements.txt --with-requirements ../contracts/requirements.txt python test_agent_api.py
 
       - name: 정기 수집 설정 (AWS 호출 없음)
         run: python3 -m unittest discover -s infra -p test_setup_opp_batch.py
