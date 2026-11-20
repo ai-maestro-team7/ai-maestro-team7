@@ -7,7 +7,7 @@
 근거와 전제:
 - B §9와 C §9는 해커톤 0~2시간에 계약을 합의하고 API 명세와 가짜 응답을 프론트·백엔드에 넘기도록 계획한다. 공통 기반은 이 시간 안에 끝낼 수 있는 크기로 유지한다.
 - 최상위 폴더는 PR #1·#2로 정했고, 백엔드·인프라·공통 문서는 PR #9~#14로 들어왔다 (이전 뼈대 `4aa11cc`를 정리해 다시 넣음, D-25).
-- 결정 상태 (2026-11-20): 확정 담당이 정한 항목은 `CONFIRMED`이고 이 스펙의 기준은 그 결정을 따른다. 결정 내용과 구현은 "결정 기록" 표, `docs/api.md`(공통 API 규칙), `docs/db-schema.md`(v1.3), `backend/`·`infra/`(PR #9~#14, 배포됨)가 기준이다. 결정이 없는 항목(D-23 통합 Agent 프레임워크, D-24 프론트엔드 프레임워크, D-27 MVP 우선순위)만 `OPEN`으로 남기고, 그 항목은 인터페이스 뒤에 두거나 담당이 정할 때까지 임의로 정하지 않는다.
+- 결정 상태 (2026-11-20): 확정 담당이 정한 항목은 `CONFIRMED`이고 이 스펙의 기준은 그 결정을 따른다. 결정 내용과 구현은 "결정 기록" 표, `docs/api.md`(공통 API 규칙), `docs/db-schema.md`(v1.3), `backend/`·`infra/`(PR #9~#14, 배포됨)가 기준이다. 결정이 없는 항목(D-27 MVP 우선순위 등. D-23은 Bedrock Agents, D-24는 Next.js로 나중에 확정)만 `OPEN`으로 남기고, 그 항목은 인터페이스 뒤에 두거나 담당이 정할 때까지 임의로 정하지 않는다.
 - 아래 각 Requirement의 기준 중 결정과 이름·형식이 다른 곳은 Requirement 첫머리의 "결정 반영" 문단이 우선한다.
 - 문서 표기: A = `docs/개발계획서1.md`, B = `docs/개발계획서2.md`, C = `docs/개발계획서3.md`, 제안서 = `docs/프로젝트_제안서.md`.
 
@@ -351,7 +351,7 @@
 | D-20 | 모의면접 API·저장 | 이전 api.md / C 명세 | C 명세 + 면접 담당 요청 (`docs/db-schema.md` §2.4, `backend/interview_api.py`) | C + BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 (C 동의) |
 | D-21 | 자원 접두사·태그 | `team07-`, `team=team07` | `team07-`, `team=team07`, 리전 `ap-northeast-2` | BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 |
 | D-22 | 벡터 저장소·임베딩 모델 | S3 Vectors / OpenSearch, Cohere v4 / Titan v2 | S3 Vectors (`team07-opp-vectors`/`postings-v1`, 1024차원, 코사인), 임베딩 `global.cohere.embed-v4:0` (한국어, 1024) | A + B | CONFIRMED · 2026-11-20 · BACKEND 담당 |
-| D-23 | 통합 Agent 프레임워크 | Bedrock Agents + Action Group (A F-06, B §5.9) / Strands | 없음. 이유: A 소유 (mentoring-agent-quality) | A | OPEN |
+| D-23 | 통합 Agent 프레임워크 | Bedrock Agents + Action Group (A F-06, B §5.9) / Strands | Bedrock Agents 단일 Agent + Action Group (A `CareerMentoring`, B `BusanOpportunity`). Action Group은 `team07-api`가 받는다. C 면접관은 Strands 그대로, 페이지 이동으로 연결 | A | CONFIRMED · 2026-11-20 · A 담당 (#110) |
 | D-24 | 프론트엔드 프레임워크 | 문서에 없음 | Next.js 16 App Router + React + TypeScript + Tailwind CSS v4, `output: "export"` 정적 내보내기 (`.kiro/specs/frontend-ui/`) | FRONTEND | CONFIRMED · 2026-11-20 · FRONTEND 담당 |
 | D-25 | 이전 뼈대(`4aa11cc`) 재사용 | 재사용 / 미사용 | 정리해 재사용 (PR #9~#14) | 팀 리더 | CONFIRMED · 2026-11-20 · BACKEND 담당 |
 | D-26 | AI·데이터 작업 영역 라벨 | `fe`·`be`·`common`만 | AI·데이터·인프라 작업은 `be` | 팀 리더 | CONFIRMED · 2026-11-20 · BACKEND 담당 |
