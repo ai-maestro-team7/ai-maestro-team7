@@ -106,8 +106,96 @@ def _manual_session():
     return dict(start, answers=answers, currentIndex=3, currentQuestion=None)
 
 
+class _ShowRawReportClient:
+    """리포트용 진단 클라이언트 (SHOW_RAW=1). 운영 코드와 같은 호출을 하되 피드백 에이전트의 원문과 검사 결과를 찍는다.
+
+    - complete(C-1)는 StrandsLLMClient에 그대로 넘긴다
+    - run_with_tools(C-2)는 StrandsLLMClient.run_with_tools와 같은 Agent를 만들고, 툴 호출마다 이름과 오류 여부를 센다
+    - 끝나면 멈춘 이유(stop_reason), 턴 수, 출력 토큰, 원문 앞부분을 찍고, 어떤 검사에서 걸리는지
+      (JSON 꺼내기 → 스키마(길이·개수·금지 표현) → questionId 일치) 운영 코드와 같은 순서로 다시 검사해 찍는다
+    원문은 이 파일의 표준 출력에만 나온다. 패키지 코드와 운영 로그에는 남기지 않는다.
+    """
+
+    def __init__(self):
+        from interview import llm
+
+        self._inner = llm.StrandsLLMClient()
+        self.attempt = 0
+
+    def complete(self, *, system_prompt, user_prompt):
+        return self._inner.complete(system_prompt=system_prompt, user_prompt=user_prompt)
+
+    def run_with_tools(self, *, system_prompt, user_prompt, tools, limits):
+        import functools
+        import re
+        from collections import Counter
+
+        from strands import Agent, tool
+
+        from interview import llm, settings
+
+        self.attempt += 1
+        calls, errors = Counter(), Counter()
+
+        def counted(fn):
+            @functools.wraps(fn)  # strands가 이름·설명·타입 힌트를 그대로 읽게 한다
+            def wrapper(*args, **kwargs):
+                out = fn(*args, **kwargs)
+                calls[fn.__name__] += 1
+                if isinstance(out, dict) and "error" in out:
+                    errors[f"{fn.__name__}:{out['error']}"] += 1
+                return out
+            return wrapper
+
+        agent = Agent(model=llm._get_model(settings.feedback_max_tokens()), system_prompt=system_prompt,
+                      tools=[tool(counted(f)) for f in tools], callback_handler=None)
+        try:
+            result = agent(user_prompt, limits=dict(limits))
+        except Exception as exc:
+            print(f"\n[SHOW_RAW] attempt={self.attempt} exception={type(exc).__name__}")
+            raise
+        raw = str(result)
+        metrics = getattr(result, "metrics", None)
+        usage = getattr(metrics, "accumulated_usage", {}) or {}
+        print(f"\n[SHOW_RAW] attempt={self.attempt} stopReason={getattr(result, 'stop_reason', None)} "
+              f"turns={getattr(metrics, 'cycle_count', '?')} outputTokens={usage.get('outputTokens')} "
+              f"totalTokens={usage.get('totalTokens')} limits={limits}")
+        print(f"[SHOW_RAW] toolCalls={dict(calls)} total={sum(calls.values())} toolErrors={dict(errors)}")
+        print(f"[SHOW_RAW] raw length={len(raw)}")
+        print(raw[:RAW_PREVIEW_CHARS] if raw.strip() else "(마지막 답에 텍스트 없음)")
+        expected = re.findall(r"questionId: (q\d+)", user_prompt)
+        print(f"[SHOW_RAW] check: {self._diagnose(raw, expected)}")
+        return raw
+
+    @staticmethod
+    def _diagnose(raw, expected):
+        from pydantic import ValidationError
+
+        from interview import llm
+        from interview.feedback import FeedbackOutput
+
+        try:
+            data = llm.extract_json(raw)
+        except ValueError as exc:
+            return f"FAIL json ({type(exc).__name__}: {exc})"
+        try:
+            parsed = FeedbackOutput.model_validate(data)
+        except ValidationError as exc:
+            details = "; ".join(f"{'.'.join(str(p) for p in e['loc'])}: {e['msg']}"
+                                for e in exc.errors(include_input=False, include_url=False)[:8])
+            kind = "banned word" if "banned word" in details else "schema"
+            return f"FAIL {kind} ({details})"
+        got = sorted(q.question_id for q in parsed.questions)
+        if got != sorted(expected):
+            return f"FAIL check questionId (expected={sorted(expected)} got={got})"
+        return "OK"
+
+
 def test_generate_report_with_real_model(caplog):
-    """REPORT_RUNS(기본 1)번 리포트를 만들고 점수·시간·툴 호출을 찍는다. 2번이면 C-1 점수 흔들림을 본다."""
+    """REPORT_RUNS(기본 1)번 리포트를 만들고 점수·시간·툴 호출을 찍는다. 2번이면 C-1 점수 흔들림을 본다.
+
+    SHOW_RAW=1이면 피드백 에이전트의 원문과 실패한 검사를 찍는다 (_ShowRawReportClient).
+    """
     import logging
     import time
 
@@ -118,8 +206,9 @@ def test_generate_report_with_real_model(caplog):
     for n in range(1, runs + 1):
         caplog.clear()
         started = time.monotonic()
+        client = _ShowRawReportClient() if os.environ.get("SHOW_RAW") == "1" else None
         with caplog.at_level(logging.INFO, logger="interview"):
-            report = interview.generate_report(session, [])
+            report = interview.generate_report(session, [], llm=client)
         seconds = time.monotonic() - started
         tool_lines = [r.getMessage() for r in caplog.records if "stage=write_feedback toolCalls=" in r.getMessage()]
         stop_lines = [r.getMessage() for r in caplog.records if r.getMessage().startswith("stage=agent stopReason=")]
