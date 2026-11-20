@@ -1,0 +1,66 @@
+# main에 frontend/ 변경이 머지되면, 검사를 통과한 빌드 결과(frontend/out)를 S3에 올리고 CloudFront 캐시를 비운다.
+# AWS는 OIDC 임시 자격 증명(액세스 키 없음). 역할은 기존 team07-github-deploy를 쓰고,
+# 웹 버킷 쓰기와 이 배포의 캐시 무효화 권한은 infra/setup-web.sh 가 붙인다 (사람이 실행).
+# 버킷 이름에 계정 ID가 들어가서 공개 저장소 로그에 남지 않게 Secret으로 받는다.
+#   Secrets: AWS_DEPLOY_ROLE_ARN, WEB_BUCKET, WEB_DISTRIBUTION_ID
+#   WEB_BUCKET·WEB_DISTRIBUTION_ID가 없으면 배포 단계를 건너뛴다 (웹 자원을 만들기 전).
+name: Frontend Deploy
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend-*.yml"
+  workflow_dispatch: {}
+concurrency:
+  group: deploy-team07-web
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  check:
+    uses: ./.github/workflows/frontend-ci.yml
+  deploy:
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      WEB_BUCKET: ${{ secrets.WEB_BUCKET }}
+      WEB_DISTRIBUTION_ID: ${{ secrets.WEB_DISTRIBUTION_ID }}
+    steps:
+      - name: 배포 설정 확인
+        id: config
+        run: |
+          if [ -n "$WEB_BUCKET" ] && [ -n "$WEB_DISTRIBUTION_ID" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::WEB_BUCKET·WEB_DISTRIBUTION_ID Secret이 없어 배포를 건너뜁니다 (infra/setup-web.sh 실행 후 등록)."
+          fi
+      - uses: actions/download-artifact@v4
+        if: steps.config.outputs.ready == 'true'
+        with:
+          name: frontend-out
+          path: out
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: steps.config.outputs.ready == 'true'
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ap-northeast-2
+          role-session-name: github-web-deploy-${{ github.run_id }}
+      - name: S3에 올리기
+        if: steps.config.outputs.ready == 'true'
+        run: |
+          # 해시가 붙은 정적 파일은 오래 캐시하고, HTML·RSC 데이터는 매번 확인하게 한다.
+          aws s3 sync out/_next/static "s3://$WEB_BUCKET/_next/static" \
+            --cache-control "public,max-age=31536000,immutable" --only-show-errors
+          aws s3 sync out "s3://$WEB_BUCKET" --delete --exclude "_next/static/*" \
+            --cache-control "public,max-age=0,must-revalidate" --only-show-errors
+      - name: CloudFront 캐시 비우기
+        if: steps.config.outputs.ready == 'true'
+        run: |
+          aws cloudfront create-invalidation --distribution-id "$WEB_DISTRIBUTION_ID" --paths "/*" \
+            --query 'Invalidation.Id' --output text

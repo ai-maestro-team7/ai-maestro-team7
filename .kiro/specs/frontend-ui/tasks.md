@@ -38,3 +38,9 @@
   - [x] 10.3 중복 컴포넌트·하드코딩 색 점검 (`#[0-9a-f]{6}` 검색이 `globals.css`에서만 나와야 함)
   - [ ] 10.4 좁은 화면(375px)과 키보드 이동 확인 (600px 폭은 확인함. 375px와 키보드 이동은 실제 브라우저에서 확인 필요)
   - _Requirements: 1.3, 1.4, 2.4, 4.5, 12.1_
+- [ ] 11. CI/CD
+  - [x] 11.1 `frontend-ci.yml`(PR 검사), `frontend-deploy.yml`(main → S3 + CloudFront) 작성
+  - [x] 11.2 `infra/setup-web.sh`, `infra/iam/github-deploy-web-policy.json`, `infra/web/index-rewrite.js` 작성
+  - [ ] 11.3 `infra/setup-web.sh` 실행과 Secrets `WEB_BUCKET`·`WEB_DISTRIBUTION_ID` 등록 (AWS 자원 생성, 사용자 확인 후)
+  - [ ] 11.4 main 머지 후 Frontend Deploy 실행 결과와 CloudFront 주소 확인
+  - _Requirements: 1.3_

@@ -18,6 +18,17 @@ npm run build      # 정적 파일을 out/ 에 만든다 (S3 + CloudFront 배포
 - 정적 내보내기(`output: "export"`, `trailingSlash: true`)라 `next start`는 쓰지 않는다. `out/`을 아무 정적 서버로 열면 된다.
 - 녹음·카메라는 HTTPS에서만 동작하므로 API 연동 뒤에는 CloudFront 주소로 확인한다 (AGENTS.md).
 
+## CI/CD
+
+| 워크플로 | 언제 | 하는 일 |
+|---|---|---|
+| `.github/workflows/frontend-ci.yml` | `frontend/`를 바꾼 PR | `npm ci` → lint → typecheck → build, `out/`을 아티팩트로 남김 |
+| `.github/workflows/frontend-deploy.yml` | `frontend/` 변경이 `main`에 머지될 때, 수동 실행 | 같은 검사 뒤 `out/`을 S3 `team07-web-<계정ID>`에 올리고 CloudFront 캐시를 비움 |
+
+- AWS는 OIDC 역할 `team07-github-deploy`(main 브랜치만)를 쓴다. 액세스 키는 없다.
+- 웹 자원(버킷, CloudFront, 배포 권한)은 `infra/setup-web.sh`를 사람이 한 번 실행해 만든다. 끝나면 출력되는 값으로 GitHub Secrets `WEB_BUCKET`, `WEB_DISTRIBUTION_ID`를 등록한다. 둘이 없으면 배포 단계는 건너뛴다.
+- 캐시: `_next/static/*`은 1년(파일 이름에 해시), 나머지 HTML·RSC 데이터는 매번 확인.
+
 ## 기술
 
 Next.js 16 (App Router) · React 19 · TypeScript strict · Tailwind CSS v4 · lucide-react · Noto Sans KR(`next/font`)

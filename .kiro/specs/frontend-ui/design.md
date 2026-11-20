@@ -128,6 +128,12 @@ frontend/
 - 녹음 타이머는 Figma에 01:42로 고정돼 있다. 화면에서는 0부터 올라가게 해 녹음 중 상태를 보여주되 "예시" 표시는 유지한다.
 - 파형 막대는 Figma 높이 48개를 데이터 배열로 옮긴다. 앞 30개는 blue-500, 나머지는 grey-300이다.
 
+## CI/CD
+- CI `.github/workflows/frontend-ci.yml`: `frontend/**` 변경 PR에서 `npm ci` → lint → typecheck → build. 결과 `out/`을 아티팩트 `frontend-out`으로 남긴다. 기존 `ci.yml`(Python 파트)과 나눠 서로 기다리지 않는다.
+- CD `.github/workflows/frontend-deploy.yml`: `main` 푸시(`frontend/**`)와 수동 실행. CI를 `workflow_call`로 다시 돌린 뒤 같은 아티팩트를 S3에 `sync --delete`하고 CloudFront `/*`를 무효화한다. `_next/static`은 `max-age=31536000,immutable`, 나머지는 `max-age=0,must-revalidate`.
+- 자격 증명: 기존 OIDC 역할 `team07-github-deploy`(신뢰 조건 main 브랜치만). 웹 권한은 별도 인라인 정책 `team07-github-deploy-web-policy`(`infra/iam/github-deploy-web-policy.json`)로 붙여 Lambda 배포 정책 파일을 건드리지 않는다. 버킷·배포 ID는 계정 ID가 드러나지 않게 Secrets로 받는다.
+- 자원 `infra/setup-web.sh` (AWS CLI, 반복 실행 안전): 버킷(퍼블릭 차단, 소유권 강제) → OAC → CloudFront 함수(`infra/web/index-rewrite.js`, 폴더 경로 → `index.html`) → 배포(HTTPS 넘김, 403·404 → `/404.html`, 관리형 CachingOptimized) → 버킷 정책(이 배포만 읽기) → 역할 정책. AWS 자원 생성이라 사람이 실행한다 (AGENTS.md "환경·보안").
+
 ## 검증
 - `npm run lint`, `npm run typecheck`(`tsc --noEmit`), `npm run build`(정적 내보내기)
 - 로컬 실행 후 각 라우트를 1440px 폭으로 Figma 스크린숏과 비교 (배치, 간격, 색, 글꼴)
