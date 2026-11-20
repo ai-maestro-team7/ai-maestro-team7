@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { LoginForm } from "@/features/auth/components/LoginForm";
+import { SocialLoginButtons } from "@/features/auth/components/SocialLoginButtons";
 
 export const metadata: Metadata = { title: "로그인" };
 
@@ -14,6 +15,9 @@ export default function LoginPage() {
         {/* LoginForm은 돌아갈 주소(?next=)를 읽어서 Suspense 경계 안에 둔다 */}
         <Suspense fallback={<div className="h-64 w-full" aria-busy />}>
           <LoginForm />
+        </Suspense>
+        <Suspense fallback={null}>
+          <SocialLoginButtons />
         </Suspense>
         <p className="text-small text-grey-600">회원가입은 없어요. 계정은 팀 관리자가 만들어요.</p>
       </div>
