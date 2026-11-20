@@ -74,6 +74,20 @@ def test_service_exception_not_retried():
     assert len(fake.calls) == 1
 
 
+def test_truncated_output_retried_once_then_success():
+    fake = FakeLLM([llm.OutputTruncated(), '{"value": 5}'])
+    assert call(fake).value == 5
+    assert len(fake.calls) == 2
+
+
+def test_truncated_output_twice_raises_ai_output_invalid():
+    fake = FakeLLM([llm.OutputTruncated(), llm.OutputTruncated(), '{"value": 5}'])
+    with pytest.raises(InterviewError) as exc:
+        call(fake)
+    assert exc.value.code == AI_OUTPUT_INVALID and exc.value.retryable is True
+    assert len(fake.calls) == 2
+
+
 def test_interview_error_passes_through():
     original = InterviewError(INVALID_INPUT, "msg")
     with pytest.raises(InterviewError) as exc:
@@ -146,6 +160,55 @@ def test_strands_client_builds_model_once_and_agent_per_call(monkeypatch, reset_
 def test_strands_client_through_call_json(monkeypatch, reset_model, fake_strands):
     monkeypatch.setenv("MODEL_ID", "test-model")
     assert llm.call_json(llm.default_client(), system_prompt="S", user_prompt="U", schema=Out, stage="t").value == 3
+
+
+class MaxTokensReachedException(Exception):
+    """strands-agents 예외와 같은 이름의 가짜. 이름으로 구분하는지 본다."""
+
+
+def _agent_raising(monkeypatch, fake_strands, errors):
+    # errors를 순서대로 던지고, 다 쓰면 정상 JSON을 준다
+    remaining = list(errors)
+
+    def __call__(self, prompt):
+        fake_strands["prompts"].append(prompt)
+        if remaining:
+            raise remaining.pop(0)
+        return '{"value": 4}'
+
+    monkeypatch.setattr(sys.modules["strands"].Agent, "__call__", __call__)
+
+
+def test_strands_max_tokens_becomes_output_truncated(monkeypatch, reset_model, fake_strands):
+    monkeypatch.setenv("MODEL_ID", "test-model")
+    _agent_raising(monkeypatch, fake_strands, [MaxTokensReachedException("max tokens")])
+    with pytest.raises(llm.OutputTruncated):
+        llm.StrandsLLMClient().complete(system_prompt="S", user_prompt="U")
+
+
+def test_strands_max_tokens_retried_then_ai_output_invalid(monkeypatch, reset_model, fake_strands):
+    monkeypatch.setenv("MODEL_ID", "test-model")
+    _agent_raising(monkeypatch, fake_strands, [MaxTokensReachedException("a"), MaxTokensReachedException("b")])
+    with pytest.raises(InterviewError) as exc:
+        llm.call_json(llm.default_client(), system_prompt="S", user_prompt="U", schema=Out, stage="t")
+    assert exc.value.code == AI_OUTPUT_INVALID and exc.value.retryable is True
+    assert fake_strands["prompts"] == ["U", "U"]
+
+
+def test_strands_max_tokens_once_then_success(monkeypatch, reset_model, fake_strands):
+    monkeypatch.setenv("MODEL_ID", "test-model")
+    _agent_raising(monkeypatch, fake_strands, [MaxTokensReachedException("a")])
+    result = llm.call_json(llm.default_client(), system_prompt="S", user_prompt="U", schema=Out, stage="t")
+    assert result.value == 4 and len(fake_strands["prompts"]) == 2
+
+
+def test_strands_other_errors_stay_aws_service_error(monkeypatch, reset_model, fake_strands):
+    monkeypatch.setenv("MODEL_ID", "test-model")
+    _agent_raising(monkeypatch, fake_strands, [RuntimeError("throttled")])
+    with pytest.raises(InterviewError) as exc:
+        llm.call_json(llm.default_client(), system_prompt="S", user_prompt="U", schema=Out, stage="t")
+    assert exc.value.code == AWS_SERVICE_ERROR
+    assert len(fake_strands["prompts"]) == 1
 
 
 def test_strands_client_without_model_id(monkeypatch, reset_model, fake_strands):

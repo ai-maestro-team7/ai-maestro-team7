@@ -132,6 +132,12 @@ def test_questions_prompt_single_question_examples():
     assert "나쁜 예" in prompt and "좋은 예" in prompt
 
 
+def test_questions_prompt_limits_question_length():
+    # max_tokens 1024 안에 질문 3개 JSON이 들어가도록 질문 길이를 제한한다 (#58)
+    prompt = prompting.questions_prompt("데이터 분석", "MIXED", RESUME, None)
+    assert "80자" in prompt
+
+
 def test_questions_v1_file_kept():
     # 이전 버전 파일은 지우지 않는다
     assert (prompting.PROMPT_DIR / "a_questions_v1.md").is_file()

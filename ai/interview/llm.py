@@ -30,6 +30,15 @@ SERVICE_MESSAGE = "AI 서비스에 연결하지 못했어요. 잠시 후 다시 
 S = TypeVar("S", bound=BaseModel)
 
 
+class OutputTruncated(Exception):
+    """모델 출력이 max_tokens에서 잘렸다. 호출은 성공했으니 서비스 오류가 아니라 출력 문제로 본다."""
+
+
+# strands-agents가 출력이 max_tokens에 닿았을 때 던지는 예외 이름.
+# 클래스를 import하지 않고 이름으로 비교해 SDK 내부 모듈 경로에 묶이지 않게 한다.
+_MAX_TOKENS_EXCEPTION_NAMES = frozenset({"MaxTokensReachedException"})
+
+
 class LLMClient(Protocol):
     def complete(self, *, system_prompt: str, user_prompt: str) -> str: ...
 
@@ -67,6 +76,11 @@ def call_json(llm: LLMClient, *, system_prompt: str, user_prompt: str, schema: t
             raw = llm.complete(system_prompt=system_prompt, user_prompt=user_prompt)
         except InterviewError:
             raise
+        except OutputTruncated:
+            # 잘린 출력은 스키마 검사 실패와 같게 다룬다: 한 번 다시 보내고, 또 잘리면 AI_OUTPUT_INVALID
+            logger.warning("stage=%s attempt=%d errorCode=%s reason=maxTokens durationMs=%d",
+                           stage, attempt, AI_OUTPUT_INVALID, _ms(started))
+            continue
         except Exception as exc:  # noqa: BLE001 — 권한, 한도 초과, 네트워크, SDK 오류
             logger.warning("stage=%s attempt=%d errorCode=%s errorType=%s durationMs=%d",
                            stage, attempt, AWS_SERVICE_ERROR, type(exc).__name__, _ms(started))
@@ -114,7 +128,12 @@ class StrandsLLMClient:
         from strands import Agent
 
         agent = Agent(model=model, system_prompt=system_prompt, tools=[], callback_handler=None)
-        return str(agent(user_prompt))
+        try:
+            return str(agent(user_prompt))
+        except Exception as exc:
+            if type(exc).__name__ in _MAX_TOKENS_EXCEPTION_NAMES:
+                raise OutputTruncated() from None
+            raise
 
 
 def default_client() -> LLMClient:
