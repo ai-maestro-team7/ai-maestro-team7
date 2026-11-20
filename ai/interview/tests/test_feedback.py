@@ -159,6 +159,33 @@ def test_invalid_feedback_twice_raises(bad):
     assert len(fake.runs) == 2
 
 
+def test_tool_limit_is_counted_per_attempt():
+    # 수동 확인에서 두 시도가 상한을 같이 써서 재시도가 시작하자마자 TOOL_LIMIT을 받았다 (#92)
+    full_budget = [("get_answer_text", {"question_id": "q1"})] * settings.FEEDBACK_MAX_TOOL_CALLS
+    bad = _with(lambda d: d["questions"].pop())  # 첫 시도는 q3를 빠뜨려 실패
+    fake = FakeToolLLM([bad, OK], tool_calls=full_budget)
+    out = feedback.write_feedback(context(), llm=fake)
+    assert len(out.questions) == 3 and len(fake.runs) == 2
+    for run in fake.runs:  # 두 시도 모두 상한 12번을 다 쓸 수 있다
+        assert all("error" not in result for _, _, result in run["results"])
+
+
+def test_tool_limit_still_applies_within_one_attempt():
+    over = [("get_answer_text", {"question_id": "q1"})] * (settings.FEEDBACK_MAX_TOOL_CALLS + 1)
+    fake = FakeToolLLM([OK], tool_calls=over)
+    feedback.write_feedback(context(), llm=fake)
+    results = [r for _, _, r in fake.runs[0]["results"]]
+    assert all("error" not in r for r in results[:-1]) and results[-1]["error"] == "TOOL_LIMIT"
+
+
+def test_usage_log_sums_attempts(caplog):
+    bad = _with(lambda d: d["questions"].pop())
+    fake = FakeToolLLM([bad, OK], tool_calls=[("get_answer_text", {"question_id": "q1"})])
+    with caplog.at_level(logging.INFO, logger="interview"):
+        feedback.write_feedback(context(), llm=fake)
+    assert "attempts=2 toolCalls=get_answer_text:2 totalToolCalls=2" in caplog.text
+
+
 def test_more_than_two_strengths_keeps_first_two_without_retry():
     # 실제 Bedrock에서 강점 3개를 써서 스키마 실패가 났다 (#92 수동 확인). 실패시키지 않고 앞의 2개만 남긴다
     three = ["첫 번째 강점 문장입니다.", "두 번째 강점 문장입니다.", "세 번째 강점 문장입니다."]
@@ -216,7 +243,7 @@ def test_logs_have_tool_names_only(caplog):
     fake = FakeToolLLM([OK], tool_calls=SCRIPT)
     with caplog.at_level(logging.DEBUG, logger="interview"):
         feedback.write_feedback(context(), llm=fake)
-    assert "stage=write_feedback toolCalls=find_resume_passages:1,get_answer_text:1" in caplog.text
+    assert "stage=write_feedback attempts=1 toolCalls=find_resume_passages:1,get_answer_text:1" in caplog.text
     assert "관광" not in caplog.text and "대응표" not in caplog.text and "질문입니다" not in caplog.text
 
 

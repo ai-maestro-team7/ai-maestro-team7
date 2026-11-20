@@ -210,7 +210,7 @@ def test_generate_report_with_real_model(caplog):
         with caplog.at_level(logging.INFO, logger="interview"):
             report = interview.generate_report(session, [], llm=client)
         seconds = time.monotonic() - started
-        tool_lines = [r.getMessage() for r in caplog.records if "stage=write_feedback toolCalls=" in r.getMessage()]
+        tool_lines = [r.getMessage() for r in caplog.records if "stage=write_feedback attempts=" in r.getMessage()]
         stop_lines = [r.getMessage() for r in caplog.records if r.getMessage().startswith("stage=agent stopReason=")]
         print(f"\n[REPORT] run={n} seconds={seconds:.1f} totalScore={report['totalScore']} grade={report['grade']} "
               f"weightBasis={report['weightBasis']}")

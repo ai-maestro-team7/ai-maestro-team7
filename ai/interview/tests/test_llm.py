@@ -374,6 +374,22 @@ def test_call_json_with_tools_retry_and_check():
     assert exc.value.code == AI_OUTPUT_INVALID
 
 
+def test_call_json_with_tools_before_attempt_runs_each_attempt():
+    seen = []
+
+    class FakeTools:
+        def __init__(self):
+            self.outputs = ['not json', '{"value": 3}']
+
+        def run_with_tools(self, **kwargs):
+            seen.append("run")
+            return self.outputs.pop(0)
+
+    out = llm.call_json_with_tools(FakeTools(), system_prompt="S", user_prompt="U", tools=[], limits={},
+                                   schema=Out, stage="t", before_attempt=lambda: seen.append("reset"))
+    assert out.value == 3 and seen == ["reset", "run", "reset", "run"]
+
+
 def test_real_strands_tool_wraps_feedback_tools():
     # 설치된 strands가 우리 툴(타입 힌트 + docstring)을 툴로 감쌀 수 있는지. 네트워크 없음
     strands = pytest.importorskip("strands")

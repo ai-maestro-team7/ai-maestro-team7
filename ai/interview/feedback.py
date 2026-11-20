@@ -85,11 +85,20 @@ def build_feedback_context(bundles: list[Bundle], content: dict[str, ContentEval
 
 
 class ToolUsage:
-    """툴 호출 횟수. 상한을 넘으면 툴이 '지금까지 정보로 답하라'를 돌려준다."""
+    """툴 호출 횟수. 상한은 에이전트 실행(시도)마다 새로 센다. 넘으면 툴이 '지금까지 정보로 답하라'를 돌려준다.
+
+    수동 확인에서 상한을 두 시도가 같이 써서 재시도가 시작하자마자 TOOL_LIMIT을 받았다 (#92). start_attempt로 나눈다.
+    """
 
     def __init__(self, limit: int):
         self.limit = limit
-        self.calls: Counter[str] = Counter()
+        self.calls: Counter[str] = Counter()      # 이번 시도
+        self.all_calls: Counter[str] = Counter()  # 모든 시도 합 (로그용)
+        self.attempts = 0
+
+    def start_attempt(self) -> None:
+        self.calls = Counter()
+        self.attempts += 1
 
     @property
     def total(self) -> int:
@@ -97,12 +106,13 @@ class ToolUsage:
 
     def take(self, name: str) -> dict | None:
         self.calls[name] += 1
+        self.all_calls[name] += 1
         if self.total > self.limit:
             return {"error": "TOOL_LIMIT", "message": "도구 호출 한도에 닿았습니다. 지금까지 받은 정보로 답을 쓰세요."}
         return None
 
     def summary(self) -> str:
-        return ",".join(f"{name}:{n}" for name, n in sorted(self.calls.items())) or "none"
+        return ",".join(f"{name}:{n}" for name, n in sorted(self.all_calls.items())) or "none"
 
 
 def _normalize(text: str) -> str:
@@ -262,9 +272,9 @@ def write_feedback(context: FeedbackContext, *, llm=None) -> FeedbackOutput:
                                                    for b in context.bundles]),
             tools=tools,
             limits={"turns": settings.FEEDBACK_MAX_TURNS, "total_tokens": settings.FEEDBACK_MAX_TOTAL_TOKENS},
-            schema=FeedbackOutput, stage=STAGE, check=check,
+            schema=FeedbackOutput, stage=STAGE, check=check, before_attempt=usage.start_attempt,
         )
     finally:
         # 툴 이름과 횟수만 남긴다. 툴 입력·결과(답변 원문)는 남기지 않는다
-        logger.info("stage=%s toolCalls=%s totalToolCalls=%d durationMs=%d", STAGE, usage.summary(), usage.total,
-                    int((time.monotonic() - started) * 1000))
+        logger.info("stage=%s attempts=%d toolCalls=%s totalToolCalls=%d durationMs=%d", STAGE, usage.attempts,
+                    usage.summary(), sum(usage.all_calls.values()), int((time.monotonic() - started) * 1000))

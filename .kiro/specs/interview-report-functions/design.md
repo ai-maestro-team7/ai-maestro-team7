@@ -157,7 +157,7 @@ write_feedback(context: FeedbackContext, *, llm=None) -> FeedbackOutput
   - 점수를 쓰는 툴이 없다. 출력 스키마에 점수 필드가 없다.
   - 테스트가 에이전트 실행 전후의 `ScoreResult`가 같은지 확인한다.
 - 잘못된 인자: 없는 `question_id` → `{"error": "UNKNOWN_QUESTION", "questionIds": [...]}`, 빈 키워드 → `{"error": "EMPTY_KEYWORD"}`. 예외를 던지지 않아 에이전트가 고쳐 부를 수 있다.
-- 툴 호출 상한: `FEEDBACK_MAX_TOOL_CALLS`(12)를 넘으면 툴이 `{"error": "TOOL_LIMIT", "message": "지금까지 받은 정보로 답을 쓰세요"}`를 돌려준다.
+- 툴 호출 상한: 한 시도에서 `FEEDBACK_MAX_TOOL_CALLS`(12)를 넘으면 툴이 `{"error": "TOOL_LIMIT", "message": "지금까지 받은 정보로 답을 쓰세요"}`를 돌려준다. 재시도는 `call_json_with_tools(before_attempt=usage.start_attempt)`로 새로 센다. 로그는 모든 시도의 합과 시도 수를 남긴다.
 - 사용자·세션 ID를 인자로 받지 않는다. 툴이 볼 수 있는 데이터는 이 리포트의 `context`뿐이다.
 
 ### 6.3 LLM 계층 변경 (`llm.py`)

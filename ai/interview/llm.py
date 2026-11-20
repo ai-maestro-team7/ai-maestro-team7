@@ -78,9 +78,15 @@ class ToolLLMClient(Protocol):
 
 
 def _call_with_retry(invoke: Callable[[], str], *, schema: type[S], stage: str,
-                     check: Callable[[S], None] | None = None) -> S:
-    """출력 검사와 재시도 규칙 (C §7). check는 스키마 밖의 검사이고, ValueError를 던지면 출력 실패로 본다."""
+                     check: Callable[[S], None] | None = None,
+                     before_attempt: Callable[[], None] | None = None) -> S:
+    """출력 검사와 재시도 규칙 (C §7). check는 스키마 밖의 검사이고, ValueError를 던지면 출력 실패로 본다.
+
+    before_attempt는 시도마다 맨 처음에 불린다 (예: 툴 호출 상한을 시도마다 새로 세기).
+    """
     for attempt in range(1, MAX_ATTEMPTS + 1):
+        if before_attempt is not None:
+            before_attempt()
         started = time.monotonic()
         try:
             raw = invoke()
@@ -116,11 +122,15 @@ def call_json(llm: LLMClient, *, system_prompt: str, user_prompt: str, schema: t
 
 def call_json_with_tools(llm: ToolLLMClient, *, system_prompt: str, user_prompt: str,
                          tools: list[Callable[..., Any]], limits: dict[str, int], schema: type[S], stage: str,
-                         check: Callable[[S], None] | None = None) -> S:
-    """call_json과 같은 규칙으로, 툴을 쓰는 에이전트의 마지막 답을 검사한다."""
+                         check: Callable[[S], None] | None = None,
+                         before_attempt: Callable[[], None] | None = None) -> S:
+    """call_json과 같은 규칙으로, 툴을 쓰는 에이전트의 마지막 답을 검사한다.
+
+    limits(턴·토큰)는 strands가 에이전트 실행마다 새로 센다. 툴 쪽 상한은 before_attempt로 시도마다 새로 센다.
+    """
     return _call_with_retry(lambda: llm.run_with_tools(system_prompt=system_prompt, user_prompt=user_prompt,
                                                        tools=tools, limits=limits),
-                            schema=schema, stage=stage, check=check)
+                            schema=schema, stage=stage, check=check, before_attempt=before_attempt)
 
 
 # ---------------------------------------------------------------- Strands
