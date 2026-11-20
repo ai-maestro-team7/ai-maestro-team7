@@ -1,4 +1,4 @@
-# DB 스키마 (v1.4)
+# DB 스키마 (v1.4.1)
 
 7팀 · 부산 청년 취업 맞춤형 멘토링 Agent
 작성: 백엔드/DB 담당 · 기준: A(멘토링) 개발 명세서 v2.0, B(부산 기회 추천) DB·API 스키마 v0.1, C(AI 모의면접) 개발명세서
@@ -10,6 +10,7 @@
 | v1.1 | 면접 담당 요청, 멘토링 담당 피드백 반영 (Workspace, GSI에 userId, `*_LATEST#`, 문서 버전, TASK, 삭제 규칙, 평가 로그) |
 | v1.2 | B 피드백 반영: 공고·정책·기업은 `team07-catalog`(B 설계), B 사용자 데이터는 `career-mentor`의 `OPP#`, 공통 프로필은 `PROFILE#BASIC`로. 알림 ID 형식, 저장 공고 ↔ 워크스페이스 연결 규칙 추가 |
 | v1.5 | 기본 정보 화면: `PROFILE#BASIC`에 `schoolName`(대학 이름, 전문대 이상, 50자)·`certificates[]`(가진 자격증, 10개, 50자) 추가. `universityRegion`은 최종 학교 소재지로 쓴다 (대학원이면 학부 대학, 고졸이면 고등학교). 지역인재 판정과 자격 요건 비교에 쓴다 |
+| v1.4.1 | 모의면접 세션 필드 반영: 답변 기록 `followUpCheck`(#152), 캡처 `reason`·`session.baseline` 형식(#115) |
 | v1.4 | 채팅 Agent (D-38~D-40, `docs/개발계획서4.md` §8): `SESSION#`·`CHAT#{sessionId}#{messageId}` 필드 확정, `PROFILE#BASIC`에 `desiredSalaryMin`·`desiredCareerType` 추가. 면접 `documentId`는 `DOC_LATEST#`에 `extractedTextKey`가 없으면 `DOC#{id}#V#{n}`의 `textKey`를 읽는다 |
 | v1.3.1 | C 명세 변경 반영 (`transcriptKey`, `eyesOpen`, `baseline=None`) |
 | v1.3 | 파트 간 충돌 정리: `eligibilityRules[]` 구조와 공통 판정 함수, 고용24·NCS 직무 코드 병행 + 매핑(`MAP#WORK24#`), 요건 종류 `REQUIRED_SKILL`/`PREFERRED_SKILL`, 옛 테이블 4개 삭제, `team07-reference` 생성 |
@@ -96,14 +97,15 @@
 | SK | 내용 |
 |---|---|
 | `INTERVIEW#{ivId}` | `session`(면접 함수가 준 그대로) + 백엔드 관리 값: `status`, `stage`, `expectedAnswerId`, `submittedAnswerIds[]`, `transcribeJobs{answerId: {jobName, audioKey, transcriptKey, timeLimitReached}}`, `nextQuestion`, `lastAnswer`, `jobRole`(= session.job), `workspaceId` |
-| `INTERVIEW#{ivId}#FRAME#{answerId}#{capturedAt}` | `type`(CALIBRATION/ANSWER), `accepted`, `valid`, `gaze`, `head`, `eyesOpen{value, confidence}` (눈 감음 판단은 점수 계산 단계). **이미지는 저장하지 않음**. 보정 캡처는 answerId 자리에 `CALIBRATION` |
+| `INTERVIEW#{ivId}#FRAME#{answerId}#{capturedAt}` | `type`(CALIBRATION/ANSWER), `accepted`, `valid`, `reason`(분석 제외 사유, `valid=false`일 때: `INVALID_IMAGE`/`NO_FACE`/`MULTIPLE_FACES`/`LOW_CONFIDENCE`/`FACE_OCCLUDED`/`TOO_DARK`/`BLURRY`/`ANALYSIS_FAILED`. 감점 아님), `gaze`, `head`, `eyesOpen{value, confidence}` (눈 감음 판단은 점수 계산 단계). **이미지는 저장하지 않음**. 보정 캡처는 answerId 자리에 `CALIBRATION` |
 | `INTERVIEW#{ivId}#REPORT` | `report`. 다시 열면 이 값을 그대로 반환 |
 | `INTERVIEW#{ivId}#Q#{questionId}` (선택) | 조회용 요약만 |
 
 - `ivId` = 면접 명세의 `sessionId` (UUID, 백엔드 생성). 중복 제출은 조건부 쓰기 → 409. 제출 뒤 캡처는 `accepted=false`
-- `compute_baseline`은 리포트 직전 `CALIBRATION` 캡처로 → `session.baseline`. 유효 3장 미만이면 `None`(태도 미측정)이고 백엔드는 대체값을 넣지 않는다
+- `compute_baseline`은 리포트 직전 `CALIBRATION` 캡처로 → `session.baseline = {gaze{yaw, pitch}, head{yaw, pitch}}`(유효 캡처의 중앙값). 유효 3장 미만이면 `None`(태도 미측정)이고 백엔드는 대체값을 넣지 않는다
+- `session`의 답변 기록에는 `followUpCheck`(꼬리질문 판단 결과 `ABSTRACT`/`INCONSISTENT`/`SUFFICIENT`/`JUDGE_FAILED`, #152)가 있다. 판단이 실패해도 면접은 꼬리질문 없이 이어지고 `JUDGE_FAILED`로 남는다. 백엔드는 `session`을 그대로 저장하므로 따로 다루지 않는다. 이 필드가 생긴 뒤 이전 면접 패키지로 되돌리면 진행 중 세션을 못 읽을 수 있다
 - Transcribe 결과는 백엔드가 정한 `uploads/interview/{ivId}/transcripts/{answerId}.json`에 저장(`start_transcription`의 `output_bucket`·`output_key`). 답변 원문이 들어 있어 녹음과 함께 바로 삭제
-- `start_interview` 입력: `resumeText` 또는 `documentId` → `DOC_LATEST#`의 `extractedTextKey`. 저장된 역량 프로필은 `PROFILE#LATEST`가 가리키는 버전을 A의 `to_career_profile_summary()`로 변환해 넘긴다. 변환 결과가 없거나 계약 검사를 통과하지 못하면 `profile=None`이다.
+- `start_interview` 입력: `resumeText` 또는 `documentId` → `DOC_LATEST#`의 `extractedTextKey`(없으면 `DOC#{id}#V#{n}`의 `textKey`, #151). 저장된 역량 프로필은 `PROFILE#LATEST`가 가리키는 버전을 A의 `to_career_profile_summary()`로 변환해 넘긴다. 변환 결과가 없거나 계약 검사를 통과하지 못하면 `profile=None`이다.
 - 녹음은 변환 끝나면 바로 삭제, `uploads/` 7일 자동 삭제는 안전장치
 - 구현 `backend/interview_api.py` · 테스트 `backend/test_interview.py`
 
