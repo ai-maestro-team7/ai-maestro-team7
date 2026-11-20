@@ -54,6 +54,8 @@ class WorkRegion(OppModel):
     sigungu: str | None = None
     label: str = "근무지 확인 필요"
     unknown: bool = False
+    overseas: bool = False       # 해외 근무. 부산·수도권 어느 쪽으로도 세지 않는다
+    country: str | None = None   # 해외 근무 국가 이름 (원문)
 
 
 class Job(OppModel):
@@ -146,6 +148,7 @@ class PostingLatest(OppModel):
     # 목록용 B 값
     is_busan: bool = False
     is_capital_area: bool = False
+    is_overseas: bool = False
     work_region: WorkRegion = Field(default_factory=WorkRegion)
     job: Job
     salary: Salary = Field(default_factory=Salary)
@@ -205,7 +208,7 @@ class VectorMeta(OppModel):
 def latest_from_snapshot(snap: PostingSnapshot, *, busan_sido: str, capital_sido: list[str],
                          is_expired: bool = False) -> PostingLatest:
     """스냅샷에서 목록용 아이템을 만든다. 수집·보강이 같은 규칙으로 쓰게 한 곳에 둔다."""
-    sido = None if snap.work_region.unknown else snap.work_region.sido
+    sido = None if snap.work_region.unknown or snap.work_region.overseas else snap.work_region.sido
     return PostingLatest(
         job_posting_id=snap.job_posting_id,
         snapshot_id=snap.snapshot_id,
@@ -217,6 +220,7 @@ def latest_from_snapshot(snap: PostingSnapshot, *, busan_sido: str, capital_sido
         checked_at=snap.checked_at,
         is_busan=sido == busan_sido,
         is_capital_area=sido in capital_sido,
+        is_overseas=snap.work_region.overseas,
         work_region=snap.work_region,
         job=snap.job,
         salary=snap.salary,

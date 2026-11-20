@@ -9,7 +9,8 @@
         "sido": "26",
         "sigungu": "26350",
         "label": "부산 해운대구",
-        "unknown": false
+        "unknown": false,
+        "overseas": false
       },
       "isBusan": true,
       "isCapitalArea": false,
@@ -74,7 +75,8 @@
         "sido": "11",
         "sigungu": "11680",
         "label": "서울 강남구",
-        "unknown": false
+        "unknown": false,
+        "overseas": false
       },
       "isBusan": false,
       "isCapitalArea": true,

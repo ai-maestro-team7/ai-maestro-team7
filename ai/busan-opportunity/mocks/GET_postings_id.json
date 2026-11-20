@@ -43,7 +43,8 @@
       "sido": "11",
       "sigungu": "11680",
       "label": "서울 강남구",
-      "unknown": false
+      "unknown": false,
+      "overseas": false
     },
     "job": {
       "code": "D0101",
@@ -104,7 +105,8 @@
         "sido": "26",
         "sigungu": "26350",
         "label": "부산 해운대구",
-        "unknown": false
+        "unknown": false,
+        "overseas": false
       },
       "closesAt": "2026-12-05",
       "similarity": 0.86,
@@ -136,7 +138,8 @@
         "sido": "26",
         "sigungu": "26290",
         "label": "부산 남구",
-        "unknown": false
+        "unknown": false,
+        "overseas": false
       },
       "closesAt": "2026-11-30",
       "similarity": 0.81,

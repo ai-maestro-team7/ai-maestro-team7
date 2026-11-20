@@ -38,6 +38,11 @@ MATCH_NOT_PROBABILITY = "적합도는 실제 합격 확률이 아닙니다"
 SIMULATED = "시뮬레이션"
 SAMPLE_DATA = "데모 데이터"
 
+LOCAL_LIFE_TITLE = "이 동네에서 일하면"
+COMMUTE_LABEL = "집에서 대중교통 약 {minutes}분"
+OVERSEAS_LABEL = "해외 근무 · {country}"
+MOVE_NEEDED = "이사가 필요한 거리예요"
+
 POLICY_TOTAL_NOTE = "추첨·심사·선착순 정책은 '선정되면 최대'로 따로 셉니다"
 NATIONAL_COMMON_NOTE = "전국 공통 정책 {count}개는 어디서든 같아요"
 
