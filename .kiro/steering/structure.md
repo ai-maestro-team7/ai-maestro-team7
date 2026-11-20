@@ -18,6 +18,7 @@ ai/
   mentoring/            A 역량 분석·첨삭·학습 경로·통합 Agent
   busan-opportunity/    B 부산 기회 추천
   interview/            C AI 모의면접 함수
+  supervisor/           채팅 Agent (Strands, D-38, 개발계획서4)
 backend/                공통 백엔드·인프라 (API, 인증, DB·S3, 배포)
 frontend/               프론트엔드 화면
 ```
@@ -34,6 +35,7 @@ frontend/               프론트엔드 화면
 | `docs/개발계획서1.md` | A: 이력서·Story Bank·적합도·첨삭·역량 격차·학습 경로·통합 Agent·AI 검증·운영 |
 | `docs/개발계획서2.md` | B: 공고·정책 수집, 부산 우선 추천, 비교, 정책 지갑, 저장·알림, Action Group |
 | `docs/개발계획서3.md` | C: AI 모의면접 함수 명세 |
+| `docs/개발계획서4.md` | 채팅 Agent (공고·청년정책 함께 찾기, 모의면접 체험 연결) |
 | `docs/CONTRIBUTING.md` | 이슈·브랜치·커밋·PR·리뷰 |
 
 - API 계약·DB 설계·팀 환경 안내 문서(이전 뼈대의 `api.md`, `db-schema.md`, `team-guide.md`)는 지금 저장소에 없다.

@@ -5,6 +5,8 @@
 기준 문서: `docs/프로젝트_제안서.md` 7.3, `docs/개발계획서1.md`(A) §3·F-06·§6·§10·§12, `docs/개발계획서2.md`(B) §1.1·§2·§5·§10, `docs/개발계획서3.md`(C, PR #19 반영본) ★·§2·§5·§10, `docs/api.md`(v1.0), `docs/db-schema.md`(v1.3), `.kiro/specs/common-foundation/requirements.md` 결정 기록(PR #16 확정본), `AGENTS.md` "노션 허브 자료"·"B 작업 기준"(PR #20), 지식 패키지 `agent/` 폴더.
 원문과 이 문서가 다르면 원문을 따르고 이 문서를 고친다. "제안"은 이 문서가 처음 내놓은 안이라 팀 확인이 필요하고, "미확정"은 결정 기록에서 OPEN인 항목이다 (§12).
 
+> **2026-11-20 방향 변경 (D-38~D-40, 이슈 #122).** Supervisor는 Bedrock Agents가 아니라 **Strands Agents**로 `team07-api` 안에서 돈다. 패키지는 `ai/supervisor/`(§10-1 제안 반영), 입구는 `POST /api/v1/agent/chat`(202 + 조회)이고 `/api/v1/mentoring/agent/chat`은 쓰지 않는다. 도구는 B `agent_feed`·`agent_policies`·`ask_policies`와 A 문서·프로필 조회, 면접 준비 확인 다섯 개다. 홈이 채팅 화면이 되고, 채팅 조건·이력서로 공고와 청년정책을 함께 찾은 뒤 모의면접 체험을 제안한다. 아래 §2~§5의 Bedrock Agents·Action Group·`sessionAttributes` 설명은 B Action Group 경로(남겨 둠)와 이전 설계 기록이다. 지금 기준은 `docs/개발계획서4.md`다.
+
 ## 1. 원칙
 
 | 원칙 | 근거 |
@@ -73,7 +75,7 @@ flowchart TB
 
 | 구성 요소 | 종류 | 담당 | 하는 일 | 위치 |
 | --- | --- | --- | --- | --- |
-| CareerMentoringAgent | Supervisor (LLM) | A (A F-06, api.md §6.6) | 의도 분석, 프로필·워크스페이스 세션 확인, 도구 선택, 결과 연결, 다음 행동 제안 | `ai/mentoring/` (분리 제안 §10-1) |
+| CareerMentoringAgent | Supervisor (LLM, Strands, D-38) | A (A F-06, api.md §6.6) | 의도 분석, 프로필·워크스페이스 세션 확인, 도구 선택, 결과 연결, 다음 행동 제안 | `ai/supervisor/` (§10-1 반영, 개발계획서4) |
 | CareerMentoring Action Group | 도구 | A | 역량 프로필, 경험 블록, 적합도·격차, 첨삭, NCS 검색, 학습 경로 | `ai/mentoring/` |
 | BusanOpportunity Action Group | 도구 | B | 부산 우선 공고, 같은 일 부산 대안, 나란히 비교, 정책 지갑, 지역인재, 저장(P1) | `ai/busan-opportunity/src/opportunity/api/agent_handler.py` |
 | 면접관 에이전트 | 별도 Agent (LLM, Strands) | C | 질문 3개 생성, 꼬리질문 판단(최대 1개), 내용 평가, 피드백 | `ai/interview/` |
@@ -164,7 +166,7 @@ flowchart TB
 
 | 경로 | 같은 함수 | 파라미터 | 우선순위 |
 | --- | --- | --- | --- |
-| `GET /agent/postings` | `search_postings` | keyword, region(ALL, BUSAN), limit ≤ 5 | P0 |
+| `GET /agent/postings` | `search_postings` (`agent_feed`) | keyword, region(ALL, BUSAN, CAPITAL, 시·도 이름), limit ≤ 5, jobName, minSalary, careerType, organization (개발계획서4 §9) | P0 |
 | `GET /agent/postings/{jobPostingId}/alternatives` | `find_busan_alternatives` | jobPostingId | P0 |
 | `GET /agent/compare` | `compare_postings` | basePostingId, altPostingId | P0 |
 | `GET /agent/policies` | `match_policies` | stage | P0 |

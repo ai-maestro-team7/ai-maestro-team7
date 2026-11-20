@@ -29,6 +29,7 @@
         "max": 3800,
         "unit": "MANWON_YEAR"
       },
+      "careerType": "UNKNOWN",
       "matchScore": 0.74,
       "matchLevel": "GOOD",
       "eligibility": {
@@ -96,6 +97,7 @@
         "max": 4400,
         "unit": "MANWON_YEAR"
       },
+      "careerType": "UNKNOWN",
       "matchScore": 0.79,
       "matchLevel": "GOOD",
       "eligibility": {
@@ -153,6 +155,7 @@
         "min": 3200,
         "unit": "MANWON_YEAR"
       },
+      "careerType": "UNKNOWN",
       "matchScore": 0.61,
       "matchLevel": "FAIR",
       "eligibility": {
@@ -209,6 +212,7 @@
         "disclosed": false,
         "unit": "MANWON_YEAR"
       },
+      "careerType": "UNKNOWN",
       "matchScore": 0.52,
       "matchLevel": "FAIR",
       "badges": [],

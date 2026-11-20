@@ -8,7 +8,7 @@
 |---|---|
 | 리전 | `ap-northeast-2` |
 | 빠른 모델 | `global.anthropic.claude-haiku-5-5` (라우팅, 짧은 답변) |
-| 정확한 모델 | `global.anthropic.claude-sonnet-5-5` (분석, 첨삭) |
+| 정확한 모델 | `global.anthropic.claude-sonnet-5-5` (분석, 첨삭, 채팅 Agent `CHAT_MODEL_ID` 기본값) |
 | 임베딩 (KB용) | `global.cohere.embed-v4:0` (다국어), `amazon.titan-embed-text-v2:0` |
 
 바로 돌려 보기 (`aws login` 후):
