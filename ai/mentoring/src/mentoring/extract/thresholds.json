@@ -1,0 +1,8 @@
+{
+  "minTotalChars": 20,
+  "minPageChars": 5,
+  "minPrintableRatio": 0.85,
+  "maxBrokenRatio": 0.05,
+  "ocrMaxPolls": 20,
+  "ocrPollSeconds": 1.0
+}
