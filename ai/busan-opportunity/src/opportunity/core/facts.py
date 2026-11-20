@@ -65,7 +65,9 @@ def salary_disclosed(salary: Salary) -> bool:
 # 직무 일치의 근거 (`ranking.MatchBreakdown.job_basis`)
 BASIS_WORK24, BASIS_NAME, BASIS_NCS = "WORK24", "NAME", "NCS"
 BASIS_NCS_MAJOR_NAME = "NCS_MAJOR_NAME"  # NCS 대분류 이름과 희망 직무 이름이 겹침
-BASIS_NCS_KINDS = (BASIS_NCS, BASIS_NCS_MAJOR_NAME)
+BASIS_NCS_MAJOR = "NCS_MAJOR"  # 공고에 NCS 대분류 분류만 있고 그 대분류가 같음
+BASIS_NCS_KINDS = (BASIS_NCS, BASIS_NCS_MAJOR_NAME, BASIS_NCS_MAJOR)
+BASIS_NCS_MAJOR_ONLY = (BASIS_NCS_MAJOR_NAME, BASIS_NCS_MAJOR)  # 값이 몇이든 "대분류"라고만 말한다
 
 
 def job_fact(config: OpportunityConfig, job_match: float | None, *, basis: str | None = None) -> str | None:
@@ -76,6 +78,8 @@ def job_fact(config: OpportunityConfig, job_match: float | None, *, basis: str |
     levels = config.match.job_match_levels
     if job_match is None or job_match <= 0:
         return None
+    if basis in BASIS_NCS_MAJOR_ONLY:  # 대분류만 아는 공고는 점수(sameMajorCategoryOnly)와 상관없이 대분류라고 말한다
+        return FACT_JOB_NCS_MAJOR
     ncs = basis in BASIS_NCS_KINDS
     if job_match >= levels.exact:
         return FACT_JOB_NCS_EXACT if ncs else FACT_JOB_EXACT
