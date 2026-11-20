@@ -9,6 +9,8 @@ import logging
 import time
 
 from . import settings
+from .config import load_scoring_config
+from .delivery import measure_delivery
 from .errors import INVALID_INPUT, InterviewError
 from .follow_up import judge_follow_up
 from .models import (AnswerRecord, AnswerResult, NextQuestion, Question, Session, StartInterviewInput, dump,
@@ -98,12 +100,15 @@ def process_answer(session, answer_result, *, llm=None):
     pending = current.current_question
     base = _check_state(current, pending, result.answer_id)
     evaluable, reason, text = _evaluate(result)
+    # 전달력은 평가 가능한 답변만 잰다. LLM 호출 전에 한다 (순수 계산, 설정 오류만 실패)
+    delivery = (measure_delivery(text, result.transcription.words, load_scoring_config().delivery)
+                if evaluable else None)
 
     new = current.model_copy(deep=True)  # 받은 Session은 바꾸지 않는다
     new.answers.append(AnswerRecord(
         answer_id=pending.answer_id, question_id=pending.question_id, is_follow_up=pending.is_follow_up,
         question=pending.text, answer_text=text, evaluable=evaluable, reason=reason,
-        time_limit_reached=result.time_limit_reached,
+        time_limit_reached=result.time_limit_reached, delivery=delivery,
     ))
 
     action, next_question = None, None
@@ -127,8 +132,10 @@ def process_answer(session, answer_result, *, llm=None):
             new.current_question = None
             action = "REPORT"
 
-    logger.info("stage=%s action=%s evaluable=%s reason=%s durationMs=%d",
-                STAGE_ANSWER, action, evaluable, reason, _ms(started))
+    logger.info("stage=%s action=%s evaluable=%s reason=%s speechRateReason=%s longPauseReason=%s durationMs=%d",
+                STAGE_ANSWER, action, evaluable, reason,
+                delivery.speech_rate_reason if delivery is not None else None,
+                delivery.long_pause_reason if delivery is not None else None, _ms(started))
     return {
         "session": dump(new),
         "action": action,

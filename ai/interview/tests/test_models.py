@@ -162,6 +162,51 @@ def test_answer_record_consistency():
         AnswerRecord.model_validate(dict(base, answerText="", evaluable=False, reason=None))
 
 
+DELIVERY = {"answerSec": 60.0, "speechRate": 300.0, "speechRateReason": None, "longPauseCount": 0,
+            "longPausePerMin": 0.0, "longPauseReason": None}
+RECORD = {"answerId": "a-q1-1", "questionId": "q1", "isFollowUp": False, "question": "질문", "answerText": "답변",
+          "evaluable": True, "reason": None, "timeLimitReached": False}
+
+
+def test_answer_record_delivery_optional_for_first_stage_sessions():
+    # 1차 Session의 answers[]에는 delivery 키가 없다
+    assert AnswerRecord.model_validate(RECORD).delivery is None
+    assert AnswerRecord.model_validate(dict(RECORD, delivery=DELIVERY)).delivery.speech_rate == 300.0
+
+
+def test_delivery_accepts_ints_after_dynamodb_round_trip():
+    # backend to_plain: 300.0 → 300, 0.0 → 0
+    as_ints = {"answerSec": 60, "speechRate": 300, "speechRateReason": None, "longPauseCount": 0,
+               "longPausePerMin": 0, "longPauseReason": None}
+    record = AnswerRecord.model_validate(dict(RECORD, delivery=as_ints))
+    assert dump(record)["delivery"] == DELIVERY
+
+
+def test_unevaluable_answer_rejects_delivery():
+    bad = dict(RECORD, answerText="", evaluable=False, reason="NO_ANSWER", delivery=DELIVERY)
+    with pytest.raises(ValidationError):
+        AnswerRecord.model_validate(bad)
+
+
+@pytest.mark.parametrize("change", [
+    {"speechRate": None},                                   # 값도 사유도 없음
+    {"speechRateReason": "TOO_SHORT"},                      # 값과 사유가 같이 있음
+    {"longPauseCount": None},                               # 횟수만 빠짐
+    {"longPauseReason": "TOO_SHORT"},                       # 값과 사유가 같이 있음
+    {"longPauseCount": None, "longPausePerMin": None},      # 침묵 값도 사유도 없음
+    {"speechRateReason": "LOUD", "speechRate": None},       # 모르는 사유
+    {"answerSec": -1},
+])
+def test_delivery_value_or_reason(change):
+    with pytest.raises(ValidationError):
+        AnswerRecord.model_validate(dict(RECORD, delivery=dict(DELIVERY, **change)))
+
+
+def test_delivery_unknown_key_rejected():
+    with pytest.raises(ValidationError):
+        AnswerRecord.model_validate(dict(RECORD, delivery=dict(DELIVERY, words=[])))
+
+
 # ---------------------------------------------------------------- Answer_Result
 
 

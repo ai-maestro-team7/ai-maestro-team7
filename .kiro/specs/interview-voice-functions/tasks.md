@@ -9,7 +9,7 @@
   - [ ] 1.2 `models.py`에 `DeliveryMetrics`를 만들고 `AnswerRecord.delivery`(기본 None)를 추가한다. 평가 불가인데 `delivery`가 있으면 거절. 실수 필드는 int도 받는다
     - `test_models.py`: 1차 형식 Session 통과, 카멜 키, int로 돌아온 측정값 통과
     - _Requirements: 5.2, 5.3, 5.4_
-  - 커밋: `feat: 전달력 설정 파일과 측정값 모델 추가`
+  - 커밋: 2와 함께 한 커밋 (1만 커밋하면 `AnswerRecord`에 `delivery: null`이 생겨 기존 `test_flow`가 깨진다)
 
 - [ ] 2. 전달력 측정
   - [ ] 2.1 `delivery.py`에 `measure_delivery`를 만든다 (design §7). 항목마다 자기 `min_answer_sec`를 쓴다
@@ -17,7 +17,7 @@
     - _Requirements: 4.1~4.8_
   - [ ] 2.3 `flow.py` `process_answer`에서 평가 가능 답변만 측정해 기록한다. `test_flow.py`에 정상·무응답·변환 실패·시간 초과 케이스 추가
     - _Requirements: 5.1, 5.2, 5.5, 5.6_
-  - 커밋: `feat: 전달력 측정 추가`
+  - 커밋: `feat: 전달력 측정과 점수 설정 파일 추가`
 
 - [ ] 3. 질문 음성
   - [ ] 3.1 `settings.py`에 Polly·Transcribe 상수(#69의 생각 끄기 설정은 그대로), `voice.py`에 클라이언트 함수 3개와 `synthesize_question`을 만든다 (design §3, §4)
