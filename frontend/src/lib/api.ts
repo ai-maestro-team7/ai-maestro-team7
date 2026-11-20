@@ -73,6 +73,51 @@ export async function login(username: string, password: string): Promise<Session
   return session;
 }
 
+/** 소셜 로그인 제공자 (Cognito 외부 로그인). `id`는 `google`·`kakao`, `label`은 화면에 보일 이름 */
+export type SocialProvider = { id: string; label: string };
+
+/** `GET /api/v1/auth/social/providers` (토큰 없이). 설정되지 않았으면 빈 목록이다. */
+export async function getSocialProviders(): Promise<SocialProvider[]> {
+  const response = await fetch(`${API_BASE}/api/v1/auth/social/providers`);
+  if (!response.ok) throw await toApiError(response);
+  const body = (await response.json()) as { providers?: SocialProvider[] };
+  return body.providers ?? [];
+}
+
+/**
+ * `POST /api/v1/auth/social/start` (토큰 없이). Cognito 로그인 화면 주소(`authorizeUrl`)를 받는다.
+ * 제공자에게는 `openid`만 요청한다 (이름·이메일을 받지 않는다).
+ */
+export async function startSocialLogin(
+  provider: string,
+  redirectUri: string,
+  state: string,
+  codeChallenge: string,
+): Promise<string> {
+  const { authorizeUrl } = await postJson<{ authorizeUrl: string }>("/api/v1/auth/social/start", {
+    provider,
+    redirectUri,
+    state,
+    codeChallenge,
+  });
+  return authorizeUrl;
+}
+
+/**
+ * `POST /api/v1/auth/social/token` (토큰 없이). 인가 코드를 토큰으로 바꾸고 세션을 저장한다.
+ * `username`은 "Google 계정" 같은 고정 문구다. 코드가 틀리거나 만료면 401 INVALID_CREDENTIALS.
+ */
+export async function exchangeSocialCode(code: string, redirectUri: string, codeVerifier: string): Promise<Session> {
+  const tokens = await postJson<TokenResponse & { username?: string }>("/api/v1/auth/social/token", {
+    code,
+    redirectUri,
+    codeVerifier,
+  });
+  const session = sessionFrom(tokens, tokens.username ?? "소셜 계정");
+  saveSession(session);
+  return session;
+}
+
 /** 여러 요청이 동시에 401을 받아도 갱신은 한 번만 한다. */
 let refreshing: Promise<Session | null> | null = null;
 
