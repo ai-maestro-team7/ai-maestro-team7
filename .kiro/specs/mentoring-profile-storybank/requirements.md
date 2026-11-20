@@ -141,6 +141,7 @@ mentoring-profile-storybank는 A 파트(`docs/개발계획서1.md`)의 첫 후�
 8. THE Task_Runner SHALL 모델이 고른 Fact_Status 중 `VERIFIED`를 그대로 저장하지 않는다. 사용자가 확인하기 전의 역량은 `NEEDS_CONFIRMATION` 또는 `SUGGESTION`이고, `VERIFIED`는 Requirement 7의 사용자 확인으로만 생긴다 (A §4.2 "VERIFIED(사용자가 증빙 내용을 확인)", F-01 처리 11단계).
 9. THE Task_Runner SHALL 결과에 `modelId`, `promptVersion`, `schemaVersion`을 남기고, 모델 ID는 환경변수에서 읽는다 (tech.md "결과에는 modelId, promptVersion", AGENTS.md "노션 허브 자료").
 10. WHERE 역량을 NCS 능력단위와 연결하면, THE Task_Runner SHALL Reference_Lookup에 있는 능력단위 코드만 `ncsUnitCode`에 넣고, 없는 코드는 넣지 않는다 (A §2.1 "정형 계산용", tech.md "NCS 코드는 정형 데이터로 정확히 조회").
+11. THE Task_Runner SHALL 역량 이름(`name`)은 이력서 표현대로 두고, 표준 분류는 모델 입력에 함께 넘긴 공식 목록에서만 고르게 한다: `ncsUnitCode`는 사용자 희망 직무(`PROFILE#BASIC.desiredJobs[].ncsCode`)의 능력단위, `basicSkillId`는 NCS 직업기초능력. 넘긴 목록에 없는 값은 저장하지 않고, 희망 직무가 없으면 `ncsUnitCode`를 비운다 (제안서 4.1 "NCS 및 직무정보 기반 역량 표준화", A §4.3, #104 · 2026-11-20 A 결정).
 
 ### Requirement 7: 역량 프로필 저장, 조회, 사용자 확인
 
