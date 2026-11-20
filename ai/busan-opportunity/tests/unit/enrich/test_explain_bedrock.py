@@ -91,7 +91,7 @@ def test_bedrock_llm_request_shape(monkeypatch, config):
     assert request["modelId"] == "test-model"
     assert request["system"] == [{"text": "시스템"}]
     assert request["messages"] == [{"role": "user", "content": [{"text": "사용자"}]}]
-    assert request["inferenceConfig"] == {"maxTokens": 256, "temperature": 0}
+    assert request["inferenceConfig"] == {"maxTokens": 256}  # temperature는 보내지 않는다 (모델이 거절한다)
 
 
 def test_bedrock_embedder_request_shape(monkeypatch, config):
