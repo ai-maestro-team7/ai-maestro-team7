@@ -1,8 +1,12 @@
 """채팅 Agent 백엔드 연결 — /api/v1/agent/* (D-38, docs/개발계획서4.md §7)
 
-  POST /api/v1/agent/chat                                   {sessionId?, message, attachments?} → 202 {sessionId, messageId, status}
-  GET  /api/v1/agent/chat/{sessionId}                       대화와 메시지 목록
-  GET  /api/v1/agent/chat/{sessionId}/messages/{messageId}  Agent 답 하나 (화면이 2초마다 조회)
+  POST   /api/v1/agent/chat                                   {sessionId?, message, attachments?} → 202 {sessionId, messageId, status}
+  GET    /api/v1/agent/chat                                   내 대화 목록 (고정한 대화 먼저, 최근 순)
+  GET    /api/v1/agent/chat/{sessionId}                       대화와 메시지 목록
+  PATCH  /api/v1/agent/chat/{sessionId}                       {pinned} 대화 고정·고정 해제
+  DELETE /api/v1/agent/chat/{sessionId}                       대화와 메시지 지우기
+  GET    /api/v1/agent/chat/{sessionId}/messages/{messageId}  Agent 답 하나 (화면이 2초마다 조회)
+  POST   /api/v1/agent/chat/{sessionId}/messages/{messageId}/cancel  만드는 중인 답 멈추기
   run_task                                                  `agentTask` 이벤트 (Lambda 비동기 자기 호출, D-19)
 
 역할 분담:
@@ -208,32 +212,6 @@ class ProfileAdapter:
         return {k: v for k, v in to_plain(item).items() if k not in ("PK", "SK", "ownerUserId", "entityType")}
 
 
-class MentoringAdapter:
-    """A 직무 적합도 분석 (`mentoring.fit.analysis.create_analysis`). 화면 `/diagnosis`와 같은 함수를 부른다."""
-
-    def _deps(self):
-        import mentoring_api
-
-        factory = mentoring_api.aws_factory()
-        if factory is None:
-            raise TeamError(501, "NOT_IMPLEMENTED", "이력서 진단이 아직 연결되지 않았어요.")
-        return mentoring_api.deps(factory)
-
-    def start_job_fit(self, user_id, *, job_posting_id, target_ncs_code, idempotency_key):
-        from mentoring.core.profiles import get_latest_profile
-        from mentoring.fit.analysis import create_analysis
-        from mentoring.fit.records import AnalysisRequest
-
-        deps = self._deps()
-        profile = get_latest_profile(deps, user_id)  # 없으면 MentoringError 404 (도구가 사실로 돌려준다)
-        request = AnalysisRequest.model_validate({"profileId": profile.profile_id, "profileVersion": profile.profile_version,
-                                                  "jobPostingId": job_posting_id, "targetNcsCode": target_ncs_code})
-        body = create_analysis(deps, user_id, request, idempotency_key)
-        return {"analysisId": body["analysisId"], "status": body.get("status", "PENDING"),
-                "profileId": profile.profile_id, "profileVersion": profile.profile_version,
-                "documentId": (profile.source_document_ids or [""])[-1]}
-
-
 class SelfInvokeDispatcher:
     """SQS 대신 Lambda 비동기 자기 호출 (D-19). Lambda 밖이나 RUN_TASKS_INLINE=1이면 바로 실행."""
 
@@ -277,7 +255,7 @@ def deps():
     if _deps is None:
         _deps = Deps(store=DynamoChatStore(table()), opportunities=OpportunityAdapter(), docs=CareerDocsAdapter(),
                      profiles=ProfileAdapter(), runner=build_runner(), dispatcher=SelfInvokeDispatcher(),
-                     model_id=model_id(), hash_user_id=lambda u: hash_user_id(u)[:16], mentoring=MentoringAdapter())
+                     model_id=model_id(), hash_user_id=lambda u: hash_user_id(u)[:16])
     return _deps
 
 
@@ -309,10 +287,32 @@ def h_message(event, user_id, params):
     return 200, service.get_message(deps(), user_id, params["sessionId"], params["messageId"])
 
 
+def h_sessions(event, user_id, params):
+    return 200, service.list_sessions(deps(), user_id)
+
+
+def h_update_session(event, user_id, params):
+    return 200, service.update_session(deps(), user_id, params["sessionId"], parse_json(event))
+
+
+def h_delete_session(event, user_id, params):
+    return 200, service.delete_session(deps(), user_id, params["sessionId"])
+
+
+def h_cancel(event, user_id, params):
+    return 200, service.cancel_message(deps(), user_id, params["sessionId"], params["messageId"])
+
+
+SESSION = r"/api/v1/agent/chat/(?P<sessionId>[^/]+)"
+MESSAGE = SESSION + r"/messages/(?P<messageId>[^/]+)"
 ROUTES = [
     ("POST", r"/api/v1/agent/chat", h_chat),
-    ("GET", r"/api/v1/agent/chat/(?P<sessionId>[^/]+)", h_session),
-    ("GET", r"/api/v1/agent/chat/(?P<sessionId>[^/]+)/messages/(?P<messageId>[^/]+)", h_message),
+    ("GET", r"/api/v1/agent/chat", h_sessions),
+    ("GET", SESSION, h_session),
+    ("PATCH", SESSION, h_update_session),
+    ("DELETE", SESSION, h_delete_session),
+    ("GET", MESSAGE, h_message),
+    ("POST", MESSAGE + r"/cancel", h_cancel),
 ]
 
 

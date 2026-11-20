@@ -2,7 +2,6 @@
 
 부산커리어 화면. Figma "v2 · AI 티 걷어낸 버전"(파일 `orxq9z9EWqrYDNVviAG1aW`, 페이지 `27:1331`)을 Next.js로 옮겼다.
 로그인(카카오·Google)과 채용 공고·청년 정책 화면(홈 요약 포함)은 B 부산 기회 추천 API(`/api/v1/opportunities/*`)에 연결했다.
-진단·첨삭·학습 로드맵은 `/api/v1/mentoring` API를 부른다.
 모의면접은 `/api/v1/interview/*`를 부른다: 설정에서 세션을 만들고, 장비 점검에서 마이크·카메라를 확인하고(정면 보정), 면접에서 질문 음성 재생·녹음·2초 간격 캡처·답변 제출을 하고, 리포트에서 채점 결과를 보여준다 (`src/features/interview/`).
 AI 멘토만 아직 `src/features/mentor/data.ts`의 Mock 데이터를 읽는다. 홈에서 질문을 보내면 대화 화면(`/mentor/?c=<대화 ID>`)으로 넘어가 거기서 답을 보여준다.
 요구사항·설계·작업 목록은 `.kiro/specs/frontend-ui/`에 있다.
@@ -56,14 +55,11 @@ Next.js 16 (App Router) · React 19 · TypeScript strict · Tailwind CSS v4 · l
 ```text
 src/
 ├── app/                 라우트와 화면 조립
-│   ├── page.tsx         홈 (AI 멘토, 이어서 하기, 공고·정책 요약)
+│   ├── page.tsx         홈 (AI 멘토, 공고·정책 요약)
 │   ├── login/           로그인
 │   ├── mentor/          AI 멘토 대화 (?c=)
 │   ├── jobs/            채용 공고 목록, detail 상세 (?id=)
 │   ├── policies/        청년 지원 정책 목록, detail 상세 (?id=)
-│   ├── diagnosis/       이력서·직무 진단, result 결과
-│   ├── review/          AI 서류 첨삭
-│   ├── roadmap/         학습 로드맵
 │   └── interview/       모의면접 설정, check 장비 점검, session 면접, report 리포트
 ├── components/
 │   ├── ui/              범용 UI (Button, Chip, TextField, TextArea, Checkbox, RadioList, SubTabs,

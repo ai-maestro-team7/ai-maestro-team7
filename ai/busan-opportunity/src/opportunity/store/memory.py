@@ -8,7 +8,8 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from ..models.policy import Policy
-from ..models.posting import AltCandidates, CompanyRecord, PostingLatest, PostingName, PostingSnapshot
+from ..core.name_index import name_row
+from ..models.posting import AltCandidates, CompanyRecord, PostingLatest, PostingSnapshot
 from ..models.profile import BasicProfile, OppPrefs
 from ..models.user_state import ExplanationCache, Notification, PolicyAlert, SavedItem
 from ..ports import IdemResult, VectorHit
@@ -19,6 +20,7 @@ class MemoryCatalog:
     def __init__(self):
         self.snapshots: dict[tuple[str, str], PostingSnapshot] = {}
         self.latest: dict[str, PostingLatest] = {}
+        self.regional_index: dict[str, str] = {}  # jobPostingId → closesAt
         self.alts: dict[str, AltCandidates] = {}
         self.policies: dict[str, Policy] = {}
         self.companies: dict[str, CompanyRecord] = {}
@@ -42,9 +44,7 @@ class MemoryCatalog:
         return sorted(rows, key=lambda p: (p.closes_at, p.job_posting_id))[:limit]
 
     def posting_names(self):
-        return [PostingName(job_posting_id=p.job_posting_id, organization=p.organization, title=p.title,
-                            job_name=p.job.name, closes_at=p.closes_at)
-                for p in sorted(self.latest.values(), key=lambda p: p.job_posting_id) if not p.is_expired]
+        return [name_row(p) for p in sorted(self.latest.values(), key=lambda p: p.job_posting_id) if not p.is_expired]
 
     def query_policies(self, region_key):
         rows = [p for p in self.policies.values() if p.region_key() == region_key]
@@ -67,6 +67,15 @@ class MemoryCatalog:
 
     def put_latest(self, latest):
         self.latest[latest.job_posting_id] = latest
+
+    def put_regional_index(self, latest):
+        self.regional_index[latest.job_posting_id] = latest.closes_at
+
+    def delete_regional_index(self, job_posting_id):
+        self.regional_index.pop(job_posting_id, None)
+
+    def list_regional_index(self, *, closes_from):
+        return sorted(i for i, closes in self.regional_index.items() if closes >= closes_from)
 
     def put_alts(self, alts):
         self.alts[alts.job_posting_id] = alts

@@ -8,14 +8,46 @@ from datetime import date, datetime, timedelta
 
 from ..config import OpportunityConfig
 from ..core import clock
-from ..models.enums import ExtractStatus, PolicySource
+from ..core.facts import is_relocated
+from ..enrich.extract import KEEP_OWNERS
+from ..enrich.regional_talent import judge_posting_regional_talent
+from ..models.enums import ExtractStatus, PolicySource, RegionalTalentStatus
 from ..models.policy import ALWAYS_APPLY_END, Policy
-from ..models.posting import CompanyRecord, PostingSnapshot, latest_from_snapshot
+from ..models.posting import CompanyRecord, PostingLatest, PostingSnapshot, latest_from_snapshot
 from ..ports import CatalogRepo
 
 # 마감 처리 때 지난 며칠까지 거슬러 읽을지, 시·도마다 몇 건까지 읽을지. 설정 파일에 자리가 생기면 옮긴다.
 EXPIRE_LOOKBACK_DAYS = 14
 EXPIRE_QUERY_LIMIT = 1000
+
+
+def has_regional_conditions(latest: PostingLatest | None) -> bool:
+    """지역 조건 색인에 둘 공고인지. 진행 중이고 공고문에서 지역 조건을 찾은(LIKELY) 공고."""
+    talent = latest.regional_talent if latest else None
+    return bool(latest and not latest.is_expired and talent and talent.status == RegionalTalentStatus.LIKELY)
+
+
+def sync_regional_index(catalog: CatalogRepo, before: PostingLatest | None, after: PostingLatest) -> None:
+    """LATEST를 쓴 뒤 지역 조건 색인을 맞춘다. 조건이 있으면 넣고(마감일 갱신), 없어졌거나 마감되면 지운다."""
+    if has_regional_conditions(after):
+        catalog.put_regional_index(after)
+    elif has_regional_conditions(before):
+        catalog.delete_regional_index(after.job_posting_id)
+
+
+def rejudge_regional_talent(config: OpportunityConfig, snapshot: PostingSnapshot) -> PostingSnapshot:
+    """공고문의 지역 조건을 지금 규칙으로 다시 읽는다. 내용이 같아도 규칙이 바뀌면 값이 바뀐다.
+
+    부산 이전기관인지는 이전 보강에서 붙인 배지로 안다. 사람이 넣은 값(API·MANUAL)은 그대로 둔다.
+    값이 같으면 같은 객체를 돌려준다.
+    """
+    if snapshot.extracted_by.get("regionalTalent") in KEEP_OWNERS:
+        return snapshot
+    text = "\n".join(x for x in (snapshot.title, snapshot.job_description or "") if x)
+    talent = judge_posting_regional_talent(config, snapshot, text, relocated=is_relocated(snapshot.badges))
+    if talent == snapshot.regional_talent:
+        return snapshot
+    return snapshot.model_copy(update={"regional_talent": talent})
 
 
 def upsert_postings(config: OpportunityConfig, catalog: CatalogRepo, snapshots: list[PostingSnapshot], *,
@@ -38,9 +70,14 @@ def upsert_postings(config: OpportunityConfig, catalog: CatalogRepo, snapshots: 
         previous = catalog.get_snapshot(snap.job_posting_id, latest.snapshot_id) if latest else None
 
         if previous is not None and previous.content_hash == snap.content_hash:
-            refreshed = latest.model_copy(update={"checked_at": checked_at, "is_expired": expired})
+            judged = rejudge_regional_talent(config, previous)
+            if judged is not previous:
+                catalog.put_snapshot(judged)
+            refreshed = latest.model_copy(update={"checked_at": checked_at, "is_expired": expired,
+                                                  "regional_talent": judged.regional_talent})
             if refreshed != latest:
                 catalog.put_latest(refreshed)
+            sync_regional_index(catalog, latest, refreshed)
             result["unchanged"] += 1
             continue
 
@@ -50,10 +87,17 @@ def upsert_postings(config: OpportunityConfig, catalog: CatalogRepo, snapshots: 
                                           "company_id": snap.company_id or previous.company_id})
         stored = catalog.get_snapshot(new.job_posting_id, new.snapshot_id)
         if stored is None:  # 같은 날 A→B→A로 돌아온 경우는 이미 있는 스냅샷(보강 결과 포함)을 다시 가리킨다
-            catalog.put_snapshot(new)
-            stored = new
-        catalog.put_latest(latest_from_snapshot(stored, busan_sido=config.data.busan_sido,
-                                                capital_sido=config.data.capital_area_sido, is_expired=expired))
+            stored = rejudge_regional_talent(config, new)
+            catalog.put_snapshot(stored)
+        else:
+            judged = rejudge_regional_talent(config, stored)
+            if judged is not stored:
+                catalog.put_snapshot(judged)
+                stored = judged
+        written = latest_from_snapshot(stored, busan_sido=config.data.busan_sido,
+                                       capital_sido=config.data.capital_area_sido, is_expired=expired)
+        catalog.put_latest(written)
+        sync_regional_index(catalog, latest, written)
         result["created" if latest is None else "updated"] += 1
         if stored.extract_status != ExtractStatus.DONE:
             result["needsEnrich"].append(stored.job_posting_id)
@@ -81,7 +125,9 @@ def expire_postings(config: OpportunityConfig, catalog: CatalogRepo, *,
     changed = 0
     for row in rows.values():
         if not row.is_expired and clock.is_expired(row.closes_at, when):
-            catalog.put_latest(row.model_copy(update={"is_expired": True}))
+            expired = row.model_copy(update={"is_expired": True})
+            catalog.put_latest(expired)
+            sync_regional_index(catalog, row, expired)
             changed += 1
     return changed
 

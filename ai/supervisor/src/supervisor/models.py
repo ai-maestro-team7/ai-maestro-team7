@@ -24,6 +24,7 @@ class MessageStatus(StrEnum):
     PROCESSING = "PROCESSING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
+    CANCELLED = "CANCELLED"  # 사용자가 답을 만드는 중에 멈췄다. 늦게 나온 결과는 저장하지 않는다
 
 
 class CardType(StrEnum):
@@ -37,7 +38,8 @@ class ActionType(StrEnum):
     START_INTERVIEW = "START_INTERVIEW"            # 저장된 자소서로 면접 화면 이동
     REQUEST_COVER_LETTER = "REQUEST_COVER_LETTER"  # 자소서 입력 받기 → 면접 화면 이동
     CONDITIONS_SAVED = "CONDITIONS_SAVED"          # 사용자가 채팅으로 저장을 승낙해 저장 도구가 저장함
-    OPEN_DIAGNOSIS = "OPEN_DIAGNOSIS"              # A 이력서·직무 진단을 시작함 → 진단 결과 화면으로
+    # 지난 대화를 읽기 위해서만 남긴다. 진단 도구를 지워(#155) 새로 만들지 않고, 화면도 그리지 않는다
+    OPEN_DIAGNOSIS = "OPEN_DIAGNOSIS"
 
 
 # ---------------------------------------------------------------- 요청
@@ -82,7 +84,7 @@ class ChatAction(SupModel):
     profile_patch: dict[str, Any] | None = None
     min_chars: int | None = None
     max_chars: int | None = None
-    # OPEN_DIAGNOSIS: 화면이 진단 흐름(analysisId·profileId…)을 저장하고 결과 화면을 연다
+    # 지난 대화의 OPEN_DIAGNOSIS 행동을 읽을 때만 채워진다 (#155에서 진단 도구 삭제)
     analysis_id: str | None = None
     profile_id: str | None = None
     profile_version: int | None = None
@@ -134,6 +136,7 @@ class ChatSession(SupModel):
     pending_message_id: str | None = None
     pending_since: str | None = None
     message_count: int = 0
+    pinned: bool = False  # 대화 목록 위에 고정
     created_at: str
     last_message_at: str
 

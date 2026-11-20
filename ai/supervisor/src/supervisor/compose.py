@@ -62,13 +62,6 @@ def actions(deps: Deps, record: TurnRecord) -> list[ChatAction]:
         if patch:
             out.append(ChatAction(type=ActionType.SAVE_CONDITIONS, conditions=labels, profile_patch=patch))
 
-    diagnosis = record.diagnosis
-    if diagnosis is not None:
-        out.append(ChatAction(type=ActionType.OPEN_DIAGNOSIS, job=diagnosis.target_role,
-                              analysis_id=diagnosis.analysis_id, profile_id=diagnosis.profile_id,
-                              profile_version=diagnosis.profile_version, document_id=diagnosis.document_id,
-                              target_ncs_code=diagnosis.target_ncs_code, job_posting_id=diagnosis.job_posting_id))
-
     interview = record.interview
     if interview is not None:
         if interview.cover_letter is not None:

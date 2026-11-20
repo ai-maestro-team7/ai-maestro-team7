@@ -91,19 +91,6 @@ class FakeProfiles:
         return self.profiles[user_id]
 
 
-class FakeMentoring:
-    def __init__(self, error=None):
-        self.calls = []
-        self.error = error
-
-    def start_job_fit(self, user_id, *, job_posting_id, target_ncs_code, idempotency_key):
-        self.calls.append((user_id, job_posting_id, target_ncs_code, idempotency_key))
-        if self.error:
-            raise self.error
-        return {"analysisId": "analysis-0001", "status": "PENDING", "profileId": "profile-1", "profileVersion": 2,
-                "documentId": "doc-r1"}
-
-
 class ScriptedRunner:
     """script(tools_by_name, call) → ChatReply. 실행할 때마다 다음 스크립트를 쓴다. 마지막 것을 되풀이한다."""
 
@@ -140,8 +127,7 @@ def build_deps(runner, *, documents=None, terms=None, profiles=None, summary=Non
     deps = Deps(store=MemoryChatStore(), opportunities=FakeOpportunities(), docs=FakeDocs(documents, terms, summary),
                 profiles=FakeProfiles(profiles if profiles is not None else {"demo1": {
                     "desiredJobs": [{"name": "데이터 분석", "ncsCode": "20010105"}], "desiredRegion": "26"}}),
-                runner=runner, dispatcher=Dispatcher(), model_id="test-model", now=lambda: clock["now"],
-                mentoring=FakeMentoring())
+                runner=runner, dispatcher=Dispatcher(), model_id="test-model", now=lambda: clock["now"])
     deps.clock = clock  # 테스트에서 시간을 옮긴다
     return deps
 

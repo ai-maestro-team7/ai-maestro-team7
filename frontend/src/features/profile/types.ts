@@ -7,7 +7,7 @@ export type BasicProfile = {
   residenceSigungu?: string;
   educationLevel?: string;
   graduationStatus?: string;
-  /** 최종 학교 소재지 시·도 (지역인재 판정). 대학원이면 학부 대학, 고졸이면 고등학교 */
+  /** 최종 학교 소재지 시·도 (지역 혜택 판정). 대학원이면 학부 대학, 고졸이면 고등학교 */
   universityRegion?: string;
   /** 대학 이름 (전문대 이상만) */
   schoolName?: string;

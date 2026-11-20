@@ -15,12 +15,25 @@ export function PageContainer({ children, className }: { children: ReactNode; cl
   );
 }
 
-/** 본문 700px + 오른쪽 332px, 사이 48px. `lg` 미만에서는 위아래로 쌓는다. */
-export function TwoColumn({ main, rail, className }: { main: ReactNode; rail: ReactNode; className?: string }) {
+/**
+ * 본문 700px + 오른쪽 332px, 사이 48px. `lg` 미만에서는 위아래로 쌓는다.
+ * stickyRail이면 넓은 화면에서 오른쪽 칸이 스크롤을 따라 위에 붙어 있다 (공고 상세의 적합도·버튼).
+ */
+export function TwoColumn({
+  main,
+  rail,
+  className,
+  stickyRail = false,
+}: {
+  main: ReactNode;
+  rail: ReactNode;
+  className?: string;
+  stickyRail?: boolean;
+}) {
   return (
     <div className={cn("flex w-full flex-col gap-12 lg:flex-row lg:items-start", className)}>
       <div className="flex w-full min-w-0 flex-col lg:max-w-main lg:flex-1">{main}</div>
-      <div className="flex w-full flex-col lg:w-rail lg:shrink-0">{rail}</div>
+      <div className={cn("flex w-full flex-col lg:w-rail lg:shrink-0", stickyRail && "lg:sticky lg:top-6")}>{rail}</div>
     </div>
   );
 }

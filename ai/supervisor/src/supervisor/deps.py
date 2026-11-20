@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 
 from .config import SupervisorConfig, get_config
-from .ports import AgentRunner, CareerDocsPort, ChatStore, Dispatcher, MentoringPort, OpportunityPort, ProfilePort
+from .ports import AgentRunner, CareerDocsPort, ChatStore, Dispatcher, OpportunityPort, ProfilePort
 
 KST = timezone(timedelta(hours=9))
 
@@ -41,7 +41,6 @@ class Deps:
     dispatcher: Dispatcher
     model_id: str
     config: SupervisorConfig = field(default_factory=get_config)
-    mentoring: MentoringPort | None = None  # 없으면 진단 도구가 NOT_IMPLEMENTED를 돌려준다
     hash_user_id: Callable[[str], str] = _hash  # 로그용. 백엔드가 공통 해시를 넣는다
     now: Callable[[], datetime] = now_kst
     new_session_id: Callable[[], str] = new_session_id

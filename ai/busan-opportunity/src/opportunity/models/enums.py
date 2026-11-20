@@ -108,6 +108,16 @@ class RegionalTalentStatus(StrEnum):
     NOT_APPLICABLE = "NOT_APPLICABLE"
 
 
+class RegionalBenefitKind(StrEnum):
+    """공고문에 적힌 지역 조건 하나의 기준. 사용자의 학교 소재지·거주지와 견준다 (`core.facts`)."""
+
+    NON_CAPITAL = "NON_CAPITAL"  # 비수도권 지역인재: 수도권(서울·인천·경기) 밖 학교
+    SCHOOL = "SCHOOL"            # 그 시·도 학교: 이전지역인재, "충청권 지역인재" 같은 권역 인재
+    RESIDENCE = "RESIDENCE"      # 그 지역 거주: 시·군·구 단위 지역 제한, 거주자 우대
+    SCHOOL_OR_RESIDENCE = "SCHOOL_OR_RESIDENCE"  # 시·도 단위 지역 제한. 그 시·도 학교나 거주 어느 쪽이든
+    UNKNOWN = "UNKNOWN"          # "지역인재"라고만 있고 어느 지역인지 공고문에 없음
+
+
 class BadgeType(StrEnum):
     CHEONGKKEUL = "CHEONGKKEUL"                    # 청끌기업
     GANGSO = "GANGSO"                              # 청년일자리강소기업

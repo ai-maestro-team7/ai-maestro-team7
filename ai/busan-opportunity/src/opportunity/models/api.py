@@ -12,6 +12,7 @@ from .base import OppModel
 from .enums import (
     CareerType,
     CompareKey,
+    EmploymentType,
     ConditionResult,
     EligibilityStatus,
     LeaveReason,
@@ -95,6 +96,35 @@ class FeedResponse(OppModel):
     next_cursor: str | None = None
     ask_leave_reason: bool = False  # 지역 필터를 수도권으로 처음 바꿨을 때 한 번
     empty_message: str | None = None
+
+
+# ---------------------------------------------------------------- 로그인 없이 보는 공고 목록 (B-D10)
+class PublicPostingCard(OppModel):
+    """로그인 없이 보는 공고 한 줄. 프로필을 쓰지 않아 적합도·자격 판정·부산 대안 수 같은 개인 값이 없다."""
+
+    job_posting_id: str
+    title: str
+    organization: str
+    org_type: OrgType = OrgType.PRIVATE
+    work_region: WorkRegion
+    is_busan: bool = False
+    is_overseas: bool = False
+    job: Job
+    closes_at: str
+    rolling: bool = False
+    salary: Salary
+    career_type: CareerType = CareerType.UNKNOWN
+    employment_type: EmploymentType = EmploymentType.UNKNOWN
+    badges: list[Badge] = Field(default_factory=list)
+    is_sample: bool = False
+
+
+class PublicPostingList(OppModel):
+    items: list[PublicPostingCard] = Field(default_factory=list)
+    total: int = 0  # 분류·검색어에 맞는 진행 중 공고 수 (모든 쪽 합)
+    next_cursor: str | None = None
+    data_as_of: str | None = None
+    stale: bool = False
 
 
 # ---------------------------------------------------------------- 대안 (B-05)

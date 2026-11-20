@@ -29,6 +29,7 @@ import {
   salaryText,
 } from "../lib";
 import type { PostingDetailResponse } from "../types";
+import { SaveToggle } from "./SaveToggle";
 
 const SOURCE_LABELS: Record<string, string> = {
   WORK24: "고용24",
@@ -86,13 +87,14 @@ function PostingView({ detail }: { detail: PostingDetailResponse }) {
   ].filter(Boolean);
   const regionalTalent =
     detail.regionalTalent && detail.regionalTalent.status !== "NOT_APPLICABLE"
-      ? (detail.regionalTalent.message ?? "지역인재 전형 대상일 수 있어요 · 공고문 확인")
+      ? (detail.regionalTalent.message ?? "지역 조건에 맞을 수 있어요 · 공고문 확인")
       : null;
 
   return (
     <div className="flex w-full flex-col gap-5">
       <Breadcrumb items={[{ label: "채용 공고", href: "/jobs" }, { label: posting.organization }]} />
       <TwoColumn
+        stickyRail
         main={
           <article className="flex flex-col">
             <header className="flex flex-col gap-3.5 pb-7">
@@ -221,7 +223,10 @@ function PostingView({ detail }: { detail: PostingDetailResponse }) {
         rail={
           <Panel as="aside" aria-label="나와의 적합도" className="flex flex-col gap-4 p-5">
             <div className="flex flex-col">
-              <p className="text-small text-grey-600">나와의 적합도</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-small text-grey-600">나와의 적합도</p>
+                <SaveToggle jobPostingId={posting.jobPostingId} jobTitle={`${posting.organization} ${posting.title}`} />
+              </div>
               <p
                 className={cn(
                   "text-title font-bold",
@@ -242,9 +247,6 @@ function PostingView({ detail }: { detail: PostingDetailResponse }) {
             <div className="flex flex-col gap-2 pt-1.5">
               <Button href={interviewHref(posting.title)} fullWidth>
                 이 공고로 모의면접
-              </Button>
-              <Button href="/diagnosis/result" variant="secondary" fullWidth>
-                직무 진단 자세히 보기
               </Button>
             </div>
             <p className="text-small text-grey-600">내 프로필을 공고 요건과 비교한 결과예요. 합격 확률이 아니에요.</p>

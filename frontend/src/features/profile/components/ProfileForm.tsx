@@ -312,7 +312,7 @@ function ProfileFields({ profile }: { profile: BasicProfile | null }) {
             />
           </Row>
           <p className="text-small text-grey-600">
-            부산에 있는 학교를 졸업했거나 졸업 예정이면 이전 공공기관의 지역인재 전형 대상일 수 있어서 따로 알려 드려요.
+            학교 지역으로 비수도권·이전지역 인재 같은 지역 혜택 대상인지 함께 살펴 알려 드려요.
             {GRADUATE_SCHOOL.has(form.educationLevel) && " 대학원을 마쳤다면 학부 대학 기준이에요."}
           </p>
         </div>

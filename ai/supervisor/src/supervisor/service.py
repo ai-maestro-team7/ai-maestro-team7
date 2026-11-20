@@ -2,6 +2,8 @@
 
 start_turn: 요청 검사 → 대화 잡기 → 사용자 메시지·빈 답(PENDING) 저장 → 비동기 실행 보내기 → 202 본문
 run_turn:   PENDING → PROCESSING → Strands Agent 실행 → 답 검사(1회 재시도) → 카드·행동 조립 → COMPLETED / FAILED
+cancel_message: 만드는 중인 답 → CANCELLED, 대화 잠금 풀기. 늦게 끝난 실행의 결과는 저장하지 않는다
+list_sessions·update_session·delete_session: 채팅 화면의 대화 목록, 고정, 삭제
 """
 
 import logging
@@ -128,8 +130,9 @@ def _pending_save(messages: list[ChatMessage], user_message: ChatMessage) -> dic
 
 
 def _recent_postings(messages: list[ChatMessage], user_message: ChatMessage) -> list[dict]:
-    """바로 앞 Agent 답의 공고 카드."""
-    before = [m for m in messages if m.message_id < user_message.message_id and m.role == Role.ASSISTANT]
+    """바로 앞 Agent 답의 공고 카드. 사용자가 멈춘 답은 건너뛴다 (화면에 카드가 없었다)."""
+    before = [m for m in messages if m.message_id < user_message.message_id and m.role == Role.ASSISTANT
+              and m.status != MessageStatus.CANCELLED]
     if not before:
         return []
     return [c.posting for c in before[-1].cards if c.posting]
@@ -204,7 +207,12 @@ def run_turn(deps: Deps, task: dict) -> dict:
     else:
         final = base.model_copy(update={"status": MessageStatus.FAILED, "error": error,
                                         "tool_calls": tools.record.calls if tools else []})
-    deps.store.put_message(final)
+    if not deps.store.finish_message(final):
+        # 그사이 사용자가 멈췄거나 대화를 지웠다. 늦게 나온 결과는 버린다 (cancel_message가 잠금도 이미 풀었다)
+        deps.store.end_turn(user_id, session_id, message_id, now=now_iso)
+        logger.info("stage=chat.dropped userHash=%s messageId=%s durationMs=%d", user_hash, message_id,
+                    round((time.perf_counter() - started) * 1000))
+        return {"messageId": message_id, "status": "SKIPPED", "reason": "CANCELLED"}
     deps.store.end_turn(user_id, session_id, message_id, now=now_iso)
     logger.info("stage=chat.finished userHash=%s messageId=%s status=%s tools=%s errorCode=%s durationMs=%d",
                 user_hash, message_id, final.status.value, ",".join(c.name for c in final.tool_calls),
@@ -229,3 +237,53 @@ def get_session(deps: Deps, user_id: str, session_id: str) -> dict:
         raise session_not_found()
     messages = deps.store.list_messages(user_id, session_id, deps.config.max_messages_per_session)
     return {**session.view(), "messages": [m.view() for m in messages if m.owner_user_id == user_id]}
+
+
+# ---------------------------------------------------------------- 멈추기
+def cancel_message(deps: Deps, user_id: str, session_id: str, message_id: str) -> dict:
+    """만드는 중인 답을 멈춘다. 이미 돌고 있는 모델은 끝까지 갈 수 있지만 그 결과는 저장하지 않는다 (finish_message 조건).
+
+    멈추면 대화 잠금을 바로 풀어 다음 말을 보낼 수 있다. 그사이 답이 끝났으면 끝난 답을 그대로 돌려준다.
+    """
+    session_id = _check_id(session_id, "sessionId", "chat-")
+    message_id = _check_id(message_id, "messageId")
+    message = deps.store.get_message(user_id, session_id, message_id)
+    if message is None or message.owner_user_id != user_id or message.role != Role.ASSISTANT:
+        raise message_not_found()
+    now_iso = deps.now_iso()
+    if deps.store.cancel_message(user_id, session_id, message_id, now=now_iso):
+        deps.store.end_turn(user_id, session_id, message_id, now=now_iso)
+        logger.info("stage=chat.cancelled userHash=%s messageId=%s", deps.hash_user_id(user_id), message_id)
+        message = deps.store.get_message(user_id, session_id, message_id) or message
+    return message.view()
+
+
+# ---------------------------------------------------------------- 대화 목록·고정·삭제
+def list_sessions(deps: Deps, user_id: str) -> dict:
+    """내 대화 목록. 고정한 대화가 먼저, 그 안과 밖은 최근에 말한 순서. 메시지는 넣지 않는다."""
+    sessions = [s for s in deps.store.list_sessions(user_id) if s.owner_user_id == user_id]
+    sessions.sort(key=lambda s: s.last_message_at, reverse=True)
+    sessions.sort(key=lambda s: not s.pinned)  # 안정 정렬이라 고정한 대화 안에서도 최근 순서가 남는다
+    return {"sessions": [s.view() for s in sessions[:deps.config.max_sessions_listed]]}
+
+
+def update_session(deps: Deps, user_id: str, session_id: str, body: dict) -> dict:
+    """대화 고정·고정 해제. 지금은 `pinned`만 바꿀 수 있다."""
+    session_id = _check_id(session_id, "sessionId", "chat-")
+    if not isinstance(body, dict) or set(body) != {"pinned"} or not isinstance(body["pinned"], bool):
+        raise invalid_input("pinned(true 또는 false)만 바꿀 수 있어요.")
+    session = deps.store.get_session(user_id, session_id)
+    if session is None or session.owner_user_id != user_id or not deps.store.set_pinned(user_id, session_id,
+                                                                                         body["pinned"]):
+        raise session_not_found()
+    return session.model_copy(update={"pinned": body["pinned"]}).view()
+
+
+def delete_session(deps: Deps, user_id: str, session_id: str) -> dict:
+    """대화와 메시지를 모두 지운다. 답을 만드는 중이어도 지운다 (늦게 끝난 결과는 finish_message가 버린다)."""
+    session_id = _check_id(session_id, "sessionId", "chat-")
+    session = deps.store.get_session(user_id, session_id)
+    if session is None or session.owner_user_id != user_id or not deps.store.delete_session(user_id, session_id):
+        raise session_not_found()
+    logger.info("stage=chat.deleted userHash=%s", deps.hash_user_id(user_id))
+    return {"sessionId": session_id, "deleted": True}

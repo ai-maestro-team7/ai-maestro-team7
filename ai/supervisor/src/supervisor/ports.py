@@ -38,6 +38,26 @@ class ChatStore(Protocol):
         """PENDING → PROCESSING 조건부 전이. 바꿨으면 True (같은 작업이 두 번 와도 한 번만 돈다)."""
         ...
 
+    def finish_message(self, message: ChatMessage) -> bool:
+        """실행이 잡은(PROCESSING) 답만 결과로 바꾼다. 그사이 멈췄거나 지운 답이면 False (늦은 결과는 버린다)."""
+        ...
+
+    def cancel_message(self, user_id: str, session_id: str, message_id: str, *, now: str) -> bool:
+        """만드는 중(PENDING·PROCESSING)인 답을 CANCELLED로 바꾼다. 이미 끝난 답이면 False."""
+        ...
+
+    def list_sessions(self, user_id: str) -> list[ChatSession]:
+        """내 대화 전부 (`SESSION#` Query). 순서는 서비스가 정한다."""
+        ...
+
+    def set_pinned(self, user_id: str, session_id: str, pinned: bool) -> bool:
+        """대화 고정을 바꾼다. 없는 대화면 False."""
+        ...
+
+    def delete_session(self, user_id: str, session_id: str) -> bool:
+        """대화와 그 메시지를 모두 지운다. 없는 대화면 False."""
+        ...
+
 
 class OpportunityPort(Protocol):
     """B 함수 (`opportunity.api.agent_handler`). 응답은 B Agent 응답의 카멜 dict 그대로다."""
@@ -86,18 +106,6 @@ class ProfilePort(Protocol):
 
     def update_basic_profile(self, user_id: str, patch: dict) -> dict:
         """보낸 항목만 바꾼다 (`PUT /api/v1/me/profile`과 같은 검사). 바뀐 프로필을 돌려준다."""
-        ...
-
-
-class MentoringPort(Protocol):
-    """A 멘토링 함수 (`mentoring.fit.analysis.create_analysis`, 개발계획서1 F-02). 화면 `/diagnosis`와 같은 함수다."""
-
-    def start_job_fit(self, user_id: str, *, job_posting_id: str | None, target_ncs_code: str | None,
-                      idempotency_key: str) -> dict:
-        """최신 역량 프로필로 직무 적합도 분석을 시작한다 (202, 비동기).
-
-        돌려주는 것: {analysisId, status, profileId, profileVersion, documentId}. 역량 프로필이 없으면 오류(code, message).
-        """
         ...
 
 

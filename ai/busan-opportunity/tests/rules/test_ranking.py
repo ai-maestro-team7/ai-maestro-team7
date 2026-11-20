@@ -553,10 +553,10 @@ def test_card_says_likely_only_when_school_is_in_busan(deps, as_of):
     card = next(c for c in feed(deps, as_of, "demo3").items if c.job_posting_id == w.BUSAN_FINANCE_PUBLIC)
     assert card.regional_talent == RegionalTalentStatus.LIKELY
     assert facts.FACT_REGIONAL_TALENT_CARD in card.facts
-    for region in ("11", None):
+    for region, status in (("11", None), (None, RegionalTalentStatus.CHECK_NEEDED)):
         _school(deps, "demo3", region)
         card = next(c for c in feed(deps, as_of, "demo3").items if c.job_posting_id == w.BUSAN_FINANCE_PUBLIC)
-        assert card.regional_talent == RegionalTalentStatus.CHECK_NEEDED
+        assert card.regional_talent == status
         assert facts.FACT_REGIONAL_TALENT_CARD not in card.facts
 
 
@@ -622,3 +622,15 @@ def test_sido_feed_queries_that_sido(deps, as_of):
     items = feed(deps, as_of, region="11").items
     assert items and all(c.work_region.sido == "11" for c in items)
     assert {"$in": ["11"]} in [f.get("sido") for f in spy.filters]
+
+
+# ---------------------------------------------------------------- 공기업·사기업 (B-D10)
+def test_feed_sector_filter(deps, as_of):
+    everything = feed(deps, as_of).items
+    public, private = feed(deps, as_of, sector="PUBLIC").items, feed(deps, as_of, sector="PRIVATE").items
+    assert public and private
+    assert all(c.org_type in ("PUBLIC_INSTITUTION", "LOCAL_PUBLIC") for c in public)
+    assert all(c.org_type == "PRIVATE" for c in private)
+    assert {c.job_posting_id for c in public} | {c.job_posting_id for c in private} == {c.job_posting_id for c in everything}
+    with pytest.raises(OppError):
+        feed(deps, as_of, sector="GOVERNMENT")

@@ -8,7 +8,7 @@ import pytest
 from fakes import NOW, ScriptedRunner, build_deps, cover_letter, invalid, reply
 from supervisor import service
 from supervisor.errors import SupervisorError
-from supervisor.models import ActionType, MessageStatus
+from supervisor.models import ActionType, ChatAction, MessageStatus
 
 
 def ask(deps, message="부산 데이터 분석 신입 공고 찾아줘", user="demo1", **extra):
@@ -336,69 +336,25 @@ def test_prompt_v3_rules():
     for rule in ("공식 데이터에는 조건에 맞는 공고가 없어요", "teamDataNote", "save_search_conditions",
                  "`saved=true`일 때만", "묻지 않았는데 저장하지 않는다", "실시간으로 부르지 않는다"):
         assert rule in prompt
-    assert deps.config.prompt_version == "chat-v4"
+    assert deps.config.prompt_version == "chat-v5"
 
 
-# ---------------------------------------------------------------- A 이력서·직무 진단 (user-flow ⑤, 개발계획서1 F-02)
-def test_this_posting_from_previous_answer_starts_diagnosis():
-    def show(tools):
-        tools["search_job_postings"](job_name="데이터 분석")
-        return reply("공고 1개를 찾았어요.", ["이 공고와 내 이력서 비교해 보기"])
-
-    def diagnose(tools):
-        out = tools["start_resume_diagnosis"](job_posting_id="demo-busan-data")
-        return reply("진단을 시작했어요. 1분쯤 걸려요." if out.get("started") else out["error"]["message"])
-
-    deps = build_deps(ScriptedRunner(show, diagnose), summary=SUMMARY)
-    started, _, _ = ask(deps)
-    deps.clock["now"] = NOW + timedelta(seconds=20)
-    again = service.start_turn(deps, "demo1", {"sessionId": started["sessionId"], "message": "이 공고와 내 이력서 비교해 보기"})
-    service.run_turn(deps, deps.dispatcher.events[-1]["agentTask"])
-    # 바로 앞 답의 공고가 문맥에 들어간다
-    block = json.loads(deps.runner.runs[-1]["message"].split("<user_context>\n", 1)[1].split("\n</user_context>", 1)[0])
-    assert block["recentPostings"][0]["jobPostingId"] == "demo-busan-data"
-    message = service.get_message(deps, "demo1", started["sessionId"], again["messageId"])
-    assert message["actions"] == [{"type": "OPEN_DIAGNOSIS", "job": "데이터 분석 신입", "documentId": "doc-r1",
-                                   "conditions": [], "analysisId": "analysis-0001", "profileId": "profile-1",
-                                   "profileVersion": 2, "jobPostingId": "demo-busan-data"}]
-    user, posting, ncs, key = deps.mentoring.calls[-1]
-    assert (user, posting, ncs) == ("demo1", "demo-busan-data", None) and again["messageId"] in key
-
-
-def test_diagnosis_rejects_made_up_posting_and_uses_desired_job():
-    deps = build_deps(None)
-    from supervisor.tools import TurnTools
-
-    tools = {f.__name__: f for f in TurnTools(deps, "demo1", turn_key="m-1").functions()}
-    assert tools["start_resume_diagnosis"](job_posting_id="wk24-made-up")["error"]["code"] == "UNKNOWN_POSTING"
-    out = tools["start_resume_diagnosis"]()
-    assert out["started"] is True and deps.mentoring.calls[-1][1:3] == (None, "20010105")
-
-
-def test_diagnosis_errors_are_facts():
-    from fakes import FakeError, FakeMentoring
-    from supervisor.tools import TurnTools
-
-    deps = build_deps(None, profiles={"demo1": {"desiredJobs": [{"name": "마케팅"}]}})  # NCS 코드 없는 직무
-    tools = {f.__name__: f for f in TurnTools(deps, "demo1").functions()}
-    assert tools["start_resume_diagnosis"]()["error"]["code"] == "NEED_TARGET"
-    deps = build_deps(None)
-    deps.mentoring = FakeMentoring(FakeError("PROFILE_NOT_FOUND", "역량 프로필이 없어요. 이력서를 먼저 올려 주세요."))
-    tools = {f.__name__: f for f in TurnTools(deps, "demo1").functions()}
-    assert tools["start_resume_diagnosis"]()["error"]["code"] == "PROFILE_NOT_FOUND"
-    deps.mentoring = None
-    tools = {f.__name__: f for f in TurnTools(deps, "demo1").functions()}
-    assert tools["start_resume_diagnosis"]()["error"]["code"] == "NOT_IMPLEMENTED"
-
-
-def test_prompt_v4_rules():
+def test_prompt_v5_rules():
     deps = build_deps(ScriptedRunner(lambda tools: reply()))
     ask(deps)
     prompt = deps.runner.runs[-1]["system_prompt"]
-    for rule in ("recentPostings", "start_resume_diagnosis", "진단 점수를 네가 말하지 않는다",
-                 "면접을 원하지 않는다고 했으면 다시 권하지 않는다", "이 공고로 모의면접 체험해 볼래요",
-                 "여러 기능을 한 번에 이어 실행하지 않는다"):
+    for rule in ("recentPostings", "면접을 원하지 않는다고 했으면 다시 권하지 않는다", "이 공고로 모의면접 체험해 볼래요",
+                 "여러 기능을 한 번에 이어 실행하지 않는다", "이 서비스에서 하지 않는다"):
         assert rule in prompt
+    # 진단·첨삭 화면과 진단 도구를 지웠다 (#155). 지침이 없는 도구나 화면을 가리키지 않는다
+    for gone in ("start_resume_diagnosis", "진단 결과 보기", "이 공고와 내 이력서 비교해 보기"):
+        assert gone not in prompt
+
+
+def test_old_diagnosis_action_still_reads():
+    """진단 도구를 지우기 전에 저장된 대화의 OPEN_DIAGNOSIS 행동도 읽을 수 있다 (새로 만들지는 않는다)."""
+    action = ChatAction.model_validate({"type": "OPEN_DIAGNOSIS", "job": "데이터 분석", "analysisId": "a-1"})
+    assert action.type == "OPEN_DIAGNOSIS" and action.analysis_id == "a-1"
 
 
 def test_missing_claimed_message_releases_session_lock(monkeypatch):
@@ -408,3 +364,141 @@ def test_missing_claimed_message_releases_session_lock(monkeypatch):
     out = service.run_turn(deps, deps.dispatcher.events[-1]["agentTask"])
     assert out["status"] == "SKIPPED" and deps.runner.runs == []
     assert deps.store.get_session("demo1", started["sessionId"]).pending_message_id is None
+
+
+# ---------------------------------------------------------------- 채팅 화면: 멈추기, 대화 목록·고정·삭제
+def start_only(deps, message="부산 데이터 분석 신입 공고 찾아줘", user="demo1"):
+    """턴을 시작만 하고 실행 이벤트는 돌리지 않는다 (답을 만드는 중인 상태)."""
+    started = service.start_turn(deps, user, {"message": message})
+    return started, deps.dispatcher.events[-1]["agentTask"]
+
+
+def test_cancel_pending_answer_releases_lock_and_task_skips():
+    deps = build_deps(ScriptedRunner(lambda tools: reply()))
+    started, task = start_only(deps)
+    sid, mid = started["sessionId"], started["messageId"]
+    assert service.cancel_message(deps, "demo1", sid, mid)["status"] == "CANCELLED"
+    deps.clock["now"] += timedelta(seconds=1)  # stale(180초)보다 훨씬 짧다
+    # 잠금이 풀려 기다리지 않고 바로 다음 말을 보낼 수 있다
+    assert service.start_turn(deps, "demo1", {"sessionId": sid, "message": "다시 찾아줘"})["status"] == "PENDING"
+    assert service.run_turn(deps, task)["status"] == "SKIPPED"  # 멈춘 답은 실행하지 않는다
+    assert service.get_message(deps, "demo1", sid, mid)["status"] == "CANCELLED"
+
+
+def test_cancel_while_model_runs_drops_late_result():
+    ids = {}
+
+    def script(tools):
+        ids["view"] = service.cancel_message(deps, "demo1", ids["sid"], ids["mid"])  # 모델이 도는 중에 멈춘다
+        return reply()
+
+    deps = build_deps(ScriptedRunner(script))
+    started, task = start_only(deps)
+    ids.update(sid=started["sessionId"], mid=started["messageId"])
+    assert ids.get("view") is None
+    result = service.run_turn(deps, task)
+    assert ids["view"]["status"] == "CANCELLED"
+    assert result == {"messageId": ids["mid"], "status": "SKIPPED", "reason": "CANCELLED"}
+    message = service.get_message(deps, "demo1", ids["sid"], ids["mid"])
+    assert message["status"] == "CANCELLED" and message["reply"] == "" and message["cards"] == []
+    assert deps.store.get_session("demo1", ids["sid"]).pending_message_id is None
+
+
+def test_cancel_finished_answer_returns_it_unchanged():
+    deps = build_deps(ScriptedRunner(search_and_policies(job_name="데이터 분석", region="부산")))
+    started, _, message = ask(deps)
+    assert service.cancel_message(deps, "demo1", started["sessionId"], started["messageId"]) == message
+
+
+def test_cancel_checks_owner_and_role():
+    deps = build_deps(ScriptedRunner(lambda tools: reply()))
+    started, _ = start_only(deps)
+    for user, mid in (("demo2", started["messageId"]), ("demo1", started["userMessageId"]), ("demo1", "nope")):
+        with pytest.raises(SupervisorError) as error:
+            service.cancel_message(deps, user, started["sessionId"], mid)
+        assert error.value.status == 404
+
+
+def test_cancelled_answer_is_not_history_and_previous_cards_stay_recent():
+    def script(tools):
+        tools["search_job_postings"](job_name="데이터 분석", region="부산")
+        return reply("부산 데이터 분석 공고 1개를 찾았어요.")
+
+    runner = ScriptedRunner(script)
+    deps = build_deps(runner)
+    first, _, _ = ask(deps)
+    sid = first["sessionId"]
+    deps.clock["now"] += timedelta(seconds=10)  # 메시지 ID가 시각순이라 턴마다 시간을 옮긴다
+    second = service.start_turn(deps, "demo1", {"sessionId": sid, "message": "서울도 찾아줘"})
+    service.cancel_message(deps, "demo1", sid, second["messageId"])
+    deps.clock["now"] += timedelta(seconds=10)
+    third = service.start_turn(deps, "demo1", {"sessionId": sid, "message": "이 공고 더 알려줘"})
+    service.run_turn(deps, deps.dispatcher.events[-1]["agentTask"])
+    assert service.get_message(deps, "demo1", sid, third["messageId"])["status"] == "COMPLETED"
+    history = [h["text"] for h in runner.runs[-1]["history"]]
+    assert "서울도 찾아줘" not in history and history[0] == "부산 데이터 분석 신입 공고 찾아줘"
+    assert "demo-busan-data" in runner.runs[-1]["message"]  # 멈춘 답을 건너뛰고 그 앞 답의 공고를 가리킨다
+
+
+def test_sessions_list_pinned_first_then_recent():
+    deps = build_deps(ScriptedRunner(lambda tools: reply()))
+    first, _, _ = ask(deps, "첫 대화")
+    deps.clock["now"] += timedelta(minutes=5)
+    second, _, _ = ask(deps, "둘째 대화")
+    ask(deps, "남의 대화", user="demo2")
+    titles = [s["title"] for s in service.list_sessions(deps, "demo1")["sessions"]]
+    assert titles == ["둘째 대화", "첫 대화"]
+
+    assert service.update_session(deps, "demo1", first["sessionId"], {"pinned": True})["pinned"] is True
+    listed = service.list_sessions(deps, "demo1")["sessions"]
+    assert [s["sessionId"] for s in listed] == [first["sessionId"], second["sessionId"]]
+    assert all("messages" not in s and "ownerUserId" not in s for s in listed)
+    service.update_session(deps, "demo1", first["sessionId"], {"pinned": False})
+    assert [s["title"] for s in service.list_sessions(deps, "demo1")["sessions"]] == ["둘째 대화", "첫 대화"]
+
+
+@pytest.mark.parametrize("body", [{}, {"pinned": "true"}, {"pinned": 1}, {"pinned": True, "title": "x"}, []])
+def test_update_session_accepts_only_pinned_bool(body):
+    deps = build_deps(ScriptedRunner(lambda tools: reply()))
+    started, _, _ = ask(deps)
+    with pytest.raises(SupervisorError) as error:
+        service.update_session(deps, "demo1", started["sessionId"], body)
+    assert error.value.status == 400
+
+
+def test_pin_and_delete_check_owner():
+    deps = build_deps(ScriptedRunner(lambda tools: reply()))
+    started, _, _ = ask(deps)
+    for call in (lambda: service.update_session(deps, "demo2", started["sessionId"], {"pinned": True}),
+                 lambda: service.delete_session(deps, "demo2", started["sessionId"]),
+                 lambda: service.delete_session(deps, "demo1", "chat-none")):
+        with pytest.raises(SupervisorError) as error:
+            call()
+        assert error.value.status == 404
+    assert service.get_session(deps, "demo1", started["sessionId"])["pinned"] is False
+
+
+def test_delete_session_removes_messages():
+    deps = build_deps(ScriptedRunner(lambda tools: reply()))
+    started, _, _ = ask(deps)
+    keep, _, _ = ask(deps, "다른 대화")
+    sid = started["sessionId"]
+    assert service.delete_session(deps, "demo1", sid) == {"sessionId": sid, "deleted": True}
+    assert deps.store.list_messages("demo1", sid, 100) == []
+    with pytest.raises(SupervisorError):
+        service.get_session(deps, "demo1", sid)
+    assert [s["sessionId"] for s in service.list_sessions(deps, "demo1")["sessions"]] == [keep["sessionId"]]
+
+
+def test_delete_while_answer_runs_drops_late_result():
+    ids = {}
+
+    def script(tools):
+        service.delete_session(deps, "demo1", ids["sid"])  # 답을 만드는 중에 대화를 지운다
+        return reply()
+
+    deps = build_deps(ScriptedRunner(script))
+    started, task = start_only(deps)
+    ids["sid"] = started["sessionId"]
+    assert service.run_turn(deps, task)["reason"] == "CANCELLED"
+    assert deps.store.list_messages("demo1", ids["sid"], 100) == []  # 지운 대화에 답이 다시 생기지 않는다

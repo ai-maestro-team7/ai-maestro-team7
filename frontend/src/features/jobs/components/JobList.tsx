@@ -11,20 +11,21 @@ import { useUsername } from "@/features/auth/useUsername";
 import { formatDateTime } from "@/lib/format";
 import { useApi } from "@/lib/useApi";
 import { fetchFeed } from "../data";
-import { asOfDate, BUSAN_FIRST_BASIS, REGION_FILTERS, SORT_LABELS } from "../lib";
-import type { FeedResponse, JobRegion, JobSort, PostingCard } from "../types";
+import { asOfDate, BUSAN_FIRST_BASIS, REGION_FILTERS, SECTOR_FILTERS, SORT_LABELS } from "../lib";
+import type { FeedResponse, JobRegion, JobSector, JobSort, PostingCard } from "../types";
 import { JobTable, JobTableSkeleton } from "./JobTable";
 
 type MorePages = { key: string; items: PostingCard[]; nextCursor?: string; pending: boolean; failed: boolean };
 
 /**
- * 채용 공고 목록 (B-03 맞춤 피드): 지역 필터, 정렬 바꾸기, GNB 검색어(`?q=`), 더 보기.
+ * 맞춤형 공고 목록 (B-03 맞춤 피드, 로그인 필요): 지역·공기업/사기업 필터, 정렬 바꾸기, 검색어(`?q=`), 더 보기.
  * 필터·정렬 줄과 안내 문구는 응답이 필요 없어 처음부터 그린다. 검색어를 읽는 아래쪽만 Suspense 안에 둔다.
- * 지역인재 전형 필터: 홈의 "지역인재 전형 공고 보기"는 `?talent=1`로 들어온다. 주소는 Feed(Suspense 안)가 읽어 알려 주고,
+ * 지역 혜택 필터: 홈의 "지역 혜택 공고 보기"는 `?talent=1`로 들어온다. 주소는 Feed(Suspense 안)가 읽어 알려 주고,
  * 사용자가 칩을 누르면 그 선택이 주소보다 우선한다.
  */
 export function JobList() {
   const [region, setRegion] = useState<JobRegion>("ALL");
+  const [sector, setSector] = useState<JobSector>("ALL");
   const [sort, setSort] = useState<JobSort>("BUSAN_FIRST");
   const [talentChoice, setTalentChoice] = useState<boolean | null>(null);
   const [urlTalent, setUrlTalent] = useState(false);
@@ -40,8 +41,19 @@ export function JobList() {
             </Chip>
           ))}
           <span aria-hidden className="mx-1 h-5 w-px self-center bg-grey-200" />
+          {/* 공기업·사기업은 다시 누르면 꺼진다 (전체) */}
+          {SECTOR_FILTERS.filter((filter) => filter.value !== "ALL").map((filter) => (
+            <Chip
+              key={filter.value}
+              selected={filter.value === sector}
+              onClick={() => setSector((value) => (value === filter.value ? "ALL" : filter.value))}
+            >
+              {filter.label}
+            </Chip>
+          ))}
+          <span aria-hidden className="mx-1 h-5 w-px self-center bg-grey-200" />
           <Chip selected={talentOnly} onClick={() => setTalentChoice(!talentOnly)}>
-            지역인재 전형
+            지역 혜택
           </Chip>
         </div>
         <button
@@ -56,7 +68,7 @@ export function JobList() {
       </div>
       {/* Feed가 GNB 검색어(?q=)를 읽어서 Suspense 경계 안에 둔다. 대체 화면은 불러오는 중 화면과 같다 */}
       <Suspense fallback={<FeedFrame sort={sort} />}>
-        <Feed region={region} sort={sort} talentChoice={talentChoice} onUrlTalent={setUrlTalent} />
+        <Feed region={region} sector={sector} sort={sort} talentChoice={talentChoice} onUrlTalent={setUrlTalent} />
       </Suspense>
     </div>
   );
@@ -64,11 +76,13 @@ export function JobList() {
 
 function Feed({
   region,
+  sector,
   sort,
   talentChoice,
   onUrlTalent,
 }: {
   region: JobRegion;
+  sector: JobSector;
   sort: JobSort;
   talentChoice: boolean | null;
   onUrlTalent: (value: boolean) => void;
@@ -79,9 +93,9 @@ function Feed({
   const talentOnly = talentChoice ?? urlTalent;
   useEffect(() => onUrlTalent(urlTalent), [urlTalent, onUrlTalent]);
   const username = useUsername();
-  const key = `${username}|${sort}|${region}|${query}|${talentOnly}`;
+  const key = `${username}|${sort}|${region}|${sector}|${query}|${talentOnly}`;
   const [state, reload] = useApi<FeedResponse>(key, () =>
-    fetchFeed({ sort, region, keyword: query, regionalTalent: talentOnly }),
+    fetchFeed({ sort, region, sector, keyword: query, regionalTalent: talentOnly }),
   );
   const [more, setMore] = useState<MorePages | null>(null);
   const extra = more?.key === key ? more : null;
@@ -92,7 +106,7 @@ function Feed({
     if (!cursor) return;
     setMore({ key, items: before, nextCursor: cursor, pending: true, failed: false });
     try {
-      const page = await fetchFeed({ sort, region, keyword: query, cursor, regionalTalent: talentOnly });
+      const page = await fetchFeed({ sort, region, sector, keyword: query, cursor, regionalTalent: talentOnly });
       setMore({ key, items: [...before, ...page.items], nextCursor: page.nextCursor, pending: false, failed: false });
     } catch {
       setMore({ key, items: before, nextCursor: cursor, pending: false, failed: true });
@@ -141,7 +155,7 @@ function FeedFrame({
         </p>
         <p className="flex gap-2">
           {sort === "BUSAN_FIRST" && <span className="text-grey-600">{basis}</span>}
-          <Link href="/profile/?next=%2Fjobs%2F" className="font-medium text-blue-500">
+          <Link href="/profile/?next=%2Fjobs%2Frecommended%2F" className="font-medium text-blue-500">
             프로필 수정
           </Link>
         </p>
@@ -196,8 +210,8 @@ function FeedResult({
       {notice && <p className="text-small text-grey-700">{notice}</p>}
       {talentOnly && (
         <p className="text-small text-grey-700">
-          이전 공공기관처럼 지역인재 전형이 있을 수 있는 공고예요. 학교 지역이 맞으면 &ldquo;지역인재 대상일 수 있음&rdquo;으로
-          표시해요. 자격은 공고문에서 확인해 주세요.
+          공고문의 지역 조건(비수도권·이전지역 인재, 지역 제한, 거주자 우대)이 내 학교 지역이나 사는 곳과 맞을 수 있는
+          공고예요. 학교 지역과 사는 곳은 프로필에서 바꿀 수 있어요. 자격은 공고문에서 확인해 주세요.
         </p>
       )}
       {items.length > 0 ? (
@@ -206,7 +220,7 @@ function FeedResult({
         <div className="flex w-full flex-col items-center gap-1 border-t border-b border-t-grey-800 border-b-grey-200 py-12 text-center">
           <p className="text-body font-bold text-grey-900">조건에 맞는 공고가 없어요</p>
           <p className="text-small text-grey-600">
-            {talentOnly ? "지역인재 전형이 있을 수 있는 공고가 지금은 없어요." : "지역이나 검색어를 바꿔 보세요."}
+            {talentOnly ? "학교 지역이나 사는 곳과 맞는 지역 조건 공고가 지금은 없어요." : "지역, 구분, 검색어를 바꿔 보세요."}
           </p>
         </div>
       )}

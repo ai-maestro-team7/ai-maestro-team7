@@ -2,7 +2,6 @@ import { sessionOwner } from "@/lib/session";
 import type { InterviewHandoff } from "./types";
 
 const HANDOFF_KEY = "team07.interviewHandoff";
-const SESSION_KEY = "team07.chatSessionId";
 const HANDOFF_EVENT = "team07:interviewHandoff";
 
 /** 채팅에서 면접 화면으로 넘길 값. 같은 탭 안에서만 쓰도록 sessionStorage에 둔다. */
@@ -47,20 +46,16 @@ export function subscribeHandoff(onChange: () => void): () => void {
   };
 }
 
-/** 새로 고침해도 같은 대화를 다시 그리도록 대화 ID만 기억한다 (대화 내용은 서버에 있다). */
-export function readChatSessionId(): string | null {
-  if (typeof window === "undefined") return null;
-  try {
-    const value = JSON.parse(window.sessionStorage.getItem(SESSION_KEY) ?? "null") as { id?: string; owner?: string } | null;
-    return value?.id && value.owner === sessionOwner() ? value.id : null;
-  } catch {
-    return null;
-  }
-}
+/** 홈과 새 대화에서 보여 주는 예시 질문 */
+export const CHAT_EXAMPLES = [
+  "부산 데이터 분석 신입 공고 찾아줘",
+  "연봉 3천 이상 부산 공기업 공고 알려줘",
+  "내가 받을 수 있는 청년정책 알려줘",
+];
 
-export function saveChatSessionId(sessionId: string | null): void {
-  if (sessionId) window.sessionStorage.setItem(SESSION_KEY, JSON.stringify({ id: sessionId, owner: sessionOwner() }));
-  else window.sessionStorage.removeItem(SESSION_KEY);
+/** 채팅 화면 주소. 대화 ID가 없으면 새 대화다 (정적 내보내기라 경로 대신 `?s=`를 쓴다) */
+export function chatHref(sessionId?: string | null): string {
+  return sessionId ? `/chat/?s=${encodeURIComponent(sessionId)}` : "/chat/";
 }
 
 export function interviewHref(job: string): string {
