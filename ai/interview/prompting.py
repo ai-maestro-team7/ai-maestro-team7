@@ -79,11 +79,12 @@ def questions_prompt(job: str, interview_type: str, resume_text: str, profile: B
     })
 
 
-def follow_up_prompt(job: str, resume_text: str, question: str, answer_text: str) -> str:
-    """Prompt_B 사용자 메시지."""
+def follow_up_prompt(job: str, resume_text: str, question_type: str, question: str, answer_text: str) -> str:
+    """Prompt_B 사용자 메시지 (B-v2, #109). 이전 답변·남은 기본 질문은 넣지 않고 에이전트가 툴로 본다."""
     return fill(load(FOLLOW_UP_FILE), {
         "JOB": wrap("job", job),
         "RESUME": wrap("resume", resume_text),
+        "QUESTION_TYPE": wrap("question_type", question_type),
         "QUESTION": wrap("question", question),
         "ANSWER": wrap("answer", answer_text),
     })

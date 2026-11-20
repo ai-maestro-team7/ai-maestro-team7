@@ -47,12 +47,17 @@ async function toApiError(response: Response): Promise<ApiError> {
   return new ApiError(response.status, "HTTP_ERROR", "잠시 뒤 다시 시도해 주세요.", response.status >= 500);
 }
 
-function sessionFrom(tokens: TokenResponse, username: string, refreshToken?: string): Session {
+/** 새 토큰으로 세션을 만든다. 아이디·개발 모드와, 응답에 없을 때의 리프레시 토큰은 `keep`에서 가져온다. */
+function sessionFrom(
+  tokens: TokenResponse,
+  keep: Pick<Session, "username" | "devMode"> & { refreshToken?: string },
+): Session {
   return {
-    username,
+    username: keep.username,
     accessToken: tokens.accessToken,
-    refreshToken: tokens.refreshToken ?? refreshToken ?? "",
+    refreshToken: tokens.refreshToken ?? keep.refreshToken ?? "",
     expiresAt: Date.now() + tokens.expiresIn * 1000,
+    ...(keep.devMode ? { devMode: true } : {}),
   };
 }
 
@@ -66,10 +71,13 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   return (await response.json()) as T;
 }
 
-/** `POST /api/v1/auth/login` (토큰 없이). 실패는 아이디·비밀번호 구분 없이 401 INVALID_CREDENTIALS. */
-export async function login(username: string, password: string): Promise<Session> {
+/**
+ * `POST /api/v1/auth/login` (토큰 없이). 실패는 아이디·비밀번호 구분 없이 401 INVALID_CREDENTIALS.
+ * `devMode`는 로그인 화면에서 켠 개발 모드를 세션에 적어 둘 때만 넘긴다. 서버로 보내지 않는다.
+ */
+export async function login(username: string, password: string, devMode = false): Promise<Session> {
   const tokens = await postJson<TokenResponse>("/api/v1/auth/login", { username, password });
-  const session = sessionFrom(tokens, username);
+  const session = sessionFrom(tokens, { username, devMode });
   saveSession(session);
   return session;
 }
@@ -108,13 +116,18 @@ export async function startSocialLogin(
  * `POST /api/v1/auth/social/token` (토큰 없이). 인가 코드를 토큰으로 바꾸고 세션을 저장한다.
  * `username`은 "Google 계정" 같은 고정 문구다. 코드가 틀리거나 만료면 401 INVALID_CREDENTIALS.
  */
-export async function exchangeSocialCode(code: string, redirectUri: string, codeVerifier: string): Promise<Session> {
+export async function exchangeSocialCode(
+  code: string,
+  redirectUri: string,
+  codeVerifier: string,
+  devMode = false,
+): Promise<Session> {
   const tokens = await postJson<TokenResponse & { username?: string }>("/api/v1/auth/social/token", {
     code,
     redirectUri,
     codeVerifier,
   });
-  const session = sessionFrom(tokens, tokens.username ?? "소셜 계정");
+  const session = sessionFrom(tokens, { username: tokens.username ?? "소셜 계정", devMode });
   saveSession(session);
   return session;
 }
@@ -126,7 +139,7 @@ async function refresh(session: Session): Promise<Session | null> {
   if (!session.refreshToken) return null;
   refreshing ??= postJson<TokenResponse>("/api/v1/auth/refresh", { refreshToken: session.refreshToken })
     .then((tokens) => {
-      const next = sessionFrom(tokens, session.username, session.refreshToken);
+      const next = sessionFrom(tokens, session);
       saveSession(next);
       return next;
     })
@@ -184,13 +197,13 @@ export async function getMyProfile(): Promise<BasicProfile | null> {
 }
 
 /**
- * 토큰이 필요한 쓰기 호출 (POST·PUT·DELETE). 본문은 JSON 값이거나 `FormData`(녹음·이미지 업로드)이고, DELETE는 본문 없이 보낸다.
+ * 토큰이 필요한 쓰기 호출 (POST·PUT·DELETE). 본문은 JSON 값이거나 `FormData`(녹음·이미지 업로드)이고, DELETE나 본문 없는 POST는 본문 없이 보낸다.
  * 401이면 한 번 갱신하고 다시 보낸다. `FormData`는 브라우저가 경계 문자열을 붙이므로 content-type을 직접 넣지 않는다.
  */
 export async function apiSend<T>(
   method: "POST" | "PUT" | "DELETE",
   path: string,
-  body: FormData | object | undefined,
+  body?: FormData | object,
   /** 더 붙일 헤더 (예: 저장 요청의 `Idempotency-Key`) */
   extraHeaders?: Record<string, string>,
 ): Promise<T> {
@@ -223,4 +236,15 @@ export async function apiSend<T>(
 /** `PUT /api/v1/me/profile`. 보낸 항목만 바뀌고 null을 보내면 그 항목이 지워진다. */
 export function saveMyProfile(profile: BasicProfileInput): Promise<BasicProfile> {
   return apiSend<BasicProfile>("PUT", "/api/v1/me/profile", profile);
+}
+
+/** 서버가 지운 수: DB 기록, 올린 파일, 알림 일정 */
+export type ResetCounts = { items: number; files: number; schedules: number };
+
+/**
+ * `POST /api/v1/me/reset` (본문 없음). 로그인한 사용자의 서버 정보를 모두 지운다. 개발 모드에서만 부른다.
+ * 백엔드와 같이 만드는 중이라 `deleted`가 빠져 와도 화면이 깨지지 않게 선택 필드로 둔다.
+ */
+export function resetMyData(): Promise<{ deleted?: ResetCounts }> {
+  return apiSend<{ deleted?: ResetCounts }>("POST", "/api/v1/me/reset");
 }

@@ -59,7 +59,12 @@
             "name": "공공기관 금융·행정"
           }
         ],
-        "employmentStatus": "UNEMPLOYED"
+        "employmentStatus": "UNEMPLOYED",
+        "schoolName": "가상대학교",
+        "certificates": [
+          "ADsP",
+          "컴퓨터활용능력 1급"
+        ]
       }
     },
     {
@@ -70,7 +75,8 @@
       "name": "delete-fields-with-null",
       "data": {
         "major": null,
-        "priorities": null
+        "priorities": null,
+        "certificates": null
       }
     }
   ]

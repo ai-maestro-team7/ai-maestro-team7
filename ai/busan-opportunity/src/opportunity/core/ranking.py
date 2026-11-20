@@ -15,7 +15,15 @@ from datetime import date, datetime
 from ..config import OpportunityConfig
 from ..deps import Deps
 from ..models.api import EligibilityResult, FeedResponse, PostingCard, Ranking
-from ..models.enums import CheonggeulType, EmploymentType, MatchLevel, RemoteWork, Sort
+from ..models.enums import (
+    CareerType,
+    CheonggeulType,
+    EmploymentType,
+    MatchLevel,
+    RegionalTalentStatus,
+    RemoteWork,
+    Sort,
+)
 from ..models.errors import invalid_input
 from ..models.posting import AltCandidates, Job, PostingLatest
 from ..models.profile import BasicProfile, DesiredJob
@@ -25,6 +33,10 @@ from .eligibility import judge, required_ratio
 from .texts import profile_text
 
 REGION_ALL, REGION_BUSAN, REGION_CAPITAL, REGION_OVERSEAS = "ALL", "BUSAN", "CAPITAL", "OVERSEAS"
+
+# 데이터 범위 (개발계획서4 §9.1). OFFICIAL = 공공 API로 모은 공고, TEAM = 팀이 넣어 둔 공고(지금은 시연용 DEMO)
+SCOPE_ALL, SCOPE_OFFICIAL, SCOPE_TEAM = "ALL", "OFFICIAL", "TEAM"
+SCOPES = (SCOPE_ALL, SCOPE_OFFICIAL, SCOPE_TEAM)
 
 # 직무 일치의 근거. 사실 문구를 고를 때 쓴다 (facts.job_fact)
 BASIS_WORK24, BASIS_NAME, BASIS_NCS = facts.BASIS_WORK24, facts.BASIS_NAME, facts.BASIS_NCS
@@ -251,8 +263,13 @@ def cosine_similarity(a: Sequence[float], b: Sequence[float]) -> float:
     return dot / (na * nb) if na and nb else 0.0
 
 
-def profile_vector(deps: Deps, profile: BasicProfile) -> list[float]:
-    return deps.embedder.embed(profile_text(profile), kind="query")
+def profile_vector(deps: Deps, profile: BasicProfile, query_terms: Sequence[str] | None = None) -> list[float]:
+    """프로필 글로 질의 벡터를 만든다. query_terms(이력서 역량 이름 등)는 질의 글에만 덧붙인다."""
+    text = profile_text(profile)
+    terms = [t.strip() for t in (query_terms or []) if t and t.strip()]
+    if terms:
+        text = f"{text} | {', '.join(terms)}"
+    return deps.embedder.embed(text, kind="query")
 
 
 def active_filter(as_of: datetime, **extra) -> dict:
@@ -324,6 +341,66 @@ def _keyword_ok(posting: PostingLatest, keyword: str | None) -> bool:
     return any(needle in (text or "").lower() for text in (posting.title, posting.organization, posting.job.name))
 
 
+def is_team_data(posting: PostingLatest) -> bool:
+    """팀이 넣어 둔 공고인지. 지금은 시연용(sourceType=DEMO)만이다. 크롤링 데이터를 넣으면 여기 한 곳만 고친다."""
+    return posting.is_sample
+
+
+def _scope_ok(posting: PostingLatest, scope: str) -> bool:
+    if scope == SCOPE_OFFICIAL:
+        return not is_team_data(posting)
+    if scope == SCOPE_TEAM:
+        return is_team_data(posting)
+    return True
+
+
+def _organization_ok(posting: PostingLatest, organization: str | None) -> bool:
+    """기관·회사 이름에 들어 있는지. 대소문자·공백·가운뎃점은 무시한다 (개발계획서4 §9)."""
+    needle = _norm(organization)
+    return not needle or needle in _norm(posting.organization)
+
+
+def _salary_ok(posting: PostingLatest, min_salary: int | None) -> bool:
+    """공개된 급여의 상한(없으면 하한)이 min_salary보다 낮으면 뺀다. 비공개·미확인 급여는 남긴다 (미확인 ≠ 미달)."""
+    if min_salary is None:
+        return True
+    salary = posting.salary
+    top = salary.max if salary.max is not None else salary.min
+    if not salary.disclosed or top is None:
+        return True
+    return top >= min_salary
+
+
+# 요청한 경력 구분마다 남길 공고 값. 무관(ANY)과 미확인(UNKNOWN)은 어느 쪽이든 남긴다
+_CAREER_KEEP = {CareerType.NEW: {CareerType.NEW, CareerType.ANY, CareerType.UNKNOWN},
+                CareerType.EXPERIENCED: {CareerType.EXPERIENCED, CareerType.ANY, CareerType.UNKNOWN}}
+
+
+def _career_ok(posting: PostingLatest, career_type: CareerType | None) -> bool:
+    keep = _CAREER_KEEP.get(career_type) if career_type is not None else None
+    return keep is None or posting.career_type in keep
+
+
+def _check_conditions(min_salary: int | None, career_type: str | CareerType | None) -> CareerType | None:
+    if min_salary is not None and (isinstance(min_salary, bool) or not isinstance(min_salary, int) or min_salary < 0):
+        raise invalid_input("minSalary는 0 이상의 정수(만 원/년)여야 해요.", field="minSalary")
+    if career_type is None:
+        return None
+    try:
+        return CareerType(str(career_type).strip().upper())
+    except ValueError:
+        raise invalid_input("careerType 값이 올바르지 않아요.", field="careerType") from None
+
+
+def with_job_name(profile: BasicProfile, job_name: str | None) -> BasicProfile:
+    """이번 검색에만 쓸 희망 직무. 저장된 희망 직무와 이름이 같으면 저장된 항목(코드 포함)을 쓴다. 저장하지 않는다."""
+    name = (job_name or "").strip()
+    if not name:
+        return profile
+    same = [job for job in profile.desired_jobs if _norm(job.name) == _norm(name)]
+    return profile.model_copy(update={"desired_jobs": same[:1] or [DesiredJob(name=name)]})
+
+
 def _sort_key(sort: Sort):
     if sort == Sort.DEADLINE:
         return lambda row: (row["posting"].closes_at, -row["rank"], row["posting"].job_posting_id)
@@ -354,7 +431,9 @@ def _card(deps: Deps, row: dict, as_of: datetime, alt_count: int | None, profile
     cfg, posting, match = deps.config, row["posting"], row["match"]
     commute = facts.commute_minutes(deps.local_life, profile, posting.work_region)
     distance = facts.distance_km(deps.local_life, profile, posting.work_region)
+    talent = facts.card_regional_talent(cfg, profile, posting)
     fact_list = facts.compact([facts.job_fact(cfg, match.job_match, basis=match.job_basis),
+                               facts.FACT_REGIONAL_TALENT_CARD if talent == RegionalTalentStatus.LIKELY else None,
                                facts.overseas_fact(posting.work_region) if is_overseas_posting(posting) else None,
                                facts.commute_fact(commute) or facts.distance_fact(distance),  # 통근 시간이 없으면 거리
                                *facts.eligibility_facts(row["eligibility"]),
@@ -364,10 +443,10 @@ def _card(deps: Deps, row: dict, as_of: datetime, alt_count: int | None, profile
         org_type=posting.org_type, work_region=posting.work_region,
         is_busan=is_busan_posting(cfg, posting), is_capital_area=is_capital_posting(cfg, posting), job=posting.job,
         closes_at=posting.closes_at, rolling=posting.rolling, salary=posting.salary,
-        match_score=round(match.score, facts.SCORE_DIGITS), match_level=match_level(cfg, match.score),
+        career_type=posting.career_type, match_score=round(match.score, facts.SCORE_DIGITS), match_level=match_level(cfg, match.score),
         rank_score=round(row["rank"], facts.SCORE_DIGITS), eligibility=row["eligibility"],
         badges=facts.valid_badges(posting.badges), facts=fact_list, busan_alternatives_count=alt_count,
-        commute_minutes=commute, distance_km=distance, is_sample=posting.is_sample,
+        commute_minutes=commute, distance_km=distance, regional_talent=talent, is_sample=posting.is_sample,
     )
 
 
@@ -380,24 +459,40 @@ def _few_busan_jobs(cfg: OpportunityConfig, rows: list[dict]) -> bool:
 
 def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort | None = None,
                     job_codes: list[str] | None = None, keyword: str | None = None, cursor: str | None = None,
-                    limit: int = 20, as_of: str | date | datetime | None = None) -> FeedResponse:
+                    limit: int = 20, as_of: str | date | datetime | None = None, job_name: str | None = None,
+                    query_terms: Sequence[str] | None = None, min_salary: int | None = None,
+                    career_type: str | CareerType | None = None, organization: str | None = None,
+                    scope: str | None = None, regional_talent: bool = False) -> FeedResponse:
     """전국 공고를 찾아 정렬한다. 후보는 벡터 질의 두 번(부산, 전국)으로 모은다. 이 경로에 LLM은 없다.
 
     sort가 None이면 사용자 설정을 쓴다. BUSAN_FIRST와 MATCH는 공고 집합이 같고 순서만 다르다 (T-01).
     마감된 공고는 뺀다 (T-21). 수도권 공고에는 busanAlternativesCount를 붙인다.
     해외 공고는 부산도 수도권도 아니라 가산점과 busanAlternativesCount가 없다. region=OVERSEAS면 해외 공고만.
+
+    대화 조건 (개발계획서4 §9): job_name은 이번 검색에만 희망 직무로 쓰고 저장하지 않는다. query_terms는 질의 글에만
+    넣는다. min_salary(만 원/년)·career_type·organization은 거르기만 하고 적합도·정렬 계산은 그대로다.
+    scope는 OFFICIAL(공공 API로 모은 공고만)·TEAM(팀이 넣어 둔 공고만)·ALL(기본, 둘 다)이다 (§9.1).
+    regional_talent=True면 지역인재 전형이 있을 수 있는 공고(이전 공공기관 등)만 남긴다. 순서와 점수는 그대로다.
+    학교 소재지가 맞는 공고는 카드의 regionalTalent가 LIKELY다.
     """
     cfg = deps.config
     region = (region or REGION_ALL).strip().upper()
     _check_region(region)
     if limit < 1:
         raise invalid_input("limit은 1 이상이어야 해요.", field="limit")
+    career = _check_conditions(min_salary, career_type)
+    scope = (scope or SCOPE_ALL).strip().upper()
+    if scope not in SCOPES:
+        raise invalid_input("scope 값이 올바르지 않아요.", field="scope", allowed=list(SCOPES))
     offset = _decode_cursor(cursor)
-    ctx = load_context(deps, user_id, as_of, require_jobs=True)
+    has_job_name = bool((job_name or "").strip())
+    ctx = load_context(deps, user_id, as_of, require_jobs=not has_job_name)
+    if has_job_name:
+        ctx.profile = with_job_name(ctx.profile, job_name)
     sort = Sort(sort) if sort is not None else ctx.prefs.sort
 
     # 1. 후보: 부산 필터 질의와 전국 질의를 합친다. 같은 공고는 높은 유사도를 쓴다.
-    vector = profile_vector(deps, ctx.profile)
+    vector = profile_vector(deps, ctx.profile, query_terms)
     top_k = cfg.ranking.candidate_top_k
     similarity: dict[str, float] = {}
     for hits in (deps.vectors.query(vector, top_k=top_k.busan, filter=active_filter(ctx.as_of, isBusan=True)),
@@ -406,12 +501,15 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
             similarity[hit.key] = max(hit.similarity, similarity.get(hit.key, hit.similarity))
     latest_by_id = deps.catalog.batch_get_latest(list(similarity))
 
-    # 2. 거르기: 마감, 지역, 직종 코드, 검색어
+    # 2. 거르기: 마감, 지역, 직종 코드, 검색어, 대화 조건(기관, 최소 연봉, 경력 구분)
     sidos = _region_sidos(cfg, region)
     rows = []
     for pid, posting in latest_by_id.items():
         if not (is_open(posting, ctx.as_of) and _in_region(posting, region, sidos)
-                and _job_code_ok(posting, job_codes) and _keyword_ok(posting, keyword)):
+                and _job_code_ok(posting, job_codes) and _keyword_ok(posting, keyword)
+                and _organization_ok(posting, organization) and _salary_ok(posting, min_salary)
+                and _career_ok(posting, career) and _scope_ok(posting, scope)
+                and (not regional_talent or facts.card_regional_talent(cfg, ctx.profile, posting) is not None)):
             continue
         match, result = score_posting(deps, ctx, posting, similarity[pid])
         rank = rank_score(cfg, match.score, is_busan=is_busan_posting(cfg, posting), sort=sort)

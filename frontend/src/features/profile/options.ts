@@ -51,6 +51,15 @@ export const EDUCATION_OPTIONS = [
   { value: "DOCTOR", label: "박사" },
 ] as const;
 
+/** 전문대 이상이면 대학 이름을 받는다. 고졸이면 학교 지역(고등학교)만 받는다 */
+export const HIGHER_EDUCATION: ReadonlySet<string> = new Set(["ASSOCIATE", "BACHELOR", "MASTER", "DOCTOR"]);
+/** 대학원까지 마쳤으면 지역인재는 학부 대학 소재지로 본다 */
+export const GRADUATE_SCHOOL: ReadonlySet<string> = new Set(["MASTER", "DOCTOR"]);
+
+/** 가진 자격증: 백엔드 `certificates`가 받는 한도 (backend/me_api.py) */
+export const MAX_CERTIFICATES = 10;
+export const CERTIFICATE_MAX_LENGTH = 50;
+
 export const GRADUATION_OPTIONS = [
   { value: "ENROLLED", label: "재학 중" },
   { value: "GRADUATING", label: "졸업 예정" },

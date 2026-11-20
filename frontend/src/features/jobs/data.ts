@@ -16,11 +16,27 @@ export type FeedQuery = {
   keyword?: string;
   cursor?: string;
   limit?: number;
+  /** true면 지역인재 전형이 있을 수 있는 공고(이전 공공기관 등)만 */
+  regionalTalent?: boolean;
 };
 
 /** B-03 맞춤 피드 */
-export function fetchFeed({ sort, region, keyword, cursor, limit = FEED_PAGE_SIZE }: FeedQuery): Promise<FeedResponse> {
-  return apiGet<FeedResponse>(`${BASE}/postings`, { sort, region, keyword: keyword?.trim(), cursor, limit });
+export function fetchFeed({
+  sort,
+  region,
+  keyword,
+  cursor,
+  limit = FEED_PAGE_SIZE,
+  regionalTalent,
+}: FeedQuery): Promise<FeedResponse> {
+  return apiGet<FeedResponse>(`${BASE}/postings`, {
+    sort,
+    region,
+    keyword: keyword?.trim(),
+    cursor,
+    limit,
+    regionalTalent: regionalTalent ? "true" : undefined,
+  });
 }
 
 /** B-04 공고 상세 */

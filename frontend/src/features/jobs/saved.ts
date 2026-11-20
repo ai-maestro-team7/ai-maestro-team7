@@ -55,6 +55,11 @@ function load(owner: string | null) {
   );
 }
 
+/** 읽어 둔 저장 목록을 버린다. 저장 표시가 필요한 화면이 다음에 열릴 때 다시 읽는다 (개발 모드의 유저 정보 초기화). */
+export function forgetSavedIds(): void {
+  update({ owner: null, ids: EMPTY, loading: false });
+}
+
 /** 저장한 공고 ID 모음. 로그인 전이면 비어 있다. */
 export function useSavedIds(): ReadonlySet<string> {
   const username = useUsername();

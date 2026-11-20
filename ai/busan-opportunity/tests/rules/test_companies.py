@@ -212,3 +212,14 @@ def test_name_sort_ignores_legal_marks(world):
     got = ids(run(world))
     assert got.index("t-01") < got.index("t-08") < got.index("t-02")  # 가나 < 거북 < 다라
     assert got[-1] == "t-07"  # 하늘은 맨 뒤 (표기 "(주)" 때문에 앞으로 오지 않는다)
+
+
+# ---------------------------------------------------------------- 이름으로 찾기 (개발계획서4 §9.1)
+def test_find_companies_by_name_ignores_legal_mark_and_spacing(world):
+    world.catalog.put_company(company("t-06", "(주)가나 소프트웨어", cg(CheonggeulType.SALARY)))
+    found = companies.find_companies(world, "가나소프트")
+    assert [c.company_id for c in found] == ["t-01", "t-06"]  # 이름이 같은 회사가 먼저
+    assert all(c.source and c.as_of for c in found)
+    assert companies.find_companies(world, "서울데이터") == []  # 부산 소재만
+    assert companies.find_companies(world, "가") == []           # 한 글자는 찾지 않는다
+    assert companies.find_companies(world, "없는회사") == []

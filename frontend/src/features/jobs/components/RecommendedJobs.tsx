@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ApiErrorNotice } from "@/features/auth/components/ApiFallback";
 import { useUsername } from "@/features/auth/useUsername";
 import { useApi } from "@/lib/useApi";
@@ -21,9 +22,7 @@ export function RecommendedJobs() {
   return (
     <>
       {/* 정렬 기준 문구는 응답 전에도 보여 줘 표가 밀리지 않게 한다 */}
-      <p className="text-small text-grey-600">
-        {SORT_LABELS.BUSAN_FIRST} · {state.status === "success" ? state.data.ranking.basis : BUSAN_FIRST_BASIS}
-      </p>
+      <BasisRow basis={state.status === "success" ? state.data.ranking.basis : BUSAN_FIRST_BASIS} />
       {state.status === "success" ? (
         <JobTable jobs={state.data.items.slice(0, HOME_COUNT)} asOf={asOfDate(state.data.dataAsOf)} />
       ) : (
@@ -37,10 +36,22 @@ export function RecommendedJobs() {
 export function RecommendedJobsLoading() {
   return (
     <>
-      <p className="text-small text-grey-600">
-        {SORT_LABELS.BUSAN_FIRST} · {BUSAN_FIRST_BASIS}
-      </p>
+      <BasisRow basis={BUSAN_FIRST_BASIS} />
       <JobTableSkeleton rows={HOME_COUNT} />
     </>
+  );
+}
+
+/** 정렬 기준 문구 + "지역인재 전형 공고 보기" 줄. 불러오는 중에도 같은 줄을 그려 표가 밀리지 않는다. */
+function BasisRow({ basis }: { basis: string }) {
+  return (
+    <div className="flex w-full flex-wrap items-center justify-between gap-2 text-small">
+      <p className="text-grey-600">
+        {SORT_LABELS.BUSAN_FIRST} · {basis}
+      </p>
+      <Link href="/jobs/?talent=1" className="font-medium text-blue-500">
+        지역인재 전형 공고 보기
+      </Link>
+    </div>
   );
 }

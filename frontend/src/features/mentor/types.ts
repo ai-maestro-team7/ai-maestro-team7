@@ -20,16 +20,25 @@ export type MentorExample = {
   reply: MentorReply;
 };
 
-/** 질문에 붙인 파일. 대화에는 이름과 크기만 남긴다 (파일 내용은 보관하지 않는다). */
+/** 보내기 전 입력칸에 붙어 있는 파일. 이름과 크기만 들고 있고 파일 내용은 읽지 않는다. */
 export type MentorAttachment = {
   name: string;
   sizeBytes: number;
 };
 
-export type MentorTurn = {
-  question: string;
-  attachment?: MentorAttachment;
-  reply: MentorReply;
+/** 대화에 남는 글 한 건. 붙인 파일은 이름만 남긴다 (내용은 어디에도 보관하지 않는다). */
+export type MentorMessage =
+  | { role: "user"; question: string; attachmentName?: string }
+  | ({ role: "assistant" } & MentorReply);
+
+/** 브라우저에 보관하는 대화 하나 */
+export type MentorConversation = {
+  id: string;
+  /** 첫 질문을 줄인 글. 대화 목록에 보인다 */
+  title: string;
+  /** 마지막으로 글이 오간 시각 (epoch ms). 목록 순서와 오래된 대화 정리에 쓴다 */
+  updatedAt: number;
+  messages: MentorMessage[];
 };
 
 /** 홈 "이어서 하기" 항목 */

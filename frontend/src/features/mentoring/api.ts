@@ -1,3 +1,4 @@
+import { sessionOwner } from "@/lib/session";
 import type {
   AnalysisResponse,
   AsyncStatus,
@@ -242,18 +243,6 @@ export function getLearningPath(learningPathId: string): Promise<LearningPathRes
   return request(`/api/v1/mentoring/learning-paths/${encodeURIComponent(learningPathId)}`);
 }
 
-function sessionOwner(session: Session): string {
-  try {
-    const payload = session.accessToken.split(".")[1];
-    const raw = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const normalized = raw.padEnd(Math.ceil(raw.length / 4) * 4, "=");
-    const claims = JSON.parse(window.atob(normalized)) as { sub?: string };
-    return claims.sub || session.username;
-  } catch {
-    return session.username;
-  }
-}
-
 function flowKey(): string | null {
   const session = readSession();
   return session ? `${FLOW_PREFIX}.${sessionOwner(session)}` : null;
@@ -274,6 +263,12 @@ export function saveFlow(flow: MentoringFlow): void {
   const key = flowKey();
   if (!key) throw new ApiError(401, "AUTH_REQUIRED", "로그인 후 다시 이용해 주세요.");
   window.localStorage.setItem(key, JSON.stringify(flow));
+}
+
+/** 진단·첨삭·학습 경로를 잇는 ID를 지운다 (개발 모드의 유저 정보 초기화). */
+export function clearFlow(): void {
+  const key = flowKey();
+  if (key) window.localStorage.removeItem(key);
 }
 
 export function updateFlow(patch: Partial<MentoringFlow>): MentoringFlow | null {

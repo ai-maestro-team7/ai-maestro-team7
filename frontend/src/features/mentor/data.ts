@@ -6,6 +6,9 @@ const DEMO_ROLE = "데이터 분석";
 /** 홈 입력칸 초기 문장 */
 export const MENTOR_DEFAULT_QUESTION = `부산에서 지원할 만한 ${DEMO_ROLE} 공고를 찾아줘`;
 
+/** 질문 한 건의 최대 글자 수. 대화를 브라우저에 보관하므로 지나치게 긴 글은 받지 않는다. */
+export const QUESTION_MAX_LENGTH = 1000;
+
 const jobReply: MentorReply = {
   answer:
     "예시 공고 중에는 (주)가상데이터의 데이터 분석 신입이 가장 잘 맞아요. SQL, Python 필수 요건이 프로필과 맞고, 우대 자격인 ADsP를 준비하면 더 좋아요.",
@@ -57,9 +60,6 @@ export const mentorExamples: MentorExample[] = [
   },
 ];
 
-/** 대화 화면에서 보여줄 Chip (Figma: 새 질문, 청년 지원 정책 알아보기) */
-export const FOLLOW_UP_EXAMPLE_LABEL = "청년 지원 정책 알아보기";
-
 /** 예시 질문과 일치하지 않는 질문에 보여줄 시연 답변 */
 export const fallbackReply: MentorReply = {
   answer: "시연 모드에서는 준비된 질문에만 답할 수 있어요. 아래 예시 질문을 눌러 보세요.",
@@ -106,6 +106,11 @@ export const attachmentReply: MentorReply = {
 
 /** 파일만 붙이고 질문을 비워 보냈을 때 대신 쓰는 질문 */
 export const ATTACHMENT_QUESTION = "첨부한 파일을 봐줘";
+
+/** 질문 하나에 붙일 시연 답변. 파일을 붙였으면 서류 안내를, 아니면 준비된 답변을 고른다. */
+export function mentorReplyTo(question: string, hasAttachment: boolean): MentorReply {
+  return hasAttachment ? attachmentReply : findMentorReply(question);
+}
 
 /** 홈 "이어서 하기" (Figma 홈 오른쪽 목록). 숫자는 진단·면접·로드맵 Mock 데이터와 같은 값이다. */
 export const continueItems: ContinueItem[] = [

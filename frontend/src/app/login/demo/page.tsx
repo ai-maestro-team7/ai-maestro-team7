@@ -6,7 +6,7 @@ import { LoginForm } from "@/features/auth/components/LoginForm";
 
 export const metadata: Metadata = { title: "시연 계정 로그인", robots: { index: false } };
 
-/** 시연 계정(demo1~demo3) 로그인. 화면 어디에도 링크하지 않는다. 일반 로그인은 `/login/`의 소셜 로그인이다. */
+/** 시연 계정(demo1~demo3) 로그인. 로그인 화면에서 개발 모드를 켰을 때만 링크가 보인다. 일반 로그인은 `/login/`의 소셜 로그인이다. */
 export default function DemoLoginPage() {
   return (
     <PageContainer className="items-center gap-6">

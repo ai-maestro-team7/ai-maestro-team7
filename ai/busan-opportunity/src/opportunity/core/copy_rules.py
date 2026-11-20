@@ -30,6 +30,7 @@ WHY_SHOWN_BY_REASON = {
 }
 
 REGIONAL_TALENT_LIKELY = "{school} 소재 학교 {status}이라 지역인재 전형 대상일 수 있어요 · 공고문 확인"
+REGIONAL_TALENT_LIKELY_NAMED = "{name}({school}) {status}이라 지역인재 전형 대상일 수 있어요 · 공고문 확인"
 REGIONAL_TALENT_CHECK = "이전 공공기관 공고예요. 지역인재 전형이 있는지 공고문에서 확인해 주세요"
 
 EMPTY_BUSAN = "부산에는 아직 이 직무 공고가 적어요. 비슷한 직무를 함께 보여드려요 · 새 공고 알림 받기"
@@ -80,3 +81,10 @@ def salary_label(disclosed: bool, low: int | None, high: int | None) -> str:
     if low is not None and high is not None and low != high:
         return f"연 {low:,}~{high:,}만 원"
     return f"연 {(low if low is not None else high):,}만 원"
+
+CAREER_LABEL = {"NEW": "신입", "EXPERIENCED": "경력", "ANY": "경력 무관"}
+
+
+def career_label(career_type: str | None) -> str:
+    """신입 / 경력 / 경력 무관. 모르면 '공고에 없음' (개발계획서4 §9)."""
+    return CAREER_LABEL.get(str(career_type or ""), NOT_IN_POSTING)

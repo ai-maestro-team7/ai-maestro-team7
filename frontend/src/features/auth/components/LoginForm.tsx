@@ -5,6 +5,7 @@ import { type FormEvent, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { TextField } from "@/components/ui/TextField";
 import { ApiError, login } from "@/lib/api";
+import { readDevModeFlag } from "../devMode";
 import { safeNextPath } from "../lib";
 
 /** 아이디·비밀번호 로그인 (`POST /api/v1/auth/login`). 회원가입은 없고 관리자가 만든 계정만 쓴다. */
@@ -25,7 +26,7 @@ export function LoginForm() {
     setPending(true);
     setError(undefined);
     try {
-      await login(username.trim(), password);
+      await login(username.trim(), password, readDevModeFlag());
       router.replace(next);
     } catch (e) {
       // 아이디가 없든 비밀번호가 틀리든 같은 문구 (docs/api.md §3)

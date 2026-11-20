@@ -159,11 +159,11 @@ class FakeToolLLM:
             raise item
         return item
 
-    def run_with_tools(self, *, system_prompt, user_prompt, tools, limits):
+    def run_with_tools(self, *, system_prompt, user_prompt, tools, limits, max_tokens=None):
         by_name = {t.__name__: t for t in tools}
         results = [(name, kwargs, by_name[name](**kwargs)) for name, kwargs in self.tool_calls]
         self.runs.append({"system": system_prompt, "user": user_prompt, "tools": sorted(by_name),
-                          "limits": limits, "results": results})
+                          "limits": limits, "max_tokens": max_tokens, "results": results})
         if not self.tool_responses:
             raise RuntimeError("FakeToolLLM: no more tool responses")
         item = self.tool_responses.pop(0)
@@ -173,7 +173,11 @@ class FakeToolLLM:
 
 
 class FakeLLM:
-    """정해 둔 응답을 차례로 돌려준다. 예외 객체를 넣으면 그 차례에 던진다. 받은 프롬프트를 기록한다."""
+    """정해 둔 응답을 차례로 돌려준다. 예외 객체를 넣으면 그 차례에 던진다. 받은 프롬프트를 기록한다.
+
+    run_with_tools(꼬리질문 판단 에이전트, #109)도 complete와 같은 응답 목록을 쓴다. 툴은 부르지 않는다.
+    툴을 실제로 부르는 테스트는 FakeToolLLM을 쓴다.
+    """
 
     def __init__(self, responses):
         self.responses = list(responses)
@@ -181,6 +185,14 @@ class FakeLLM:
 
     def complete(self, *, system_prompt, user_prompt):
         self.calls.append({"system": system_prompt, "user": user_prompt})
+        return self._next()
+
+    def run_with_tools(self, *, system_prompt, user_prompt, tools, limits, max_tokens=None):
+        self.calls.append({"system": system_prompt, "user": user_prompt, "tools": sorted(t.__name__ for t in tools),
+                           "limits": limits, "max_tokens": max_tokens})
+        return self._next()
+
+    def _next(self):
         if not self.responses:
             raise RuntimeError("FakeLLM: no more responses")
         item = self.responses.pop(0)

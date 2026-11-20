@@ -7,6 +7,7 @@ from rules.test_ncs_match import ALIO_IT, ALIO_OFFICE, OVERSEAS_VN, add_posting
 
 from opportunity.core import copy_rules, eligibility, facts, ranking
 from opportunity.models import MatchLevel, OppError, Sort
+from opportunity.models.enums import RegionalTalentStatus
 from opportunity.models.posting import AltCandidate, AltCandidates, Job, Salary, WorkRegion
 from opportunity.models.profile import BasicProfile, DesiredJob
 from opportunity.models.region import LocalLifeData
@@ -287,6 +288,80 @@ def test_profile_without_jobs_is_incomplete(deps, as_of):
     assert e.value.code == "PROFILE_INCOMPLETE" and e.value.status == 422
 
 
+# ---------------------------------------------------------------- 대화 조건 (개발계획서4 §9, B-S1)
+def _set_latest(deps, job_posting_id, **update):
+    latest = deps.catalog.get_latest(job_posting_id)
+    deps.catalog.put_latest(latest.model_copy(update=update))
+
+
+def test_job_name_searches_without_saved_jobs_and_is_not_saved(deps, as_of):
+    deps.users.profiles["empty"] = BasicProfile(major="통계학")
+    cards = feed(deps, as_of, "empty", job_name="데이터 분석").items
+    assert cards
+    assert deps.users.get_basic_profile("empty").desired_jobs == []  # 저장하지 않는다
+
+
+def test_job_name_same_as_saved_keeps_saved_codes(deps):
+    saved = deps.users.get_basic_profile("demo1")
+    same = ranking.with_job_name(saved, f"  {saved.desired_jobs[0].name} ")
+    assert same.desired_jobs == saved.desired_jobs[:1]
+    other = ranking.with_job_name(saved, "마케팅")
+    assert other.desired_jobs == [DesiredJob(name="마케팅")] and ranking.with_job_name(saved, None) is saved
+
+
+def test_min_salary_drops_only_disclosed_lower_salary(deps, as_of):
+    _set_latest(deps, w.BUSAN_DATA, salary=Salary(disclosed=True, min=2800, max=2900))
+    _set_latest(deps, w.SEOUL_DATA, salary=Salary(disclosed=False))
+    _set_latest(deps, w.BUSAN_DATA_PUBLIC, salary=Salary(disclosed=True, min=3200, max=None))
+    kept = ids(feed(deps, as_of, min_salary=3000))
+    assert w.BUSAN_DATA not in kept           # 공개 급여 상한 2,900 < 3,000
+    assert w.SEOUL_DATA in kept               # 비공개 급여는 남긴다 (미확인 ≠ 미달)
+    assert w.BUSAN_DATA_PUBLIC in kept        # 상한이 없으면 하한으로 본다
+    assert w.BUSAN_DATA in ids(feed(deps, as_of, min_salary=2900))
+
+
+def test_career_type_keeps_any_and_unknown(deps, as_of):
+    from opportunity.models.enums import CareerType
+    _set_latest(deps, w.BUSAN_DATA, career_type=CareerType.EXPERIENCED)
+    _set_latest(deps, w.SEOUL_DATA, career_type=CareerType.NEW)
+    _set_latest(deps, w.BUSAN_DATA_PUBLIC, career_type=CareerType.ANY)
+    new = set(ids(feed(deps, as_of, career_type="new")))
+    assert w.BUSAN_DATA not in new and {w.SEOUL_DATA, w.BUSAN_DATA_PUBLIC} <= new
+    experienced = set(ids(feed(deps, as_of, career_type="EXPERIENCED")))
+    assert w.SEOUL_DATA not in experienced and w.BUSAN_DATA in experienced
+    assert len(ids(feed(deps, as_of, career_type="ANY"))) == len(ids(feed(deps, as_of)))
+    card = next(c for c in feed(deps, as_of).items if c.job_posting_id == w.BUSAN_DATA)
+    assert card.career_type == CareerType.EXPERIENCED
+
+
+def test_organization_filter_ignores_spacing(deps, as_of):
+    org = deps.catalog.get_latest(w.BUSAN_DATA).organization
+    cards = feed(deps, as_of, organization=org.replace(" ", "").upper()).items
+    assert cards and all(c.organization == org for c in cards)
+
+
+def test_conditions_do_not_change_scores(deps, as_of):
+    """거르기만 하고 matchScore·rankScore는 그대로다."""
+    before = {c.job_posting_id: (c.match_score, c.rank_score) for c in feed(deps, as_of).items}
+    after = feed(deps, as_of, career_type="NEW", min_salary=0).items
+    assert after and all(before[c.job_posting_id] == (c.match_score, c.rank_score) for c in after)
+
+
+def test_bad_conditions_are_400(deps, as_of):
+    for kwargs in ({"min_salary": -1}, {"min_salary": True}, {"career_type": "INTERN"}):
+        with pytest.raises(OppError) as e:
+            feed(deps, as_of, **kwargs)
+        assert e.value.code == "INVALID_INPUT"
+
+
+def test_query_terms_go_only_to_embedding(deps, as_of, monkeypatch):
+    texts = []
+    inner = deps.embedder.embed
+    monkeypatch.setattr(deps.embedder, "embed", lambda text, kind: texts.append(text) or inner(text, kind=kind))
+    feed(deps, as_of, query_terms=["SQL", " ", "Tableau"])
+    assert texts and texts[-1].endswith("| SQL, Tableau")
+
+
 def test_ask_leave_reason_only_once_for_capital(deps, as_of):
     assert feed(deps, as_of, region="ALL").ask_leave_reason is False
     assert feed(deps, as_of, region="CAPITAL").ask_leave_reason is True
@@ -443,3 +518,63 @@ def test_commute_needs_residence(deps, as_of):
     profile = deps.users.get_basic_profile("demo1").model_copy(update={"residence_sigungu": None})
     deps.users.profiles["demo1"] = profile
     assert all(c.commute_minutes is None for c in feed(deps, as_of).items)
+
+
+def test_scope_splits_official_and_team_data(deps, as_of):
+    _set_latest(deps, w.SEOUL_DATA, is_sample=False)  # 공공 API로 모은 공고 하나
+    every = feed(deps, as_of).items
+    official = feed(deps, as_of, scope="official").items
+    team = feed(deps, as_of, scope="TEAM").items
+    assert ids(feed(deps, as_of, scope="OFFICIAL")) == [w.SEOUL_DATA] and all(c.is_sample for c in team)
+    assert w.SEOUL_DATA not in ids_of(team) and official
+    assert sorted(ids_of(official) | ids_of(team)) == sorted(ids_of(every))
+    assert ranking.is_team_data(deps.catalog.get_latest(w.BUSAN_DATA)) is deps.catalog.get_latest(w.BUSAN_DATA).is_sample
+    with pytest.raises(OppError) as e:
+        feed(deps, as_of, scope="CRAWLED")
+    assert e.value.code == "INVALID_INPUT"
+
+
+# ---------------------------------------------------------------- 지역인재 (출신 학교 소재지)
+def _school(deps, user, region, name=None):
+    deps.users.profiles[user] = deps.users.get_basic_profile(user).model_copy(
+        update={"university_region": region, "school_name": name})
+
+
+def test_regional_talent_filter_keeps_only_talent_postings(deps, as_of):
+    everything = feed(deps, as_of, "demo3")
+    only = feed(deps, as_of, "demo3", regional_talent=True)
+    assert ids(only) and set(ids(only)) < set(ids(everything))
+    assert all(c.regional_talent is not None for c in only.items)
+    assert [i for i in ids(everything) if i in set(ids(only))] == ids(only)  # 순서는 그대로
+    assert w.BUSAN_DATA not in ids(only)  # 민간 공고는 빠진다
+
+
+def test_card_says_likely_only_when_school_is_in_busan(deps, as_of):
+    card = next(c for c in feed(deps, as_of, "demo3").items if c.job_posting_id == w.BUSAN_FINANCE_PUBLIC)
+    assert card.regional_talent == RegionalTalentStatus.LIKELY
+    assert facts.FACT_REGIONAL_TALENT_CARD in card.facts
+    for region in ("11", None):
+        _school(deps, "demo3", region)
+        card = next(c for c in feed(deps, as_of, "demo3").items if c.job_posting_id == w.BUSAN_FINANCE_PUBLIC)
+        assert card.regional_talent == RegionalTalentStatus.CHECK_NEEDED
+        assert facts.FACT_REGIONAL_TALENT_CARD not in card.facts
+
+
+def test_school_does_not_change_scores_or_order(deps, as_of):
+    before = [(c.job_posting_id, c.match_score, c.rank_score) for c in feed(deps, as_of, "demo3").items]
+    _school(deps, "demo3", "11")
+    after = [(c.job_posting_id, c.match_score, c.rank_score) for c in feed(deps, as_of, "demo3").items]
+    assert before == after
+
+
+def test_regional_talent_card_copy_is_allowed(deps, as_of):
+    assert not copy_rules.find_forbidden(facts.FACT_REGIONAL_TALENT_CARD)
+
+
+def test_certificates_from_basic_profile_count_for_preferred(deps):
+    profile = BasicProfile(desired_jobs=[DesiredJob(name="데이터 분석", ncs_code="20010105")])
+    posting = deps.catalog.get_latest(w.BUSAN_DATA)
+    assert posting.preferred_names, "데모 공고에 우대 요건이 있어야 한다"
+    without = ranking.preferred_ok_value(profile, posting)
+    with_cert = ranking.preferred_ok_value(profile.model_copy(update={"certificates": [posting.preferred_names[0]]}), posting)
+    assert without is None and with_cert is not None and with_cert > 0

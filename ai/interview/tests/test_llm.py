@@ -339,6 +339,34 @@ def test_run_with_tools_passes_tools_limits_and_feedback_max_tokens(monkeypatch,
     assert all(m["additional_request_fields"] == {"thinking": {"type": "disabled"}} for m in fake_tool_strands["models"])
 
 
+def test_run_with_tools_uses_given_max_tokens(monkeypatch, reset_model, fake_tool_strands):
+    # 꼬리질문 판단(#109)은 피드백(2048)과 다른 출력 상한을 넘긴다. 같은 값이면 모델을 다시 쓴다
+    monkeypatch.setenv("MODEL_ID", "test-model")
+    monkeypatch.delenv("INTERVIEW_FEEDBACK_MAX_TOKENS", raising=False)
+    client = llm.StrandsLLMClient()
+    client.run_with_tools(system_prompt="S", user_prompt="U", tools=[_a_tool], limits={"turns": 4}, max_tokens=700)
+    client.run_with_tools(system_prompt="S", user_prompt="U", tools=[_a_tool], limits={"turns": 4}, max_tokens=700)
+    client.run_with_tools(system_prompt="S", user_prompt="U", tools=[_a_tool], limits={"turns": 6})
+    assert [m["max_tokens"] for m in fake_tool_strands["models"]] == [700, 2048]
+
+
+def test_call_json_with_tools_passes_max_tokens_only_when_given():
+    class FakeTools:
+        def __init__(self):
+            self.seen = []
+
+        def run_with_tools(self, **kwargs):
+            self.seen.append(kwargs)
+            return '{"value": 1}'
+
+    fake = FakeTools()
+    llm.call_json_with_tools(fake, system_prompt="S", user_prompt="U", tools=[], limits={}, schema=Out, stage="t")
+    llm.call_json_with_tools(fake, system_prompt="S", user_prompt="U", tools=[], limits={}, schema=Out, stage="t",
+                             max_tokens=900)
+    assert "max_tokens" not in fake.seen[0]  # 주지 않으면 넘기지 않는다 (max_tokens를 모르는 클라이언트도 그대로)
+    assert fake.seen[1]["max_tokens"] == 900
+
+
 def test_run_with_tools_max_tokens_becomes_output_truncated(monkeypatch, reset_model, fake_tool_strands):
     monkeypatch.setenv("MODEL_ID", "test-model")
 
