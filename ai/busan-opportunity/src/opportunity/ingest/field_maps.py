@@ -25,6 +25,8 @@ DETAIL_MAX_PER_RUN = 300      # 일일 한도를 확인하기 전까지 상세 �
 SECRET_DATA_GO_KR = "DATA_GO_KR_SERVICE_KEY"
 SECRET_WORK24 = "WORK24_AUTH_KEY"
 SECRET_YOUTHCENTER = "YOUTHCENTER_API_KEY"
+SECRET_WORK24_GANGSO = "WORK24_GANGSO_KEY"  # 고용24는 서비스마다 인증키가 따로다
+SECRET_WORK24_CODES = "WORK24_CODES_KEY"
 
 # 응답 미확인 (개인회원 불가): 고용24 채용정보 목록 210L01·상세 210D01은 개인회원 키로 부르면
 # "개인회원은 사용할 수 없는 OPEN-API입니다" 오류가 온다 (2026-11-20). 아래 필드 이름은 임시 값이다.
@@ -175,7 +177,7 @@ EXTRA_SIDO_NAMES = {"12": "전남광주"}
 # 응답: smallGiantsList > total, smallGiant[]
 WORK24_GANGSO = {
     "source": "work24_gangso",
-    "secret": SECRET_WORK24,
+    "secret": SECRET_WORK24_GANGSO,
     "key_param": "authKey",
     "list": {
         "url": "https://www.work24.go.kr/cm/openApi/call/wk/callOpenApiSvcInfo216L01.do",

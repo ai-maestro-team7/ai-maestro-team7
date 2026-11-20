@@ -611,7 +611,8 @@ def normalize_gangso(record: Mapping, *, as_of) -> CompanyRecord:
     sido = region[:2] if len(region) >= 2 and region[:2] in _sido_codes(None) else None
     year, brand = get("year"), get("brand")
     badges = []
-    if re.fullmatch(r"\d{4}", year) and brand:
+    # "…신청기업"은 선정이 아니라 신청 상태라 배지로 만들지 않는다 (사실과 다른 인증 표시 금지)
+    if re.fullmatch(r"\d{4}", year) and brand and "신청" not in brand:
         badges.append(Badge(type=BadgeType.GANGSO, label=brand, source=GANGSO_BADGE_SOURCE, as_of=year))
     workers = _amount(get("workers"))
     return CompanyRecord(
