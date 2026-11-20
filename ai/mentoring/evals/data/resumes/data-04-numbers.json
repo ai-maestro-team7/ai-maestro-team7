@@ -1,0 +1,13 @@
+{
+  "resumeId": "virtual-data-04",
+  "jobRole": "데이터 분석",
+  "ncsCode": "20010105",
+  "documentType": "RESUME",
+  "text": "성명: 가상 지원자 D\n연락처: 010-0000-XXXX\n이메일: virtual-d@example.com\n가상기업 인턴으로 6개월 동안 로그 50,000건을 정리하고 대시보드 4개를 제작해 보고 시간을 30% 줄였습니다.",
+  "expectedSkills": [
+    {"name": "로그 데이터 정리", "quote": "로그 50,000건을 정리", "evidenceLevel": "EVIDENCED"},
+    {"name": "대시보드 제작", "quote": "대시보드 4개를 제작", "evidenceLevel": "EVIDENCED"}
+  ],
+  "notMentioned": ["통계 검정"],
+  "notes": "기간과 수치가 많아 지어낸 숫자 검증에 쓰는 사례"
+}

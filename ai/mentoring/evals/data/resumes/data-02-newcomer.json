@@ -1,0 +1,12 @@
+{
+  "resumeId": "virtual-data-02",
+  "jobRole": "데이터 분석",
+  "ncsCode": "20010105",
+  "documentType": "RESUME",
+  "text": "성명: 가상 지원자 B\n연락처: 010-0000-XXXX\n이메일: virtual-b@example.com\n가상대학교 재학생이며 Excel을 사용할 수 있습니다. 직무 관련 경력은 아직 없습니다.",
+  "expectedSkills": [
+    {"name": "Excel", "quote": "Excel을 사용할 수 있습니다", "evidenceLevel": "SELF_REPORTED"}
+  ],
+  "notMentioned": ["SQL", "Python", "데이터 시각화"],
+  "notes": "경력 없는 신입의 보유 선언만 있는 사례"
+}

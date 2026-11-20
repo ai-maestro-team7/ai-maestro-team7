@@ -1,0 +1,12 @@
+{
+  "resumeId": "virtual-accounting-01",
+  "jobRole": "회계·감사",
+  "ncsCode": "02030201",
+  "documentType": "RESUME",
+  "text": "성명: 가상 지원자 H\n연락처: 010-0000-XXXX\n이메일: virtual-h@example.com\n가상 회계 프로젝트에서 전표를 분류하고 월별 결산표를 검토했습니다.",
+  "expectedSkills": [
+    {"name": "전표 분류", "quote": "전표를 분류하고 월별 결산표를 검토했습니다", "evidenceLevel": "EVIDENCED"}
+  ],
+  "notMentioned": ["외부 감사 대응"],
+  "notes": "회계·감사 직무 교차 평가 사례"
+}

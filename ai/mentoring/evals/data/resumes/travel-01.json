@@ -1,0 +1,12 @@
+{
+  "resumeId": "virtual-travel-01",
+  "jobRole": "여행상품상담",
+  "ncsCode": "12030102",
+  "documentType": "RESUME",
+  "text": "성명: 가상 지원자 L\n연락처: 010-0000-XXXX\n이메일: virtual-l@example.com\n가상여행사 체험에서 고객 희망 일정을 듣고 여행상품 비교표를 안내했습니다.",
+  "expectedSkills": [
+    {"name": "여행상품 상담", "quote": "고객 희망 일정을 듣고 여행상품 비교표를 안내했습니다", "evidenceLevel": "EVIDENCED"}
+  ],
+  "notMentioned": ["항공 발권"],
+  "notes": "여행상품상담 직무 교차 평가 사례"
+}

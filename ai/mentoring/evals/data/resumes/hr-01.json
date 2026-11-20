@@ -1,0 +1,12 @@
+{
+  "resumeId": "virtual-hr-01",
+  "jobRole": "인사",
+  "ncsCode": "02020201",
+  "documentType": "RESUME",
+  "text": "성명: 가상 지원자 G\n연락처: 010-0000-XXXX\n이메일: virtual-g@example.com\n가상기업 인사팀에서 지원자 일정 조율과 면접 운영을 담당했습니다.",
+  "expectedSkills": [
+    {"name": "채용 운영", "quote": "지원자 일정 조율과 면접 운영을 담당했습니다", "evidenceLevel": "EVIDENCED"}
+  ],
+  "notMentioned": ["급여 관리"],
+  "notes": "인사 직무 교차 평가 사례"
+}
