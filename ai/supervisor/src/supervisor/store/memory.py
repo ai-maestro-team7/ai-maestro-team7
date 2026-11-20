@@ -51,3 +51,36 @@ class MemoryChatStore:
         self.messages[(user_id, session_id, message_id)] = message.model_copy(update={
             "status": MessageStatus.PROCESSING, "updated_at": now})
         return True
+
+    def finish_message(self, message):
+        key = (message.owner_user_id, message.session_id, message.message_id)
+        current = self.messages.get(key)
+        if current is None or current.status != MessageStatus.PROCESSING:
+            return False
+        self.messages[key] = message
+        return True
+
+    def cancel_message(self, user_id, session_id, message_id, *, now):
+        message = self.messages.get((user_id, session_id, message_id))
+        if message is None or message.status not in (MessageStatus.PENDING, MessageStatus.PROCESSING):
+            return False
+        self.messages[(user_id, session_id, message_id)] = message.model_copy(update={
+            "status": MessageStatus.CANCELLED, "updated_at": now})
+        return True
+
+    def list_sessions(self, user_id):
+        return [s for (u, _), s in self.sessions.items() if u == user_id]
+
+    def set_pinned(self, user_id, session_id, pinned):
+        session = self.sessions.get((user_id, session_id))
+        if session is None:
+            return False
+        self.sessions[(user_id, session_id)] = session.model_copy(update={"pinned": pinned})
+        return True
+
+    def delete_session(self, user_id, session_id):
+        if self.sessions.pop((user_id, session_id), None) is None:
+            return False
+        for key in [k for k in self.messages if k[0] == user_id and k[1] == session_id]:
+            del self.messages[key]
+        return True
