@@ -39,6 +39,10 @@ SCHEDULER_ROLE_ARN=arn:aws:iam::${ACCOUNT_ID}:role/${SCHEDULER_ROLE_NAME}
 ROLE_ARN=${ROLE_ARN:-arn:aws:iam::${ACCOUNT_ID}:role/${PREFIX}-lambda-role}
 
 
+# 소셜 로그인 (infra/setup-social-login.sh). 비밀값 JSON: {"google": {"clientId", "clientSecret"}, "kakao": {…}}
+SOCIAL_SECRET_ID=${SOCIAL_SECRET_ID:-team07/social-login}
+COGNITO_DOMAIN_PREFIX=${PREFIX}-auth-${ACCOUNT_ID: -6}   # 호스트: {접두사}.auth.{리전}.amazoncognito.com
+
 # 프론트 주소가 정해지면 바꾼다. 개발 중에는 * (모두 허용)
 ALLOWED_ORIGIN=${ALLOWED_ORIGIN:-*}
 
