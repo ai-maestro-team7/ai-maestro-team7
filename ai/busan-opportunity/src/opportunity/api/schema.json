@@ -1,0 +1,1039 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "BusanOpportunity",
+    "description": "부산 채용공고·청년정책 조회 도구 (B 파트)",
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "paths": {
+    "/agent/postings/{jobPostingId}/alternatives": {
+      "get": {
+        "summary": "GET /agent/postings/{jobPostingId}/alternatives",
+        "description": "수도권 공고와 하는 일이 비슷한 부산 공고를 찾는다. 사용자가 수도권 공고를 말하거나 비교하려 할 때 쓴다. 대안이 없으면 noAlternative=true다. suggestCompare=false면 비교를 권하지 않는다.",
+        "operationId": "agent_alternatives_agent_postings__jobPostingId__alternatives_get",
+        "parameters": [
+          {
+            "description": "기준 공고 ID (예: wk24-…, alio-…)",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Jobpostingid",
+              "description": "기준 공고 ID (예: wk24-…, alio-…)"
+            },
+            "name": "jobPostingId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentAlternatives"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/postings/{jobPostingId}/regional-talent": {
+      "get": {
+        "summary": "GET /agent/postings/{jobPostingId}/regional-talent",
+        "description": "공공기관 공고의 지역인재 전형 해당 가능성을 돌려준다. 사용자가 이전 공공기관·공기업 공고의 지역인재 전형을 물을 때 쓴다. 결과는 '대상일 수 있어요'까지만이고 공고문 확인이 필요하다.",
+        "operationId": "agent_regional_talent_agent_postings__jobPostingId__regional_talent_get",
+        "parameters": [
+          {
+            "description": "공고 ID",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Jobpostingid",
+              "description": "공고 ID"
+            },
+            "name": "jobPostingId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegionalTalentResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/postings": {
+      "get": {
+        "summary": "GET /agent/postings",
+        "description": "사용자에게 맞는 채용공고를 찾는다. 사용자가 일자리·채용공고를 물을 때 쓴다. 비슷하게 맞으면 부산 근무 공고를 먼저 돌려준다. 공고는 최대 5개이고 적합도는 3단계 말로만 준다.",
+        "operationId": "agent_search_postings_agent_postings_get",
+        "parameters": [
+          {
+            "description": "찾을 직무·회사 낱말. 없으면 희망 직무로 찾는다",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                }
+              ],
+              "title": "Keyword",
+              "description": "찾을 직무·회사 낱말. 없으면 희망 직무로 찾는다",
+              "nullable": true
+            },
+            "name": "keyword",
+            "in": "query"
+          },
+          {
+            "description": "ALL(전국) 또는 BUSAN(부산 근무만)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "ALL",
+                "BUSAN"
+              ],
+              "title": "Region",
+              "description": "ALL(전국) 또는 BUSAN(부산 근무만)",
+              "default": "ALL"
+            },
+            "name": "region",
+            "in": "query"
+          },
+          {
+            "description": "돌려받을 공고 수. 최대 5",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1.0
+                }
+              ],
+              "title": "Limit",
+              "description": "돌려받을 공고 수. 최대 5",
+              "nullable": true
+            },
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentFeed"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/compare": {
+      "get": {
+        "summary": "GET /agent/compare",
+        "description": "두 공고를 급여·주거비·통근·지역 정책·지역인재 기준으로 나란히 비교한다. 사용자가 두 공고를 견주어 보고 싶어 할 때 쓴다. 값만 나란히 주고 어느 쪽이 낫다고 판정하지 않는다.",
+        "operationId": "agent_compare_agent_compare_get",
+        "parameters": [
+          {
+            "description": "기준 공고 ID (보통 수도권 공고)",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Basejobpostingid",
+              "description": "기준 공고 ID (보통 수도권 공고)"
+            },
+            "name": "baseJobPostingId",
+            "in": "query"
+          },
+          {
+            "description": "비교할 공고 ID (보통 부산 공고)",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Altjobpostingid",
+              "description": "비교할 공고 ID (보통 부산 공고)"
+            },
+            "name": "altJobPostingId",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentCompare"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/agent/policies": {
+      "get": {
+        "summary": "GET /agent/policies",
+        "description": "사용자가 받을 수 있는 청년 정책과 판정 이유를 단계별로 돌려준다. 지원금·주거·자산 정책을 물을 때 쓴다. guaranteedIfEligible은 자격이 맞으면 받는 지원, selectiveMax는 선정되면 최대 금액이다.",
+        "operationId": "agent_policies_agent_policies_get",
+        "parameters": [
+          {
+            "description": "PREPARE(취업 준비), EMPLOYED(취업 후), SETTLE(정착)",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/PolicyStage"
+                }
+              ],
+              "title": "Stage",
+              "description": "PREPARE(취업 준비), EMPLOYED(취업 후), SETTLE(정착)",
+              "nullable": true
+            },
+            "name": "stage",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentPolicies"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AgentAlternative": {
+        "properties": {
+          "jobPostingId": {
+            "type": "string",
+            "title": "Jobpostingid"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "organization": {
+            "type": "string",
+            "title": "Organization"
+          },
+          "workRegion": {
+            "type": "string",
+            "title": "Workregion"
+          },
+          "closesAt": {
+            "type": "string",
+            "title": "Closesat"
+          },
+          "deadline": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Deadline",
+            "nullable": true
+          },
+          "matchLevel": {
+            "type": "string",
+            "title": "Matchlevel"
+          },
+          "whyShown": {
+            "type": "string",
+            "title": "Whyshown"
+          },
+          "badges": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Badges"
+          },
+          "facts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Facts"
+          },
+          "isSample": {
+            "type": "boolean",
+            "title": "Issample",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "jobPostingId",
+          "title",
+          "organization",
+          "workRegion",
+          "closesAt",
+          "matchLevel",
+          "whyShown"
+        ],
+        "title": "AgentAlternative"
+      },
+      "AgentAlternatives": {
+        "properties": {
+          "baseJobPostingId": {
+            "type": "string",
+            "title": "Basejobpostingid"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentAlternative"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "expanded": {
+            "type": "boolean",
+            "title": "Expanded",
+            "default": false
+          },
+          "noAlternative": {
+            "type": "boolean",
+            "title": "Noalternative",
+            "default": false
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Reason",
+            "nullable": true
+          },
+          "suggestCompare": {
+            "type": "boolean",
+            "title": "Suggestcompare",
+            "default": true
+          },
+          "dataAsOf": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Dataasof",
+            "nullable": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "baseJobPostingId"
+        ],
+        "title": "AgentAlternatives"
+      },
+      "AgentCompare": {
+        "properties": {
+          "base": {
+            "type": "string",
+            "title": "Base"
+          },
+          "alt": {
+            "type": "string",
+            "title": "Alt"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/CompareRow"
+            },
+            "type": "array",
+            "title": "Rows"
+          },
+          "costAdjusted": {
+            "$ref": "#/components/schemas/CostAdjusted"
+          },
+          "suggestMore": {
+            "type": "boolean",
+            "title": "Suggestmore",
+            "default": true
+          },
+          "dataAsOf": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Dataasof",
+            "nullable": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "base",
+          "alt",
+          "costAdjusted"
+        ],
+        "title": "AgentCompare"
+      },
+      "AgentFeed": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentPosting"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "rankingBasis": {
+            "type": "string",
+            "title": "Rankingbasis"
+          },
+          "notice": {
+            "type": "string",
+            "title": "Notice",
+            "default": "적합도는 실제 합격 확률이 아닙니다"
+          },
+          "emptyMessage": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Emptymessage",
+            "nullable": true
+          },
+          "dataAsOf": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Dataasof",
+            "nullable": true
+          },
+          "stale": {
+            "type": "boolean",
+            "title": "Stale",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "rankingBasis"
+        ],
+        "title": "AgentFeed"
+      },
+      "AgentPolicies": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentPolicy"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/PolicyTotals"
+          },
+          "dataAsOf": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Dataasof",
+            "nullable": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "totals"
+        ],
+        "title": "AgentPolicies"
+      },
+      "AgentPolicy": {
+        "properties": {
+          "policyId": {
+            "type": "string",
+            "title": "Policyid"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "bucket": {
+            "type": "string",
+            "title": "Bucket"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Reasons"
+          },
+          "manualChecks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Manualchecks"
+          },
+          "benefit": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Benefit",
+            "nullable": true
+          },
+          "selection": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Selection",
+            "nullable": true
+          },
+          "applyStart": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Applystart",
+            "nullable": true
+          },
+          "applyEnd": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Applyend",
+            "nullable": true
+          },
+          "expected": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Expected",
+            "nullable": true
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "asOf": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Asof",
+            "nullable": true
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Url",
+            "nullable": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "policyId",
+          "title",
+          "bucket",
+          "status",
+          "source"
+        ],
+        "title": "AgentPolicy"
+      },
+      "AgentPosting": {
+        "properties": {
+          "jobPostingId": {
+            "type": "string",
+            "title": "Jobpostingid"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "organization": {
+            "type": "string",
+            "title": "Organization"
+          },
+          "workRegion": {
+            "type": "string",
+            "title": "Workregion"
+          },
+          "isBusan": {
+            "type": "boolean",
+            "title": "Isbusan"
+          },
+          "isCapitalArea": {
+            "type": "boolean",
+            "title": "Iscapitalarea"
+          },
+          "closesAt": {
+            "type": "string",
+            "title": "Closesat"
+          },
+          "deadline": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Deadline",
+            "nullable": true
+          },
+          "salary": {
+            "type": "string",
+            "title": "Salary"
+          },
+          "matchLevel": {
+            "type": "string",
+            "title": "Matchlevel"
+          },
+          "eligibility": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Eligibility",
+            "nullable": true
+          },
+          "badges": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Badges"
+          },
+          "facts": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Facts"
+          },
+          "busanAlternativesCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Busanalternativescount",
+            "nullable": true
+          },
+          "isSample": {
+            "type": "boolean",
+            "title": "Issample",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "jobPostingId",
+          "title",
+          "organization",
+          "workRegion",
+          "isBusan",
+          "isCapitalArea",
+          "closesAt",
+          "salary",
+          "matchLevel"
+        ],
+        "title": "AgentPosting"
+      },
+      "CompareKey": {
+        "type": "string",
+        "enum": [
+          "SALARY",
+          "HOUSING",
+          "COMMUTE",
+          "REGIONAL_POLICY",
+          "REGIONAL_TALENT",
+          "VERIFIED"
+        ],
+        "title": "CompareKey"
+      },
+      "CompareRow": {
+        "properties": {
+          "key": {
+            "$ref": "#/components/schemas/CompareKey"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "base": {
+            "title": "Base"
+          },
+          "alt": {
+            "title": "Alt"
+          },
+          "comparable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              }
+            ],
+            "title": "Comparable",
+            "nullable": true
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Source",
+            "nullable": true
+          },
+          "asOf": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Asof",
+            "nullable": true
+          },
+          "assumption": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Assumption",
+            "nullable": true
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Note",
+            "nullable": true
+          },
+          "isRegionalAverage": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              }
+            ],
+            "title": "Isregionalaverage",
+            "nullable": true
+          },
+          "nationalCommon": {
+            "anyOf": [
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Nationalcommon",
+            "nullable": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "label"
+        ],
+        "title": "CompareRow",
+        "description": "값만 나란히 둔다. 승패 표시는 하지 않는다."
+      },
+      "CostAdjusted": {
+        "properties": {
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Reason",
+            "nullable": true
+          },
+          "base": {
+            "anyOf": [
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Base",
+            "nullable": true
+          },
+          "alt": {
+            "anyOf": [
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Alt",
+            "nullable": true
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Unit",
+            "nullable": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "available"
+        ],
+        "title": "CostAdjusted"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "PolicyStage": {
+        "type": "string",
+        "enum": [
+          "PREPARE",
+          "EMPLOYED",
+          "SETTLE"
+        ],
+        "title": "PolicyStage"
+      },
+      "PolicyTotals": {
+        "properties": {
+          "guaranteedIfEligible": {
+            "type": "integer",
+            "title": "Guaranteedifeligible",
+            "default": 0
+          },
+          "selectiveMax": {
+            "type": "integer",
+            "title": "Selectivemax",
+            "default": 0
+          },
+          "unit": {
+            "type": "string",
+            "title": "Unit",
+            "default": "MANWON"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Note",
+            "nullable": true
+          }
+        },
+        "type": "object",
+        "title": "PolicyTotals",
+        "description": "본인 저축분은 더하지 않는다."
+      },
+      "RegionalTalentResponse": {
+        "properties": {
+          "jobPostingId": {
+            "type": "string",
+            "title": "Jobpostingid"
+          },
+          "organization": {
+            "type": "string",
+            "title": "Organization"
+          },
+          "regionalTalent": {
+            "$ref": "#/components/schemas/RegionalTalentView"
+          }
+        },
+        "type": "object",
+        "required": [
+          "jobPostingId",
+          "organization",
+          "regionalTalent"
+        ],
+        "title": "RegionalTalentResponse",
+        "description": "Action Group `/agent/postings/{id}/regional-talent`."
+      },
+      "RegionalTalentStatus": {
+        "type": "string",
+        "enum": [
+          "LIKELY",
+          "CHECK_NEEDED",
+          "NOT_APPLICABLE"
+        ],
+        "title": "RegionalTalentStatus"
+      },
+      "RegionalTalentView": {
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/RegionalTalentStatus"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Basis",
+            "nullable": true
+          },
+          "message": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Message",
+            "nullable": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "title": "RegionalTalentView"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "ResponseValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "ResponseValidationError"
+      }
+    }
+  }
+}

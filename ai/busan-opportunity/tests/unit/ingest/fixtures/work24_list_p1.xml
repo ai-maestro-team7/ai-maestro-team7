@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wantedRoot>
+  <total>3</total>
+  <startPage>1</startPage>
+  <display>2</display>
+  <wanted>
+    <wantedAuthNo>K000000001</wantedAuthNo>
+    <company>(주)가상데이터</company>
+    <title>데이터 분석 신입 채용</title>
+    <salTpNm>연봉</salTpNm>
+    <sal>3,000만원 ~ 4,000만원</sal>
+    <region>부산 해운대구</region>
+    <basicAddr>부산광역시 해운대구 센텀중앙로 1</basicAddr>
+    <career>신입</career>
+    <minEdubg>대졸(4년)</minEdubg>
+    <empTpNm>정규직</empTpNm>
+    <closeDt>2026-12-15</closeDt>
+    <wantedInfoUrl>https://example.invalid/wk24/K000000001</wantedInfoUrl>
+    <jobsCd>024101</jobsCd>
+  </wanted>
+  <wanted>
+    <wantedAuthNo>K000000002</wantedAuthNo>
+    <company>(주)가상테크</company>
+    <title>Data Analyst</title>
+    <salTpNm>회사내규</salTpNm>
+    <sal></sal>
+    <region>서울 강남구</region>
+    <basicAddr>서울특별시 강남구 테헤란로 2</basicAddr>
+    <career>신입·경력</career>
+    <minEdubg>학력무관</minEdubg>
+    <empTpNm>정규직</empTpNm>
+    <closeDt>채용시까지</closeDt>
+    <wantedInfoUrl>https://example.invalid/wk24/K000000002</wantedInfoUrl>
+    <jobsCd>024101</jobsCd>
+  </wanted>
+</wantedRoot>
