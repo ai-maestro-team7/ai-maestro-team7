@@ -13,6 +13,12 @@ export const SORT_LABELS: Record<JobSort, string> = {
   DEADLINE: "마감순",
 };
 
+/**
+ * 부산 우선 추천순의 정렬 기준 문구. B `copy_rules.RANKING_BASIS[BUSAN_FIRST]`와 같은 글이다.
+ * 응답이 오기 전에도 같은 자리에 미리 보여 줘 화면이 밀리지 않게 한다. 응답이 오면 응답의 `ranking.basis`를 쓴다.
+ */
+export const BUSAN_FIRST_BASIS = "비슷하게 맞는 공고 중 부산 근무 공고를 먼저 보여드려요";
+
 export const REGION_FILTERS: { value: JobRegion; label: string }[] = [
   { value: "ALL", label: "전체" },
   { value: "BUSAN", label: "부산" },

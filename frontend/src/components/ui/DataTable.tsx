@@ -106,13 +106,14 @@ export function DataTableSkeleton({
         {Array.from({ length: rows }, (_, row) => (
           <TableRow key={row} className={rowClassName}>
             {columns.map((column) => (
-              <TableCell key={column.key} className={cn(column.className, "flex flex-col gap-1.5")}>
+              <TableCell key={column.key} className={cn(column.className, "flex flex-col gap-0.5")}>
                 {column.srOnly ? (
                   <Skeleton className="size-4" />
                 ) : (
                   <>
-                    <Skeleton className="h-4 w-4/5" />
-                    <Skeleton className="h-3 w-1/2" />
+                    {/* 막대 위아래 여백까지 실제 글줄 높이(본문 24px, 작은 글 20px)와 같게 해 불러온 뒤 행 높이가 거의 그대로다 */}
+                    <Skeleton className="my-1 h-4 w-4/5" />
+                    <Skeleton className="my-1 h-3 w-1/2" />
                   </>
                 )}
               </TableCell>
