@@ -167,6 +167,12 @@ class LocalLifeConfig(OppModel):
     transit_max: int = 3
 
 
+class BatchConfig(OppModel):
+    daily_sources: list[str] = Field(default_factory=lambda: ["alio", "klid", "worldjob", "youthcenter"])
+    weekly_sources: list[str] = Field(default_factory=lambda: ["work24_gangso"])  # 강소기업은 자주 바뀌지 않는다
+    enrich_chunk: int = 100  # 한 번 실행에서 보강할 공고 수 (Lambda 실행 시간 안에 끝나게)
+
+
 class DataConfig(OppModel):
     stale_after_hours: int
     busan_sido: str
@@ -188,6 +194,7 @@ class OpportunityConfig(OppModel):
     explanation: ExplanationConfig = Field(default_factory=ExplanationConfig)
     agent: AgentConfig = Field(default_factory=AgentConfig)
     local_life: LocalLifeConfig = Field(default_factory=LocalLifeConfig)
+    batch: BatchConfig = Field(default_factory=BatchConfig)
     data: DataConfig
 
 
