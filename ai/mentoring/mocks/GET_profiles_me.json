@@ -18,7 +18,6 @@
         {
           "skillId": "skill-1",
           "name": "데이터 전처리",
-          "ncsUnitCode": "2001010501_23v2",
           "evidenceLevel": "EVIDENCED",
           "factStatus": "NEEDS_CONFIRMATION",
           "evidenceIds": [
