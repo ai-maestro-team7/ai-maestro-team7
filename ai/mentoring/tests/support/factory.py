@@ -8,6 +8,7 @@ from mentoring.config import CONFIG_PATH, load_config
 from mentoring.deps import KST, Deps
 from mentoring.llm.mock import MockLlm
 from mentoring.store.memory import MemoryObjectStore, MemoryUserRepo, QueueDispatcher
+from mentoring.stories.memory import MemoryStoryRepo
 
 from .data import good_output
 from .fake_text_tools import fake_text_tools
@@ -54,6 +55,7 @@ def make_deps(responses=None, *, reference="default", config=None, extractor=Non
         new_id=lambda prefix: f"{prefix}-{next(counter):04d}",
         extractor=extractor,
         metrics_sink=lambda line: metrics.append(json.loads(line)),
+        stories=MemoryStoryRepo(),
     )
     deps.metrics = metrics  # 테스트 확인용: 남긴 EMF 기록
     return deps

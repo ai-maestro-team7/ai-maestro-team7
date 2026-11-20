@@ -3,10 +3,14 @@ import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from typing import TYPE_CHECKING
 
 from .config import MentoringConfig
 from .ports import DocumentExtractor, Llm, ObjectStore, ReferenceLookup, TaskDispatcher, UserRepo
 from .text_tools import TextTools
+
+if TYPE_CHECKING:  # stories 패키지가 이 모듈을 import하므로 실행 중에는 가져오지 않는다
+    from .stories.repo import StoryRepo
 
 KST = timezone(timedelta(hours=9))
 
@@ -33,6 +37,7 @@ class Deps:
     reference: ReferenceLookup | None = None  # 없으면 NCS 능력단위 코드를 붙이지 않는다
     extractor: DocumentExtractor | None = None  # 없으면 PDF 업로드 완료를 받지 않는다 (텍스트 입력만)
     metrics_sink: Callable[[str], None] | None = None  # EMF 한 줄을 받을 곳. 없으면 stdout
+    stories: "StoryRepo | None" = None  # 없으면 경험 블록 경로가 501
     now: Callable[[], datetime] = field(default=now_kst)
     new_id: Callable[[str], str] = field(default=new_id)
 

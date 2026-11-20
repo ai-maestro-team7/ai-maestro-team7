@@ -14,6 +14,7 @@ from mentoring.deps import Deps
 from mentoring.extract import TextractOcr
 from mentoring.llm.bedrock import BedrockLlm
 from mentoring.reference import DynamoReferenceLookup
+from mentoring.stories.dynamo import DynamoStoryRepo
 from mentoring.text_tools import load_text_tools
 
 from .dispatch import LambdaTaskDispatcher
@@ -66,6 +67,7 @@ def build_aws_deps(
     region = require_env("AWS_REGION")
 
     dynamodb = _dynamodb_resource(region)
+    table = dynamodb.Table(table_name)
     reference = None
     reference_table = os.environ.get("TABLE_REFERENCE", "").strip()
     if reference_table:
@@ -73,13 +75,14 @@ def build_aws_deps(
 
     return Deps(
         config=config or get_config(),
-        users=DynamoUserRepo(dynamodb.Table(table_name)),
+        users=DynamoUserRepo(table),
         objects=S3ObjectStore(_client("s3", region), bucket),
         llm=BedrockLlm(_client("bedrock-runtime", region), model_id),
         tasks=LambdaTaskDispatcher(_client("lambda", region), function_name),
         text=load_text_tools(),
         hash_user_id=hash_user_id or _hash_user_id_not_set,
         reference=reference,
+        stories=DynamoStoryRepo(table),
         # 텍스트 레이어 먼저, 부족할 때만 Textract OCR (이슈 #41 결정). OCR은 career-docs 원본을 직접 읽는다
         extractor=PdfExtractor(ocr=TextractOcr(_client("textract", region)), bucket=bucket),
     )

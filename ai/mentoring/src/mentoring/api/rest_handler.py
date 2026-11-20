@@ -19,6 +19,8 @@ from ..core.upload import complete_upload, create_upload_url
 from ..deps import Deps
 from ..errors import MentoringError, invalid_input, not_implemented, unauthorized
 from ..models import ConfirmRequest, TextDocumentRequest, UploadUrlRequest
+from ..stories import AnswerStoryRequest, CreateStoryRequest, get_story, list_stories
+from ..stories.flow import start_story, story_view, update_story
 from . import errors
 
 PREFIX = "/api/v1/mentoring"
@@ -113,9 +115,39 @@ def rest_confirm_profile(profile_id: str):
     return _json(201, profile.to_view())
 
 
+# ---------------------------------------------------------------- 경험 블록 (Requirement 9, A F-01B)
+# 질문 생성은 동기라서 POST는 202가 아니라 201로 결과를 돌려준다 (미결정 M-7, stories/flow.py)
+@app.post(f"{PREFIX}/stories")
+def rest_create_story():
+    story = start_story(_deps(), _user_id(), _body(CreateStoryRequest), _header("Idempotency-Key"))
+    return _json(201, story_view(story))
+
+
+@app.get(f"{PREFIX}/stories")
+def rest_list_stories():
+    items = list_stories(_deps(), _story_repo(), _user_id())
+    return {"stories": [{k: v for k, v in item.to_api().items() if k != "ownerUserId"} for item in items]}
+
+
+@app.get(f"{PREFIX}/stories/<story_id>")
+def rest_get_story(story_id: str):
+    return story_view(get_story(_deps(), _story_repo(), _user_id(), _id(story_id, "storyId")))
+
+
+@app.patch(f"{PREFIX}/stories/<story_id>")
+def rest_update_story(story_id: str):
+    story, warnings = update_story(_deps(), _user_id(), _id(story_id, "storyId"), _body(AnswerStoryRequest))
+    return story_view(story, warnings)
+
+
+def _story_repo():
+    if _deps().stories is None:
+        raise not_implemented()
+    return _deps().stories
+
+
 # ---------------------------------------------------------------- 아직 만들지 않은 경로 (개발계획서1 §6.1)
 _LATER = [
-    ("POST", "/stories"), ("GET", "/stories"), ("PATCH", "/stories/<story_id>"),
     ("POST", "/analyses"), ("GET", "/analyses/<analysis_id>"),
     ("POST", "/reviews"), ("GET", "/reviews/<review_id>"),
     ("POST", "/learning-paths"), ("GET", "/learning-paths/<learning_path_id>"),
