@@ -101,6 +101,14 @@ export function AssistantMessage({
         if (action.type === "SAVE_CONDITIONS") return <SaveConditions key={key} action={action} />;
         if (action.type === "START_INTERVIEW") return <StartInterview key={key} action={action} />;
         if (action.type === "REQUEST_COVER_LETTER") return <CoverLetterForm key={key} action={action} />;
+        if (action.type === "REVIEW_RESUME")
+          return (
+            <div key={key}>
+              <Button size="M" href={`/resume-review/?documentId=${encodeURIComponent(action.documentId)}`}>
+                이력서 내용과 근거 확인하기
+              </Button>
+            </div>
+          );
         if (action.type === "CONDITIONS_SAVED")
           return (
             <p key={key} className="text-small text-grey-800">

@@ -92,6 +92,38 @@ def test_other_users_profile_is_not_found(ready):
     assert error.value.status == 404
 
 
+def test_confirm_project_correct_experience_and_remove_certificate(ready):
+    deps, v1 = ready
+    project, experience, certificate = v1.projects[0], v1.experiences[0], v1.certificates[0]
+    request = ConfirmRequest.model_validate({"baseVersion": v1.profile_version, "entryDecisions": [
+        {"group": "PROJECT", "itemId": project.item_id, "action": "CONFIRM"},
+        {"group": "EXPERIENCE", "itemId": experience.item_id, "action": "RENAME", "name": "SQL 스터디 운영"},
+        {"group": "CERTIFICATE", "itemId": certificate.item_id, "action": "DELETE"},
+    ]})
+    v2 = confirm_profile(deps, USER, v1.profile_id, request)
+    assert v2.projects[0].fact_status == FactStatus.VERIFIED
+    assert v2.experiences[0].name == "SQL 스터디 운영"
+    assert v2.experiences[0].fact_status == FactStatus.VERIFIED
+    assert v2.certificates == []
+    assert not any(e.evidence_id in certificate.evidence_ids for e in v2.evidence)
+    assert v1.certificates[0].name == "ADsP"  # 기존 버전 보존
+
+
+def test_entry_confirmation_rejects_duplicate_and_stale_version(ready):
+    deps, v1 = ready
+    entry = {"group": "PROJECT", "itemId": v1.projects[0].item_id, "action": "CONFIRM"}
+    with pytest.raises(MentoringError) as duplicate:
+        confirm_profile(deps, USER, v1.profile_id, ConfirmRequest.model_validate({
+            "baseVersion": 1, "entryDecisions": [entry, entry]}))
+    assert duplicate.value.code == "INVALID_INPUT"
+    confirm_profile(deps, USER, v1.profile_id, ConfirmRequest.model_validate({
+        "baseVersion": 1, "entryDecisions": [entry]}))
+    with pytest.raises(MentoringError) as stale:
+        confirm_profile(deps, USER, v1.profile_id, ConfirmRequest.model_validate({
+            "baseVersion": 1, "entryDecisions": [entry]}))
+    assert stale.value.status == 409
+
+
 def test_new_extraction_continues_the_same_profile(ready):
     deps, v1 = ready
     create_text_document(deps, USER, TextDocumentRequest.model_validate({"text": DATA_ANALYST_RESUME + "\n추가"}))

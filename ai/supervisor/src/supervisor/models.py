@@ -38,6 +38,7 @@ class ActionType(StrEnum):
     START_INTERVIEW = "START_INTERVIEW"            # 저장된 자소서로 면접 화면 이동
     REQUEST_COVER_LETTER = "REQUEST_COVER_LETTER"  # 자소서 입력 받기 → 면접 화면 이동
     CONDITIONS_SAVED = "CONDITIONS_SAVED"          # 사용자가 채팅으로 저장을 승낙해 저장 도구가 저장함
+    REVIEW_RESUME = "REVIEW_RESUME"                # 인증된 A 프로필 화면에서 첨부 이력서 근거 확인
     # 지난 대화를 읽기 위해서만 남긴다. 진단 도구를 지워(#155) 새로 만들지 않고, 화면도 그리지 않는다
     OPEN_DIAGNOSIS = "OPEN_DIAGNOSIS"
 

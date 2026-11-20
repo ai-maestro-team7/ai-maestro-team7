@@ -23,13 +23,22 @@ def build_user_context(tools: TurnTools) -> dict:
     if "desiredJobs" in profile:
         profile["desiredJobs"] = [j.get("name") for j in profile["desiredJobs"] if isinstance(j, dict) and j.get("name")]
     docs = tools.documents()
-    summary = tools.deps.docs.career_summary(tools.user_id) or {}
+    summary = tools.career_profile()
+    attached_resume = tools.attached_resume()
+    resume_review = None
+    if attached_resume:
+        ready = attached_resume.document_id in summary.get("sourceDocumentIds", [])
+        status = ("FAILED" if attached_resume.status == "FAILED" else
+                  "READY" if ready and attached_resume.status == "COMPLETED" else
+                  "REQUIRES_USER_REVIEW" if ready else "PROCESSING")
+        resume_review = {"documentId": attached_resume.document_id, "status": status}
     return {
         "basicProfile": profile,
         "documents": [{"documentType": d.document_type, "title": d.title, "status": d.status} for d in docs],
         "attachedThisMessage": [d.document_type for d in docs if d.document_id in tools.attachments],
         "hasCoverLetter": tools.cover_letter() is not None,
         "careerProfile": summary,
+        "resumeReview": resume_review,
         # 바로 앞 답에서 보여 준 공고. "이 공고", "첫 번째 공고"가 무엇인지 알 수 있게 한다
         "recentPostings": [{k: p[k] for k in POSTING_KEYS if k in p}
                            for p in tools.recent_postings[:tools.deps.config.recent_postings]],

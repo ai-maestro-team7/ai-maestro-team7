@@ -61,12 +61,14 @@ function Launcher({ guest }: { guest: boolean }) {
 
   function onResumeReady(documentId: string) {
     setResumeOpen(false);
-    void start("이력서를 올렸어요. 이력서로 맞는 공고와 청년정책 찾아 줘", [{ documentId }]);
+    void start("이력서를 올렸어요. 추출한 내용과 원문 근거를 확인하고 싶어요", [{ documentId }]);
   }
 
   function onPdfReady(documentId: string, fileName: string, kind: "RESUME" | "COVER_LETTER") {
     const what = kind === "COVER_LETTER" ? "자기소개서" : "이력서";
-    void start(`${what} ‘${fileName}’을 올렸어요. 내 서류로 맞는 공고와 청년정책 찾아 줘`, [{ documentId }]);
+    void start(kind === "RESUME"
+      ? `이력서 ‘${fileName}’을 올렸어요. 추출한 내용과 원문 근거를 확인하고 싶어요`
+      : `${what} ‘${fileName}’을 올렸어요. 내 서류로 맞는 공고와 청년정책 찾아 줘`, [{ documentId }]);
   }
 
   return (

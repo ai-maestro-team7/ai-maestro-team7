@@ -81,12 +81,37 @@ def confirm_profile(deps, user_id: str, profile_id: str, request: ConfirmRequest
         next_number += 1
 
     kept = [skills[i] for i in order if i in skills] + added
+    groups = {"PROJECT": current.projects, "EXPERIENCE": current.experiences, "CERTIFICATE": current.certificates}
+    entries = {key: {item.item_id: item.model_copy(deep=True) for item in group} for key, group in groups.items()}
+    entry_seen: set[tuple[str, str]] = set()
+    for decision in request.entry_decisions:
+        key = (decision.group, decision.item_id)
+        if key in entry_seen:
+            raise invalid_input("같은 항목에 확인이 두 번 들어왔어요.", field="entryDecisions")
+        entry_seen.add(key)
+        item = entries[decision.group].get(decision.item_id)
+        if item is None:
+            raise invalid_input("프로필에 없는 항목이에요.", field="entryDecisions")
+        if decision.action == ConfirmAction.DELETE:
+            del entries[decision.group][decision.item_id]
+        elif decision.action == ConfirmAction.RENAME:
+            item.name = _name(decision.name, limits.name_max_chars)
+            item.fact_status = FactStatus.VERIFIED
+        else:
+            item.fact_status = FactStatus.VERIFIED
+
+    projects = [entries["PROJECT"][item.item_id] for item in current.projects if item.item_id in entries["PROJECT"]]
+    experiences = [entries["EXPERIENCE"][item.item_id] for item in current.experiences
+                   if item.item_id in entries["EXPERIENCE"]]
+    certificates = [entries["CERTIFICATE"][item.item_id] for item in current.certificates
+                    if item.item_id in entries["CERTIFICATE"]]
     used = {e for s in kept for e in s.evidence_ids} | {
-        e for group in (current.projects, current.experiences, current.certificates) for item in group
+        e for group in (projects, experiences, certificates) for item in group
         for e in item.evidence_ids}
     profile = current.model_copy(deep=True, update={
         "profile_version": current.profile_version + 1, "based_on_version": current.profile_version,
         "created_by": "USER_CONFIRMATION", "skills": kept,
+        "projects": projects, "experiences": experiences, "certificates": certificates,
         "evidence": [e for e in current.evidence if e.evidence_id in used],
         "needs_confirmation": [n for n in current.needs_confirmation if n not in decided_names],
         "created_at": deps.now_iso()})
@@ -95,7 +120,8 @@ def confirm_profile(deps, user_id: str, profile_id: str, request: ConfirmRequest
     except VersionConflict:
         raise precondition_not_met("프로필이 그 사이에 바뀌었어요. 최신 프로필을 다시 불러와 주세요.") from None
     log_event("profile.confirmed", userHash=user_hash(deps, user_id), feature="profile", status="CREATED",
-              counts={"decisions": len(request.decisions), "additions": len(added)})
+              counts={"decisions": len(request.decisions), "entryDecisions": len(request.entry_decisions),
+                      "additions": len(added)})
     return profile
 
 

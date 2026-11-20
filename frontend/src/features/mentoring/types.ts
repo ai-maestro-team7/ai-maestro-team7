@@ -27,6 +27,23 @@ export type DocumentResponse = {
 export type ProfileResponse = {
   profileId: string;
   profileVersion: number;
+  sourceDocumentIds: string[];
+  createdBy: "EXTRACTION" | "USER_CONFIRMATION";
+  skills: Array<{ skillId: string; name: string; evidenceLevel: string; factStatus: string; evidenceIds: string[] }>;
+  projects: ProfileReviewEntry[];
+  experiences: ProfileReviewEntry[];
+  certificates: ProfileReviewEntry[];
+  evidence: Array<{ evidenceId: string; sourceDocumentId: string; page: number; quotedText: string }>;
+  needsConfirmation: string[];
+};
+
+export type ProfileReviewEntry = {
+  itemId: string;
+  name: string;
+  summary?: string;
+  period?: string;
+  factStatus: string;
+  evidenceIds: string[];
 };
 
 export type Evidence = { evidenceId: string; quotedText: string };

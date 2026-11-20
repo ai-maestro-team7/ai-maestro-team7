@@ -50,10 +50,12 @@ def profile_patch(deps: Deps, chat: dict, saved: dict) -> tuple[dict, list[str]]
     return patch, labels
 
 
-def actions(deps: Deps, record: TurnRecord) -> list[ChatAction]:
+def actions(deps: Deps, record: TurnRecord, *, resume_document_id: str | None = None) -> list[ChatAction]:
     """면접 체험 제안은 코드 칩이 아니라 모델의 follow_ups로 한다. 사용자가 면접을 원하지 않으면 다시 권하지 않아야 해서다
     (docs/user-flow.md ⑤). 면접 준비 도구를 부른 턴에만 시작·자소서 입력 카드를 만든다."""
     out: list[ChatAction] = []
+    if resume_document_id:
+        out.append(ChatAction(type=ActionType.REVIEW_RESUME, document_id=resume_document_id))
     search = record.search
     if record.saved_conditions is not None:
         out.append(ChatAction(type=ActionType.CONDITIONS_SAVED, conditions=record.saved_conditions))

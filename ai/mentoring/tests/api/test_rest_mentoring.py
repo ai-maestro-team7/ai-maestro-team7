@@ -68,8 +68,10 @@ def test_int01_text_resume_to_confirmed_profile_and_interview_summary(deps):
         "baseVersion": 1,
         "decisions": [{"skillId": ids["데이터 전처리"], "action": "CONFIRM"},
                       {"skillId": ids["SQL"], "action": "CONFIRM"}],
-        "additions": [{"name": "통계 분석"}]})
+        "additions": [{"name": "통계 분석"}],
+        "entryDecisions": [{"group": "PROJECT", "itemId": profile["projects"][0]["itemId"], "action": "CONFIRM"}]})
     assert status == 201 and confirmed["profileVersion"] == 2
+    assert confirmed["projects"][0]["factStatus"] == "VERIFIED"
 
     stored = deps.users.get_profile_version("user-a", profile["profileId"], 2)
     summary = to_career_profile_summary(stored.to_api())

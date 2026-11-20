@@ -3,6 +3,7 @@
 import inspect
 
 from fakes import FakeError, build_deps, cover_letter, reply
+from supervisor.models import DocumentInfo
 from supervisor.tools import TurnTools
 
 
@@ -123,6 +124,17 @@ def test_status_reports_documents_and_resume_terms():
     out = tools["get_my_status"]()
     assert out["savedConditions"]["desiredJobs"] == ["데이터 분석"] and out["hasCoverLetter"] is True
     assert out["resumeSkills"] == ["SQL"] and out["attachedThisMessage"] == ["COVER_LETTER"]
+
+
+def test_failed_new_resume_cannot_reuse_old_verified_terms():
+    document = DocumentInfo(document_id="doc-new", document_type="RESUME", status="FAILED")
+    deps = build_deps(None, documents=[document], terms=["old SQL"],
+                      summary={"sourceDocumentIds": ["doc-old"], "skills": [{"name": "old SQL", "confirmed": True}]})
+    _, tools = tools_for(deps, attachments=["doc-new"])
+    status = tools["get_my_status"]()
+    tools["search_job_postings"](use_resume=True)
+    assert status["resumeSkills"] == [] and status["resumeReady"] is False
+    assert deps.opportunities.calls[-1][2]["query_terms"] is None
 
 
 def test_reply_helper_is_valid():

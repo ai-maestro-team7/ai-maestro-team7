@@ -136,6 +136,25 @@ class TurnTools:
     def documents(self) -> list[DocumentInfo]:
         return self.deps.docs.latest_documents(self.user_id)
 
+    def attached_resume(self) -> DocumentInfo | None:
+        return next((d for d in self.documents() if d.document_id in self.attachments
+                     and d.document_type == "RESUME"), None)
+
+    def career_profile(self) -> dict:
+        """새 첨부가 있으면 그 문서로 만든 프로필만 이번 턴의 이력서 결과로 쓴다."""
+        summary = self.deps.docs.career_summary(self.user_id) or {}
+        attached = self.attached_resume()
+        if attached and (attached.status not in {"COMPLETED", "REQUIRES_USER_REVIEW"}
+                         or attached.document_id not in summary.get("sourceDocumentIds", [])):
+            return {}
+        return summary
+
+    def resume_terms_for_turn(self) -> list[str]:
+        attached = self.attached_resume()
+        if attached and not self.career_profile():
+            return []
+        return self.deps.docs.resume_terms(self.user_id)
+
     def cover_letter(self) -> DocumentInfo | None:
         letters = [d for d in self.documents()
                    if d.document_type == "COVER_LETTER" and d.has_text and d.status in TEXT_STATUSES]
@@ -146,7 +165,7 @@ class TurnTools:
         tools = self
 
         def get_my_status() -> dict:
-            """사용자의 저장된 검색 조건, 이력서·자소서 유무, 이력서에서 찾은 역량 이름(확인 전)을 돌려준다.
+            """사용자의 저장된 검색 조건, 이력서·자소서 유무, 사용자가 확인한 이력서 역량 이름을 돌려준다.
             이력서로 찾기 전, 면접 준비 전, 사용자 상황을 알아야 할 때 쓴다. 입력은 없다."""
             return tools._call("get_my_status", tools._status)
 
@@ -207,7 +226,7 @@ class TurnTools:
     def _status(self) -> dict:
         saved = self.saved_profile()
         docs = self.documents()
-        terms = self.deps.docs.resume_terms(self.user_id)
+        terms = self.resume_terms_for_turn()
         resume = [d for d in docs if d.document_type == "RESUME"]
         return {
             "savedConditions": {
@@ -221,7 +240,7 @@ class TurnTools:
             "resumeReady": bool(terms),
             "resumeProcessing": bool(resume) and not terms and any(d.status not in {"COMPLETED", "FAILED"} for d in resume),
             "resumeSkills": terms,
-            "resumeSkillsNote": "이력서에서 찾은 역량이고 사용자가 아직 확인하지 않았어요" if terms else None,
+            "resumeSkillsNote": "사용자가 확인한 이력서 역량이에요" if terms else None,
             "hasCoverLetter": self.cover_letter() is not None,
         }
 
@@ -248,7 +267,7 @@ class TurnTools:
         use_region = place or saved.get("desiredRegion") or "ALL"
         use_salary = chat.get("minSalary", saved.get("desiredSalaryMin"))
         use_career = chat.get("careerType", saved.get("desiredCareerType"))
-        terms = self.deps.docs.resume_terms(self.user_id) if use_resume else []
+        terms = self.resume_terms_for_turn() if use_resume else []
         org = _clean(organization)
 
         def find(scope: str) -> dict:
