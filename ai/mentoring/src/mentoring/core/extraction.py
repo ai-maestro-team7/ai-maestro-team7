@@ -243,7 +243,7 @@ def assemble(deps, source: str, version: DocumentVersion, mask_spans: list, outp
             existing.evidence_ids.extend(i for i in ids if i not in existing.evidence_ids)
             continue
         code = (item.ncs_unit_code or "").strip() or None
-        if code and taxonomy is not None and taxonomy.units:
+        if code and taxonomy is not None:
             code = code if code in unit_codes else None  # 넘긴 후보 목록에 있는 코드만 (#104)
         elif code and (deps.reference is None or deps.reference.get_competency_unit(code) is None):
             code = None  # 기준 데이터에 없는 코드는 넣지 않는다 (Requirement 6 기준 10)
