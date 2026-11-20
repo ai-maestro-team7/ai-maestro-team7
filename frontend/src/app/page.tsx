@@ -4,8 +4,6 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { ChatPanel } from "@/features/chat/components/ChatPanel";
 import { RecommendedJobs, RecommendedJobsLoading } from "@/features/jobs/components/RecommendedJobs";
-import { ContinueList } from "@/features/mentor/components/ContinueList";
-import { continueItems } from "@/features/mentor/data";
 import { OpenPolicies } from "@/features/policies/components/OpenPolicies";
 import { PolicyTableSkeleton } from "@/features/policies/components/PolicyTable";
 
@@ -14,9 +12,9 @@ export default function HomePage() {
     <PageContainer className="gap-12">
       <PageHeader title="부산 취업 준비" />
 
-      <div className="flex w-full flex-col gap-12 lg:flex-row lg:items-start">
+      {/* 채팅 창은 본문 폭(700px)으로 가운데에 둬 한 줄이 너무 길어 보이지 않게 한다 */}
+      <div className="mx-auto flex w-full max-w-main">
         <ChatPanel />
-        <ContinueList items={continueItems} />
       </div>
 
       {/* 공고·정책은 로그인한 사용자 프로필로 B API에서 읽는다. 오류 안내가 주소(?q=)를 읽어 Suspense 안에 둔다 */}

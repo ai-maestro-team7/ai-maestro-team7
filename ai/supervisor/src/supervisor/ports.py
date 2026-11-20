@@ -109,18 +109,6 @@ class ProfilePort(Protocol):
         ...
 
 
-class MentoringPort(Protocol):
-    """A 멘토링 함수 (`mentoring.fit.analysis.create_analysis`, 개발계획서1 F-02). 화면 `/diagnosis`와 같은 함수다."""
-
-    def start_job_fit(self, user_id: str, *, job_posting_id: str | None, target_ncs_code: str | None,
-                      idempotency_key: str) -> dict:
-        """최신 역량 프로필로 직무 적합도 분석을 시작한다 (202, 비동기).
-
-        돌려주는 것: {analysisId, status, profileId, profileVersion, documentId}. 역량 프로필이 없으면 오류(code, message).
-        """
-        ...
-
-
 class AgentRunner(Protocol):
     def run(self, *, system_prompt: str, history: list[dict], message: str, tools: list[Callable[..., Any]],
             max_turns: int) -> ChatReply:

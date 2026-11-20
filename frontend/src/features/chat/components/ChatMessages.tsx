@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { asOfLabel } from "../lib";
 import type { ChatMessage } from "../types";
-import { CoverLetterForm, OpenDiagnosis, SaveConditions, StartInterview } from "./ChatActions";
+import { CoverLetterForm, SaveConditions, StartInterview } from "./ChatActions";
 import { PolicyCard, PostingCard } from "./ChatCards";
 
 /** 조회만 실패한 답. 다시 보내지 않고 같은 답을 다시 확인한다 */
@@ -101,13 +101,14 @@ export function AssistantMessage({
         if (action.type === "SAVE_CONDITIONS") return <SaveConditions key={key} action={action} />;
         if (action.type === "START_INTERVIEW") return <StartInterview key={key} action={action} />;
         if (action.type === "REQUEST_COVER_LETTER") return <CoverLetterForm key={key} action={action} />;
-        if (action.type === "OPEN_DIAGNOSIS") return <OpenDiagnosis key={key} action={action} />;
         if (action.type === "CONDITIONS_SAVED")
           return (
             <p key={key} className="text-small text-grey-800">
               내 프로필에 저장했어요: {action.conditions.join(" · ")}
             </p>
           );
+        // 진단 결과 보기(OPEN_DIAGNOSIS)처럼 지금은 쓰지 않는 행동이 지난 대화에 남아 있어도 그리지 않는다
+        if (action.type !== "SUGGEST_INTERVIEW") return null;
         return latest ? (
           <div key={key}>
             <Chip onClick={() => onAsk(`${action.job} 직무로 모의면접 체험해 볼래요`)} disabled={busy}>

@@ -202,22 +202,6 @@ def main():
     check("채팅 승낙 → PROFILE#BASIC 저장", int(basic["desiredSalaryMin"]) == 2500 and m["reply"] == "저장했어요.")
     check("저장 완료 카드", m["actions"] == [{"type": "CONDITIONS_SAVED", "conditions": ["연봉 2,500만 원 이상"]}])
 
-    # 5-4. A 이력서·직무 진단 어댑터 (A 메모리 대역으로 실제 create_analysis를 부른다)
-    from support.fit import USER as A_USER, fit_deps
-
-    fdeps = fit_deps()
-    agent_api.MentoringAdapter._deps = lambda self: fdeps
-    adapter = agent_api.MentoringAdapter()
-    first = adapter.start_job_fit(A_USER, job_posting_id="job-demo-busan-001", target_ncs_code=None, idempotency_key="chat-k1")
-    again = adapter.start_job_fit(A_USER, job_posting_id="job-demo-busan-001", target_ncs_code=None, idempotency_key="chat-k1")
-    check("진단 시작 → analysisId·프로필 버전", first["analysisId"] and first["profileId"] == "profile-1" and first["status"] == "PENDING")
-    check("같은 턴 키로 다시 불러도 분석은 하나 (멱등)", again["analysisId"] == first["analysisId"])
-    try:
-        adapter.start_job_fit("no-profile-user", job_posting_id=None, target_ncs_code="20010105", idempotency_key="chat-k2")
-        check("역량 프로필이 없으면 오류", False)
-    except Exception as error:  # noqa: BLE001
-        check("역량 프로필이 없으면 코드·문장이 있는 오류", getattr(error, "code", "").endswith("NOT_FOUND") and getattr(error, "message", ""))
-
     # 5-5. 채팅 화면: 대화 목록·고정·삭제·멈추기
     s, listed = call("GET", "/api/v1/agent/chat")
     check("GET /agent/chat → 내 대화 목록 (메시지 없이)", s == 200 and any(x["sessionId"] == sid for x in listed["sessions"])
