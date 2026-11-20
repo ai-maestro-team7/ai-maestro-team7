@@ -782,6 +782,15 @@
             "type": "string",
             "title": "Salary"
           },
+          "orgPay": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Orgpay",
+            "nullable": true
+          },
           "career": {
             "type": "string",
             "title": "Career",

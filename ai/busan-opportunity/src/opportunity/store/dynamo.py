@@ -24,11 +24,13 @@ from botocore.exceptions import BotoCoreError, ClientError
 
 from ..config import require_env
 from ..core import clock
+from ..core.name_index import name_row
 from ..models.errors import aws_service_error, invalid_input
 from ..models.policy import Policy
 from ..models.posting import (
     AltCandidates,
     CompanyRecord,
+    OrgPay,
     PostingLatest,
     PostingName,
     PostingSnapshot,
@@ -241,6 +243,7 @@ class DynamoCatalog:
     NAMES_PK = "POSTNAMES"  # 진행 중 공고의 이름 색인 (B-D08). SK는 `POSTING#{jobPostingId}`
     NAMES_CACHE_SECONDS = 60  # API Lambda 안에서 이름 색인을 다시 읽지 않고 쓰는 시간
     REGIONAL_INDEX_PK = "INDEX#REGIONAL"
+    ORG_PAY_PK = "ORGPAY"  # 공공기관 직원 평균보수 (B-D11). SK는 `ORG#{orgId}`
 
     def __init__(self, resource=None, table_name: str | None = None, *,
                  now: Callable[[], datetime] = clock.now_kst, sleep: Callable[[float], None] = time.sleep,
@@ -250,6 +253,7 @@ class DynamoCatalog:
         self.sleep = sleep
         self.max_retries = max_retries
         self._names: tuple[float, list[PostingName]] | None = None
+        self._org_pays: tuple[float, list[OrgPay]] | None = None
 
     # -- 키
     @staticmethod
@@ -314,6 +318,15 @@ class DynamoCatalog:
         self._names = (time.monotonic(), rows)
         return rows
 
+    def org_pays(self):
+        """기관 평균보수 파티션 하나를 Query로 읽는다 (355곳 안팎). 이름 색인처럼 1분 동안은 읽은 것을 그대로 쓴다."""
+        if self._org_pays and time.monotonic() - self._org_pays[0] < self.NAMES_CACHE_SECONDS:
+            return self._org_pays[1]
+        rows = [OrgPay.model_validate(i) for i in self.t.query(
+            KeyConditionExpression="PK = :pk", ExpressionAttributeValues={":pk": self.ORG_PAY_PK})]
+        self._org_pays = (time.monotonic(), rows)
+        return rows
+
     def query_policies(self, region_key):
         rows = [Policy.model_validate(i) for i in self.t.query(
             IndexName=GSI1, KeyConditionExpression="GSI1PK = :pk",
@@ -358,9 +371,11 @@ class DynamoCatalog:
         if latest.is_expired:
             self.t.delete(self.NAMES_PK, sk)
             return
-        self.t.upsert(self.NAMES_PK, sk, "PostingName", PostingName(
-            job_posting_id=latest.job_posting_id, organization=latest.organization, title=latest.title,
-            job_name=latest.job.name, closes_at=latest.closes_at))
+        self.t.upsert(self.NAMES_PK, sk, "PostingName", name_row(latest))
+
+    def put_org_pay(self, pay):
+        self._org_pays = None
+        self.t.upsert(self.ORG_PAY_PK, f"ORG#{pay.org_id}", "OrgPay", pay)
 
     def put_regional_index(self, latest):
         entry = RegionalIndexEntry(job_posting_id=latest.job_posting_id, closes_at=latest.closes_at)

@@ -32,6 +32,8 @@ except ImportError:  # 배포 묶음에 없으면 해당 경로만 501
     IMPL_NAME = None
 
 _deps = None
+# 토큰 없이 부르는 경로 (B-D10 로그인 없이 보는 공고 목록). API Gateway에도 인증 없는 경로로 만든다 (infra/setup-auth.sh)
+PUBLIC_ROUTES = {("GET", "/api/v1/opportunities/public/postings")}
 
 
 class Workspaces:
@@ -75,6 +77,8 @@ def not_implemented():
 def handle(event, method, path):
     if IMPL_NAME is None:
         return not_implemented()
+    if (method, path) in PUBLIC_ROUTES:
+        return rest_handler.handle_public(event, deps())
     try:
         user_id = get_user_id(event)
     except TeamError as e:

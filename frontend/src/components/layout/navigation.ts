@@ -5,19 +5,21 @@ export type NavItem = {
   match: string[];
 };
 
-/** GNB 탭 6개 (Figma GNB 27:1616 변형 순서) */
+/** GNB 탭 4개 (Figma GNB 27:1616 변형 순서에서 진단·첨삭·로드맵을 뺐다, #155). AI 채팅은 채팅 Agent 전용 화면이다 */
 export const NAV_ITEMS: NavItem[] = [
   { label: "홈", href: "/", match: ["/"] },
+  { label: "AI 채팅", href: "/chat", match: ["/chat"] },
   { label: "채용·정책", href: "/jobs", match: ["/jobs", "/policies"] },
   { label: "AI 모의면접", href: "/interview", match: ["/interview"] },
-  { label: "이력서·직무 진단", href: "/diagnosis", match: ["/diagnosis"] },
-  { label: "AI 서류 첨삭", href: "/review", match: ["/review"] },
-  { label: "학습 로드맵", href: "/roadmap", match: ["/roadmap"] },
 ];
 
-/** "채용·정책" 아래 하위 탭 (채용 공고 목록 · 청년 지원 정책 목록) */
+/**
+ * "채용·정책" 아래 하위 탭. 채용 공고는 로그인 없이 보고(분류·검색), 맞춤형 공고와 청년 지원 정책은 로그인해야 본다.
+ * GNB 검색은 채용 공고로 들어간다.
+ */
 export const OPPORTUNITY_TABS = [
   { key: "jobs", label: "채용 공고", href: "/jobs" },
+  { key: "recommended", label: "맞춤형 공고", href: "/jobs/recommended" },
   { key: "policies", label: "청년 지원 정책", href: "/policies" },
 ] as const satisfies ReadonlyArray<{ key: string; label: string; href: string }>;
 

@@ -1,11 +1,19 @@
 import type { AnswerGuideItem, InterviewModeOption, InterviewType } from "./types";
 
-/** 설정 화면에 미리 채워 두는 값. 데모 직무는 데이터 분석, 자기소개서는 데이터 분석 가상 자소서다 (D-37, docs/api.md §6.2). */
+/**
+ * 면접 기본값. 설정 화면의 직무와 자기소개서는 빈칸으로 시작하고 입력칸 안내 글로 쓰는 법만 보여 준다.
+ * `job`은 장비 점검·면접·리포트 주소에 직무가 빠졌을 때만 쓴다 (설정 화면에서 넘어오면 늘 들어 있다).
+ */
 export const interviewDefaults = {
   job: "데이터 분석",
   interviewType: "MIXED" as InterviewType,
+} as const;
+
+/** 입력칸 안내 글 (흐린 글씨). 예시는 쓰는 법을 보여 주려는 것이고 값으로 들어가지 않는다 */
+export const SETUP_PLACEHOLDERS = {
+  job: "예: 데이터 분석, 백엔드 개발, 마케팅",
   coverLetter:
-    "부산 관광 공공데이터로 월별 방문객 추이를 분석했고, 결측치 처리 기준을 정해 회귀분석 결과를 검증했습니다. 발표 준비에서는 팀원과 역할을 나눠 결론을 정리했습니다.",
+    "어떤 경험에서 무엇을 했고 결과가 어땠는지 순서대로 써 주세요. 50자 이상이면 돼요.\n예: 공공데이터로 월별 방문객 추이를 분석했고, 결측치 기준을 정해 회귀분석 결과를 검증했어요. 발표에서는 팀원과 역할을 나눠 결론을 정리했어요.",
 } as const;
 
 export const MODE_OPTIONS: InterviewModeOption[] = [
@@ -41,6 +49,11 @@ export const RULES = {
   frameFlushMs: 3000,
   resumeMin: 50,
   resumeMax: 5000,
+  /** 채용공고 (C #158 settings.JOB_POSTING_*) */
+  postingMin: 30,
+  postingMax: 4000,
+  postingTitleMax: 200,
+  postingCompanyMax: 100,
   jobMax: 50,
   answerTextMax: 3000,
 } as const;

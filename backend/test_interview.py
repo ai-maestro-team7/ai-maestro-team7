@@ -117,6 +117,80 @@ def main():
     t.put_item(Item={**career_profile, "skills": ["이전 형식의 원본"]})
     check("변환할 수 없는 역량 프로필은 전달하지 않음", api.load_latest_profile("u-1") is None)
 
+    # 채용공고 (#167, C #158): jobPosting 글 또는 B 공고 ID. 공고는 7번째 인자로 넘기고 INTERVIEW#에는 두지 않는다
+    real_start, seen = api.impl.start_interview, {}
+
+    def spy_start(*args):
+        seen["args"] = args
+        return real_start(*args)
+
+    api.impl.start_interview = spy_start
+    try:
+        posting = {"title": "데이터 분석 신입", "company": "가상데이터", "text": "SQL로 매출 데이터를 분석하고 대시보드를 만듭니다. Python 우대."}
+        base = {"job": "데이터 분석", "interviewType": "JOB", "cameraConsent": False, "resumeText": RESUME}
+        s, b = call("POST", "/api/v1/interview/start", body={**base, "jobPosting": posting})
+        stored = api.get_interview("u-1", b["sessionId"])
+        check("jobPosting → 202, jobPostingUsed=true, 면접 함수 7번째 인자로 전달",
+              s == 202 and b["jobPostingUsed"] is True and len(seen["args"]) == 7 and seen["args"][6] == posting)
+        check("채용공고 원문은 INTERVIEW#에 저장하지 않음", posting["text"] not in json.dumps(stored, ensure_ascii=False))
+        s, b = call("POST", "/api/v1/interview/start", body=base)
+        check("공고 없이 시작 → jobPostingUsed=false, 7번째 인자 None", s == 202 and b["jobPostingUsed"] is False and seen["args"][6] is None)
+        s, b = call("POST", "/api/v1/interview/start", body={**base, "jobPosting": posting, "jobPostingId": "wk24-1"})
+        check("jobPosting과 jobPostingId를 함께 보내면 400", s == 400 and b["error"]["code"] == "INVALID_INPUT")
+        s, b = call("POST", "/api/v1/interview/start", body={**base, "jobPostingId": "wk24#1"})
+        check("jobPostingId에 #이 있으면 400", s == 400 and b["error"]["code"] == "INVALID_INPUT")
+
+        real_load = api.load_b_posting
+        b_posting = {"jobPostingId": "wk24-1", "title": "데이터 분석 신입", "organization": "(주)가상데이터",
+                     "jobDescription": "공공데이터로 월별 방문객 추이를 분석하고 결측치 기준을 정해 보고서를 씁니다.",
+                     "requirements": [{"name": "SQL", "kind": "REQUIRED_SKILL", "sourceQuote": "SQL 활용 가능자"}]}
+        api.load_b_posting = lambda pid: b_posting if pid == "wk24-1" else (_ for _ in ()).throw(
+            api.TeamError(404, "POSTING_NOT_FOUND", "공고를 찾을 수 없어요."))
+        try:
+            s, b = call("POST", "/api/v1/interview/start", body={**base, "jobPostingId": "wk24-1"})
+            check("jobPostingId → B 공고를 변환해 전달", s == 202 and b["jobPostingUsed"] is True
+                  and seen["args"][6] == api.impl.job_posting_from_posting(b_posting))
+            s, b = call("POST", "/api/v1/interview/start", body={**base, "jobPostingId": "wk24-none"})
+            check("없는 공고 ID → 404 POSTING_NOT_FOUND, 세션을 만들지 않음", s == 404 and b["error"]["code"] == "POSTING_NOT_FOUND")
+            b_posting["jobDescription"] = "짧음"
+            s, b = call("POST", "/api/v1/interview/start", body={**base, "jobPostingId": "wk24-1"})
+            check("B 공고 본문이 짧으면 공고 없이 시작 (jobPostingUsed=false)", s == 202 and b["jobPostingUsed"] is False)
+        finally:
+            api.load_b_posting = real_load
+    finally:
+        api.impl.start_interview = real_start
+
+    # 채용공고 PDF → 글자만 돌려줌 (저장 안 함)
+    def tiny_pdf(text):
+        stream = f"BT /F1 12 Tf 72 720 Td ({text}) Tj ET".encode()
+        objs = [b"<< /Type /Catalog /Pages 2 0 R >>", b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+                b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+                b"<< /Length %d >>stream\n" % len(stream) + stream + b"\nendstream",
+                b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>"]
+        out, offsets = b"%PDF-1.4\n", []
+        for i, body in enumerate(objs, 1):
+            offsets.append(len(out))
+            out += b"%d 0 obj\n" % i + body + b"\nendobj\n"
+        xref = len(out)
+        out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1) + b"".join(b"%010d 00000 n \n" % o for o in offsets)
+        return out + b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, xref)
+
+    try:
+        import mentoring.extract  # noqa: F401  (CI처럼 ai/mentoring/src가 PYTHONPATH에 있을 때만)
+        has_reader = True
+    except ImportError:
+        has_reader = False
+    if has_reader:
+        body = "Data analyst wanted. SQL and Python required. Build dashboards for monthly sales."
+        s, b = call("POST", "/api/v1/interview/job-posting/text", multipart={"file": (tiny_pdf(body), "application/pdf")})
+        check("공고 PDF → 200, 읽은 글을 돌려줌", s == 200 and "SQL and Python" in b["text"] and b["truncated"] is False and b["pageCount"] == 1)
+        s, b = call("POST", "/api/v1/interview/job-posting/text", multipart={"file": (tiny_pdf("Too short"), "application/pdf")})
+        check("공고 PDF 글이 30자 미만이면 422", s == 422 and b["error"]["code"] == "DOCUMENT_UNREADABLE")
+    s, b = call("POST", "/api/v1/interview/job-posting/text", multipart={"file": (b"hello", "text/plain")})
+    check("PDF가 아니면 400", s == 400 and b["error"]["code"] == "INVALID_INPUT")
+    s, b = call("POST", "/api/v1/interview/job-posting/text", multipart={"file": (b"%PDF" + b"0" * api.MAX_POSTING_PDF, "application/pdf")})
+    check("4MB를 넘는 공고 PDF는 413", s == 413 and b["error"]["code"] == "FILE_TOO_LARGE")
+
     s, b = call("GET", f"/api/v1/interview/{sid}/status")
     check("status → NEXT_QUESTION_READY + answerId", b["stage"] == "NEXT_QUESTION_READY" and b["nextQuestion"]["answerId"] == "a-q1-1")
     s, _ = call("GET", f"/api/v1/interview/{sid}/status", user="u-2")

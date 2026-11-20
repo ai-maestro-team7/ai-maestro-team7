@@ -353,3 +353,25 @@ def test_log_line_has_only_allowed_fields(deps, caplog):
     assert set(line) == {"requestId", "method", "path", "status", "durationMs", "errorCode"}
     assert line["requestId"] == "req-test" and line["status"] == 200 and line["errorCode"] is None
     assert "demo1" not in record.getMessage() and "청년내일저축계좌" not in record.getMessage()
+
+
+# ---------------------------------------------------------------- 로그인 없이 보는 공고 목록 (B-D10)
+def test_public_postings_need_no_user(deps):
+    response = rest_handler.handle_public(http_event("GET", BASE + "/public/postings", query={"limit": "2"}), deps)
+    body = json.loads(response["body"])
+    assert response["statusCode"] == 200 and len(body["items"]) == 2 and body["total"] >= 2 and body["nextCursor"]
+    assert "matchScore" not in body["items"][0]
+
+
+def test_public_entry_only_opens_public_paths(deps):
+    """토큰 없이 들어온 요청은 공개 경로만 받는다. 사용자 경로는 401이다."""
+    response = rest_handler.handle_public(http_event("GET", BASE + "/postings"), deps)
+    assert response["statusCode"] == 401 and json.loads(response["body"])["error"]["code"] == "UNAUTHORIZED"
+    response = rest_handler.handle(http_event("GET", BASE + "/saved"), deps, None)
+    assert response["statusCode"] == 401  # user_id 없이 사용자 경로에 오면 막는다
+
+
+def test_public_postings_bad_filter_is_400(deps):
+    response = rest_handler.handle_public(http_event("GET", BASE + "/public/postings", query={"orgType": "X"}), deps)
+    assert response["statusCode"] == 400 and json.loads(response["body"])["error"]["code"] == "INVALID_INPUT"
+

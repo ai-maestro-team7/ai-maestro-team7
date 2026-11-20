@@ -12,10 +12,12 @@ from .base import OppModel
 from .enums import (
     CareerType,
     CompareKey,
+    EmploymentType,
     ConditionResult,
     EligibilityStatus,
     LeaveReason,
     MatchLevel,
+    MoneyUnit,
     NotificationType,
     OrgType,
     PolicyBucket,
@@ -29,7 +31,7 @@ from .enums import (
     WorkspaceStatus,
 )
 from .policy import PolicyBenefit
-from .posting import Badge, Job, PostingSnapshot, Salary, WorkRegion
+from .posting import Badge, Job, OrgPay, PostingSnapshot, Salary, WorkRegion
 from .profile import NotificationPrefs
 from .region import LocalLifeView
 from .user_state import Notification
@@ -54,6 +56,23 @@ class EligibilityResult(OppModel):
 
 
 # ---------------------------------------------------------------- 피드 (B-03)
+class OrgPayBrief(OppModel):
+    """카드용 기관 직원 평균보수 (B-D11). 직원 전체 평균이라 신입 초봉이 아니다. 화면에는 "기관 평균"으로 쓴다."""
+
+    average: int                  # 최근 연도 1인당 평균 보수액
+    year: int
+    year_note: str = "결산"
+    unit: MoneyUnit = MoneyUnit.MANWON_YEAR
+    source: str
+    as_of: str
+    source_url: str
+
+    @classmethod
+    def of(cls, pay: OrgPay) -> "OrgPayBrief":
+        return cls(average=pay.latest_average, year=pay.latest_year, year_note=pay.year_note, source=pay.source,
+                   as_of=pay.as_of, source_url=pay.source_url)
+
+
 class PostingCard(OppModel):
     job_posting_id: str
     title: str
@@ -79,6 +98,7 @@ class PostingCard(OppModel):
     # 지역인재 전형: LIKELY(학교 소재지가 맞아 대상일 수 있음), CHECK_NEEDED(공고문 확인). 해당 없으면 없음
     regional_talent: RegionalTalentStatus | None = None
     is_sample: bool = False
+    org_pay: OrgPayBrief | None = None  # 공공기관이면 기관 직원 평균보수 (공고 급여가 아니다)
 
 
 class Ranking(OppModel):
@@ -95,6 +115,36 @@ class FeedResponse(OppModel):
     next_cursor: str | None = None
     ask_leave_reason: bool = False  # 지역 필터를 수도권으로 처음 바꿨을 때 한 번
     empty_message: str | None = None
+
+
+# ---------------------------------------------------------------- 로그인 없이 보는 공고 목록 (B-D10)
+class PublicPostingCard(OppModel):
+    """로그인 없이 보는 공고 한 줄. 프로필을 쓰지 않아 적합도·자격 판정·부산 대안 수 같은 개인 값이 없다."""
+
+    job_posting_id: str
+    title: str
+    organization: str
+    org_type: OrgType = OrgType.PRIVATE
+    work_region: WorkRegion
+    is_busan: bool = False
+    is_overseas: bool = False
+    job: Job
+    closes_at: str
+    rolling: bool = False
+    salary: Salary
+    career_type: CareerType = CareerType.UNKNOWN
+    employment_type: EmploymentType = EmploymentType.UNKNOWN
+    badges: list[Badge] = Field(default_factory=list)
+    is_sample: bool = False
+    org_pay: OrgPayBrief | None = None  # 공공기관이면 기관 직원 평균보수 (공고 급여가 아니다, B-D11)
+
+
+class PublicPostingList(OppModel):
+    items: list[PublicPostingCard] = Field(default_factory=list)
+    total: int = 0  # 분류·검색어에 맞는 진행 중 공고 수 (모든 쪽 합)
+    next_cursor: str | None = None
+    data_as_of: str | None = None
+    stale: bool = False
 
 
 # ---------------------------------------------------------------- 대안 (B-05)
@@ -228,6 +278,7 @@ class PostingDetailResponse(OppModel):
     local_life: LocalLifeView | None = None  # 부산 공고에만
     facts: list[str] = Field(default_factory=list)
     data_as_of: str | None = None
+    org_pay: OrgPay | None = None  # 공공기관이면 기관 직원 평균보수 연도별 (B-D11). 공고 급여가 아니다
 
 
 class ExplanationResponse(OppModel):

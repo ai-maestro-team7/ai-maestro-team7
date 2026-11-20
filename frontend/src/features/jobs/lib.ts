@@ -1,5 +1,16 @@
 import { formatDday, formatMonthDay } from "@/lib/format";
-import type { CareerType, EmploymentType, JobRegion, JobSort, MatchLevel, OrgType, Salary } from "./types";
+import type {
+  CareerFilter,
+  CareerType,
+  EmploymentFilter,
+  EmploymentType,
+  JobRegion,
+  JobSector,
+  JobSort,
+  MatchLevel,
+  OrgType,
+  Salary,
+} from "./types";
 
 /** 적합도 문구 (docs/api.md §6.3). 점수 숫자는 보여주지 않는다. */
 export const MATCH_LABELS: Record<MatchLevel, string> = {
@@ -26,8 +37,28 @@ export const REGION_FILTERS: { value: JobRegion; label: string }[] = [
   { value: "OVERSEAS", label: "해외" },
 ];
 
+/** 공기업·사기업 분류. 공기업은 공공기관과 지방공공기관(도시공사·시설공단 등)이다 */
+export const SECTOR_FILTERS: { value: JobSector; label: string }[] = [
+  { value: "ALL", label: "전체" },
+  { value: "PUBLIC", label: "공기업" },
+  { value: "PRIVATE", label: "사기업" },
+];
+
+export const CAREER_FILTERS: { value: CareerFilter; label: string }[] = [
+  { value: "ALL", label: "전체" },
+  { value: "NEW", label: "신입" },
+  { value: "EXPERIENCED", label: "경력" },
+];
+
+export const EMPLOYMENT_FILTERS: { value: EmploymentFilter; label: string }[] = [
+  { value: "ALL", label: "전체" },
+  { value: "FULL_TIME", label: "정규직" },
+  { value: "CONTRACT", label: "계약직" },
+  { value: "INTERN", label: "인턴" },
+];
+
 export const ORG_TYPE_LABELS: Record<OrgType, string> = {
-  PRIVATE: "민간",
+  PRIVATE: "사기업",
   PUBLIC_INSTITUTION: "공공기관",
   LOCAL_PUBLIC: "지방공공기관",
 };
@@ -77,7 +108,29 @@ export function salaryText(salary?: Salary): string {
   return `${fmt((salary.min ?? salary.max) as number)}${unit}`;
 }
 
+/** "2025년 결산" / "2025년" (출처가 연도 성격을 밝히지 않으면 연도만) */
+export function orgPayYear(year: number, note?: string): string {
+  return note ? `${year}년 ${note}` : `${year}년`;
+}
+
+/** 기관 평균보수 한 줄 (예: "기관 평균 연 9,118만 원"). 직원 전체 평균이라 "기관 평균"으로만 쓴다. */
+export function orgPayText(average: number): string {
+  return `기관 평균 연 ${average.toLocaleString("ko-KR")}만 원`;
+}
+
 /** 표에 보이는 짧은 근거. 마감 사실은 마감 칸에 따로 있으니 뺀다. */
+/**
+ * 표에 보일 공고 제목. 원문 제목이 "2026.10.15(목) 14:00~17:00 [박람회 …]"처럼 일정으로 시작하면 앞의 일정을 뗀다.
+ * 원문은 그대로 두고(상세·툴팁) 표에서만 쓴다. 떼고 나서 비면 원문을 쓴다.
+ */
+const LEADING_SCHEDULE =
+  /^\s*\d{4}\s*[.\-/년]\s*\d{1,2}\s*[.\-/월]\s*\d{1,2}\s*[.일]?\s*(?:\([^)]{1,3}\))?\s*(?:\d{1,2}:\d{2}\s*(?:[~～-]\s*\d{1,2}:\d{2})?)?\s*/;
+
+export function displayTitle(title: string): string {
+  const trimmed = title.replace(LEADING_SCHEDULE, "").trim();
+  return trimmed || title;
+}
+
 export function matchReason(facts: string[]): string {
   return facts.find((fact) => !fact.startsWith("마감")) ?? "";
 }
@@ -88,6 +141,9 @@ export function jobDetailHref(jobPostingId: string): string {
 }
 
 /** C 모의면접 `job` 칸은 1~50자 (B rev 55 §10.1) */
-export function interviewHref(title: string): string {
-  return `/interview?job=${encodeURIComponent(title.slice(0, 50))}`;
+/** 공고 상세 → 면접 설정. 공고 ID를 같이 넘기면 면접 화면이 그 공고로 질문을 만들고 공고 올리기를 끈다 (#167) */
+export function interviewHref(title: string, jobPostingId?: string): string {
+  const params = new URLSearchParams({ job: title.slice(0, 50) });
+  if (jobPostingId) params.set("posting", jobPostingId);
+  return `/interview?${params.toString()}`;
 }

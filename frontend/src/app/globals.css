@@ -53,6 +53,10 @@
   --text-small: 13px;
   --text-small--line-height: 20px;
 
+  /* 홈 첫 화면 제목 */
+  --text-hero: 36px;
+  --text-hero--line-height: 48px;
+
   /* 모서리: 버튼 M·Chip·검색 8, 버튼 L·입력칸 10, 상자 12 */
   --radius-control: 8px;
   --radius-field: 10px;
@@ -60,7 +64,7 @@
   /* 체크박스 20px 상자 */
   --radius-check: 5px;
 
-  /* GNB·본문·Footer 공통 폭 */
+  /* GNB·본문 공통 폭 */
   --container-content: 1080px;
   /* 2단 배치: 본문 700 + 오른쪽 332 */
   --container-main: 700px;
@@ -83,5 +87,206 @@
   :focus-visible {
     outline: 2px solid var(--color-blue-500);
     outline-offset: 2px;
+  }
+}
+
+/*
+ * 홈 첫 화면 (HomeHero). 색은 위 토큰만 쓴다.
+ * - 제목 글자 물결(.wave-char): 커서가 지나가는 글자가 파랗게 떠오르고 양옆 글자가 따라 뜬다.
+ * - 제목 등장: 갈매기가 문장을 물고 와서 떨어뜨린다. 움직임은 화면 코드(features/home/intro.ts)가 주고,
+ *   여기에는 갈매기 날갯짓(.gull-wing)과 등장 전 글자 숨김만 둔다.
+ * 움직임 줄이기 설정이면 등장 없이 글자가 바로 보이고, 커서를 올리면 색만 바뀐다.
+ */
+@layer components {
+  /* 배경(다리) 위의 작은 글이 선에 묻히지 않게 글자 둘레를 흰빛으로 감싼다 */
+  .text-halo {
+    text-shadow:
+      0 0 2px var(--color-white),
+      0 0 6px var(--color-white),
+      0 0 14px var(--color-white);
+  }
+
+  .wave-char {
+    display: inline-block;
+    transition:
+      transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+      color 0.2s ease;
+  }
+
+  /* 착지할 때 눌렸다 튀어 오르는 안쪽 상자. 바닥을 축으로 눌린다 */
+  .wave-hop {
+    display: inline-block;
+    transform-origin: 50% 100%;
+  }
+
+  .wave-char:hover {
+    transform: translateY(-10px);
+    color: var(--color-blue-500);
+  }
+
+  .wave-char:hover + .wave-char,
+  .wave-char:has(+ .wave-char:hover) {
+    transform: translateY(-5px);
+  }
+
+  /* 등장 코드가 시작하기 전에는 글자를 숨긴다. 코드가 끝내 돌지 않아도 3초 뒤에는 보이게 한다 */
+  .hero-title[data-intro="pending"] .wave-char {
+    opacity: 0;
+    animation: hero-title-failsafe 0.3s 3s forwards;
+  }
+
+  /* 갈매기: 날개는 어깨를 축으로 퍼덕이고, 발은 허공을 젓고, 목도리 자락은 나부낀다.
+     짐이 있을 때(carry)는 바쁘게, 놓은 뒤(free)에는 느긋하게 움직인다. 축은 그림(viewBox) 좌표다 */
+  .gull-wing,
+  .gull-leg,
+  .gull-scarf,
+  .gull-beak-lower {
+    transform-box: view-box;
+  }
+
+  .gull-wing {
+    transform-origin: 73px 76px;
+    animation: gull-flap var(--gull-flap, 0.13s) ease-in-out infinite alternate;
+  }
+
+  .gull-wing-far {
+    transform-origin: 81px 69px;
+    animation-delay: -0.035s;
+  }
+
+  .gull-leg {
+    transform-origin: 68.5px 111px;
+    animation: gull-kick 0.16s ease-in-out infinite alternate;
+  }
+
+  .gull-leg-far {
+    transform-origin: 86.5px 110px;
+    animation-delay: -0.16s;
+  }
+
+  .gull-scarf {
+    transform-origin: 90px 52px;
+    animation: gull-scarf 0.22s ease-in-out infinite alternate;
+  }
+
+  .gull-beak-lower {
+    transform-origin: 132px 67px;
+    transition: transform 0.16s ease;
+  }
+
+  .gull-string,
+  .gull-sweat,
+  .gull-eyes-strain,
+  .gull-eyes-happy,
+  .gull-mouth {
+    transition: opacity 0.12s ease;
+  }
+
+  .gull-sweat {
+    animation: gull-sweat 0.46s ease-out infinite;
+  }
+
+  .gull-eyes-happy,
+  .gull-mouth {
+    opacity: 0;
+  }
+
+  .gull[data-phase="free"] {
+    --gull-flap: 0.24s;
+  }
+
+  .gull[data-phase="free"] .gull-string,
+  .gull[data-phase="free"] .gull-sweat,
+  .gull[data-phase="free"] .gull-eyes-strain {
+    opacity: 0;
+  }
+
+  .gull[data-phase="free"] .gull-eyes-happy,
+  .gull[data-phase="free"] .gull-mouth {
+    opacity: 1;
+  }
+
+  /* 땀방울은 움직임이 투명도를 쥐고 있어서, 움직임까지 꺼야 사라진다 */
+  .gull[data-phase="free"] .gull-sweat {
+    animation: none;
+  }
+
+  .gull[data-phase="free"] .gull-beak-lower {
+    transform: rotate(18deg);
+  }
+
+  .gull[data-phase="free"] .gull-leg {
+    animation-duration: 0.4s;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .wave-char {
+      transition: color 0.2s ease;
+    }
+
+    .wave-char:hover,
+    .wave-char:hover + .wave-char,
+    .wave-char:has(+ .wave-char:hover) {
+      transform: none;
+    }
+
+    .hero-title[data-intro="pending"] .wave-char {
+      opacity: 1;
+      animation: none;
+    }
+
+    .gull-wing,
+    .gull-leg,
+    .gull-scarf,
+    .gull-sweat {
+      animation: none;
+    }
+  }
+}
+
+@keyframes hero-title-failsafe {
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes gull-flap {
+  from {
+    transform: rotate(-26deg);
+  }
+  to {
+    transform: rotate(58deg);
+  }
+}
+
+@keyframes gull-kick {
+  from {
+    transform: rotate(-22deg);
+  }
+  to {
+    transform: rotate(24deg);
+  }
+}
+
+@keyframes gull-scarf {
+  from {
+    transform: rotate(-8deg) scaleX(1.06);
+  }
+  to {
+    transform: rotate(10deg) scaleX(0.92);
+  }
+}
+
+@keyframes gull-sweat {
+  from {
+    opacity: 0;
+    transform: translate(0, 7px);
+  }
+  25% {
+    opacity: 0.95;
+  }
+  to {
+    opacity: 0;
+    transform: translate(3px, -11px);
   }
 }

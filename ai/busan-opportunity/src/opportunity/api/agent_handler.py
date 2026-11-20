@@ -27,6 +27,7 @@ from ..core.companies import find_companies
 from ..core.compare import compare_postings
 from ..core import regions
 from ..core.copy_rules import MATCH_LEVEL_LABEL, MATCH_NOT_PROBABILITY, career_label, deadline_label, salary_label
+from ..core.org_pay import label as org_pay_label
 from ..core.policies import match_policies
 from ..core.posting_detail import get_regional_talent
 from ..core.ranking import search_postings
@@ -67,6 +68,7 @@ class AgentPosting(OppModel):
     closes_at: str
     deadline: str | None = None  # "마감 D-9", "상시 채용"
     salary: str                  # "연 3,400~3,800만 원", "공고에 없음"
+    org_pay: str | None = None   # 공공기관이면 "기관 직원 평균 연 9,118만 원 (2025년 결산 · 알리오 경영공시, 신입 초봉 아님)"
     career: str = "공고에 없음"  # "신입", "경력", "경력 무관", "공고에 없음"
     match_level: str             # "잘 맞아요" 같은 3단계 말. 숫자 점수는 주지 않는다
     eligibility: str | None = None
@@ -157,6 +159,8 @@ def _posting(card: PostingCard, as_of) -> AgentPosting:
         work_region=card.work_region.label, is_busan=card.is_busan, is_capital_area=card.is_capital_area,
         closes_at=card.closes_at, deadline=_deadline(card.closes_at, as_of),
         salary=salary_label(card.salary.disclosed, card.salary.min, card.salary.max),
+        org_pay=(org_pay_label(card.org_pay.average, card.org_pay.year, card.org_pay.source, card.org_pay.year_note)
+                 if card.org_pay else None),
         career=career_label(card.career_type), match_level=MATCH_LEVEL_LABEL[card.match_level],
         eligibility=str(card.eligibility.status) if card.eligibility else None,
         badges=_badges(card.badges), facts=card.facts, busan_alternatives_count=card.busan_alternatives_count,

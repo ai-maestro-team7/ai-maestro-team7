@@ -1,5 +1,5 @@
 import { apiGet, apiSend } from "@/lib/api";
-import type { InterviewStatusBody, StartInterviewInput } from "./types";
+import type { InterviewStatusBody, JobPostingText, StartInterviewInput, StartInterviewResponse } from "./types";
 
 /**
  * 모의면접 API (`/api/v1/interview/*`, docs/개발계획서3.md §5).
@@ -8,8 +8,15 @@ import type { InterviewStatusBody, StartInterviewInput } from "./types";
 const BASE = "/api/v1/interview";
 
 /** 세션을 만든다. 질문은 뒤에서 만들어지고 `/status`가 NEXT_QUESTION_READY가 되면 준비된 것이다. */
-export function startInterview(input: StartInterviewInput): Promise<{ sessionId: string }> {
-  return apiSend<{ sessionId: string }>("POST", `${BASE}/start`, input);
+export function startInterview(input: StartInterviewInput): Promise<StartInterviewResponse> {
+  return apiSend<StartInterviewResponse>("POST", `${BASE}/start`, input);
+}
+
+/** 채용공고 PDF에서 글자만 읽는다. 서버는 파일과 글을 저장하지 않는다 (#167). */
+export function readJobPostingText(file: File): Promise<JobPostingText> {
+  const form = new FormData();
+  form.set("file", file, file.name);
+  return apiSend<JobPostingText>("POST", `${BASE}/job-posting/text`, form);
 }
 
 export function getInterviewStatus(sessionId: string): Promise<InterviewStatusBody> {

@@ -162,7 +162,7 @@ B(부산 채용공고·청년정책 맞춤 추천) 코드를 짤 때는 이 절�
 | 같은 `Idempotency-Key` 재요청 | 본문이 다르면 409 `PRECONDITION_NOT_MET` | D-31 |
 | 저장 공고 상태를 `OppUserState`에 | `POST /saved`가 공통 함수 `ensure_workspace`를 불러 `OPP#SAVED#`와 `WORKSPACE#`를 한 트랜잭션으로 쓴다. 지원 상태는 `WORKSPACE#.status`에만 둔다 | D-36, db-schema §2.3 |
 | 알림 ID `{createdAt}#{해시}` | `{yyyyMMddTHHmmss}-{해시 8자}`. 주소에 `#`이 들어가면 요청이 깨진다 | db-schema §2.2 |
-| C `/start`에 직무와 요건을 넘김 | 면접 페이지로 이동하고 `job` 칸(1~50자)만 채운다 | B rev 55 §10.1 |
+| C `/start`에 직무와 요건을 넘김 | `job`(1~50자, 필수)은 그대로 두고 채용공고를 선택으로 넘긴다: 글 `jobPosting{title?, company?, text}` 또는 B 공고 ID `jobPostingId`(백엔드가 변환) | B rev 55 §10.1 → #158 팀 합의, #167 연결 |
 | 개발용 사용자 헤더 | `X-User-Id` + `ALLOW_DEV_USER_HEADER=1`, 로컬 테스트에서만 | D-35 |
 
 - 데모 계정 `demo1`~`demo3`이 B 페르소나 ①②③이다. 통합 데모는 페르소나 ① 데이터 분석(NCS 20010105)으로 한다 (D-37).
@@ -194,6 +194,8 @@ B(부산 채용공고·청년정책 맞춤 추천) 코드를 짤 때는 이 절�
 
 - 배치 작업은 공고·정책 수집(B-01)과 요건 추출·임베딩·배지·부산 대안 후보 미리 계산(B-02)이다.
 - 공고 피드의 검색어·회사 조건은 벡터 후보에 이름 색인(`team07-catalog`의 `POSTNAMES`)에서 찾은 진행 중 공고를 더해서 거른다. 색인은 `put_latest`가 같이 쓴다 (`ai/busan-opportunity/DECISIONS.md` B-D08).
+- 채용 공고 목록은 로그인 없이 본다(`GET /api/v1/opportunities/public/postings`, 마감 임박순, 공기업·사기업·지역·경력·고용 형태 분류). 맞춤형 공고와 청년 지원 정책은 로그인해야 본다 (B-D10).
+- 공공기관 공고에는 알리오 경영공시의 기관 직원 평균보수(`team07-catalog`의 `ORGPAY`, 매주 수집)를, 지방출자·출연기관 공고에는 행정안전부 직원평균임금 파일(`seeds/klid_org_pay.json`)을 붙인다. 지방공사·공단은 자료가 없다. 공고에 급여가 없으면 연봉 조건을 이 값으로 거른다. 직원 전체 평균이라 "기관 평균"으로만 말하고 신입 초봉이라고 하지 않는다 (B-D11).
 - `opportunity_config.json` v1.0 초기값
   - 적합도 가중치: 직종 일치 0.35, 직무 내용 유사도 0.30, 필수 조건 0.20, 선호 조건 0.15. 재지 못한 항목은 빼고 나머지로 다시 나눈다.
   - 직종 일치 값: 세분류 1.0, 중분류 0.6, 대분류 0.3. 공고에 대분류 분류만 있으면(잡알리오) 대분류 일치를 0.6으로 본다 (`ai/busan-opportunity/DECISIONS.md` B-D07).

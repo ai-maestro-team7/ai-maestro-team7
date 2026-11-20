@@ -213,6 +213,36 @@ class CompanyRecord(OppModel):
     as_of: str
 
 
+class OrgPayYear(OppModel):
+    """한 해의 일반정규직 1인당 평균 보수액. 금액은 만 원/년이다 (공시 단위 천 원을 10으로 나눠 반올림)."""
+
+    year: int
+    average: int
+    budget: bool = False  # True면 그해 예산(아직 결산 전)
+
+
+class OrgPay(OppModel):
+    """공공기관 직원 평균보수 (`ORGPAY` / `ORG#{orgId}`). 알리오 경영공시 「직원 평균보수」의 일반정규직 표와,
+    클린아이의 지방출자·출연기관 직원평균임금(행정안전부 파일, `seeds/klid_org_pay.json`)이다.
+
+    직원 전체의 평균이라 신입 초봉이 아니다. 화면·대화에서는 "기관 평균"으로만 말한다 (DECISIONS B-D11).
+    orgId는 알리오 기관 코드(C0072, 채용공시의 pblntInstCd와 같다)나 `klid-` 해시다. 공고와는 기관 이름으로 잇는다.
+    """
+
+    org_id: str
+    name: str
+    org_type: str | None = None   # 공기업(시장형), 준정부기관(위탁집행형), 기타공공기관 …
+    ministry: str | None = None   # 주무부처. 지방출자·출연기관은 설립 지자체
+    years: list[OrgPayYear] = Field(default_factory=list)  # 오래된 해부터
+    latest_year: int              # 가장 최근 결산 연도
+    latest_average: int           # 그해 1인당 평균 보수액 (만 원/년)
+    year_note: str = "결산"  # 연도 뒤에 붙이는 말 ("2025년 결산"). 출처가 밝히지 않으면 빈 글 (연도만 쓴다)
+    tenure_months: int | None = None  # 그해 평균근속연수 (개월)
+    source: str
+    as_of: str                    # 공시 기준일 (YYYY-MM-DD)
+    source_url: str
+
+
 class RegionalIndexEntry(OppModel):
     """지역 조건이 있는 공고 색인 한 줄 (`INDEX#REGIONAL` / `POSTING#{id}`). 피드의 지역 혜택 거르기가 벡터 상위 후보
     밖의 공고까지 찾으려고 읽는다. 수집·보강이 LATEST를 쓸 때 함께 쓰고 지운다."""
@@ -233,9 +263,10 @@ class VectorMeta(OppModel):
 
 
 class PostingName(OppModel):
-    """검색어·회사 이름 검색용 이름 색인 한 줄 (B-D08). 진행 중 공고만 둔다.
+    """공고 이름 색인 한 줄 (B-D08). 진행 중 공고만 둔다. 만드는 곳은 `core/name_index.name_row` 하나다.
 
     `team07-catalog`의 `POSTNAMES` / `POSTING#{jobPostingId}`. LATEST를 쓸 때 같이 쓰고, 마감 처리하면 지운다.
+    검색어·회사 이름 검색과, 로그인 없이 보는 공고 목록의 분류(B-D10)에 쓴다.
     """
 
     job_posting_id: str
@@ -243,6 +274,12 @@ class PostingName(OppModel):
     title: str
     job_name: str | None = None
     closes_at: str
+    # 분류 (B-D10). 이 칸이 생기기 전에 쓴 줄은 기본값이라 다시 채워야 한다
+    org_type: OrgType = OrgType.PRIVATE
+    sido: str | None = None  # 해외·근무지 미상이면 없음
+    is_overseas: bool = False
+    career_type: CareerType = CareerType.UNKNOWN
+    employment_type: EmploymentType = EmploymentType.UNKNOWN
 
 
 def latest_from_snapshot(snap: PostingSnapshot, *, busan_sido: str, capital_sido: list[str],

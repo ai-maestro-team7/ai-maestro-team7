@@ -40,10 +40,3 @@ export type MentorConversation = {
   updatedAt: number;
   messages: MentorMessage[];
 };
-
-/** 홈 "이어서 하기" 항목 */
-export type ContinueItem = {
-  title: string;
-  description: string;
-  href: string;
-};

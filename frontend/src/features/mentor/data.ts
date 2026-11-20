@@ -1,4 +1,4 @@
-import type { ContinueItem, MentorExample, MentorReply } from "./types";
+import type { MentorExample, MentorReply } from "./types";
 
 /** 데모 직무 (D-37: 페르소나 ① 데이터 분석). 칩·예시 문장도 이 직무로 맞춘다 (docs/architecture.md §5.3). */
 const DEMO_ROLE = "데이터 분석";
@@ -83,23 +83,17 @@ export function attachmentError(file: File): string | null {
 
 /**
  * 파일을 붙여 보냈을 때의 시연 답변. 서류 종류는 사용자가 고르지 않고 내용으로 판단하므로,
- * 실제 분석 전인 지금은 진단과 첨삭 화면을 함께 안내한다.
+ * 실제 분석 전인 지금은 그 서류로 연습할 수 있는 모의면접을 안내한다.
  */
 export const attachmentReply: MentorReply = {
   answer:
-    "파일을 받았어요. 이력서라면 이력서·직무 진단에서 희망 직무 요건과 비교해 강점과 보완할 역량을, 자기소개서라면 AI 서류 첨삭에서 근거가 약한 문장과 고칠 방향을 알려드려요.",
+    "파일을 받았어요. 자기소개서나 이력서라면 AI 모의면접 설정에서 그 PDF를 올려 서류 내용으로 만든 면접 질문을 연습할 수 있어요.",
   recommendations: [
     {
-      title: "이력서·직무 진단",
-      meta: `${DEMO_ROLE} · NCS 직무 요건 비교`,
-      actionLabel: "진단하기",
-      href: "/diagnosis",
-    },
-    {
-      title: "AI 서류 첨삭",
-      meta: "자기소개서 문장 다듬기",
-      actionLabel: "첨삭하기",
-      href: "/review",
+      title: "AI 모의면접",
+      meta: `${DEMO_ROLE} · 자기소개서·이력서 PDF로 질문 만들기`,
+      actionLabel: "모의면접 시작하기",
+      href: `/interview?job=${encodeURIComponent(DEMO_ROLE)}`,
     },
   ],
 };
@@ -111,11 +105,3 @@ export const ATTACHMENT_QUESTION = "첨부한 파일을 봐줘";
 export function mentorReplyTo(question: string, hasAttachment: boolean): MentorReply {
   return hasAttachment ? attachmentReply : findMentorReply(question);
 }
-
-/** 홈 "이어서 하기" (Figma 홈 오른쪽 목록). 숫자는 진단·면접·로드맵 Mock 데이터와 같은 값이다. */
-export const continueItems: ContinueItem[] = [
-  { title: "이력서·직무 진단", description: "서류 적합도 86점 · 보완할 역량 2개", href: "/diagnosis/result" },
-  { title: "AI 모의면접", description: "최근 82점 · 질문 3개", href: "/interview/report" },
-  { title: "AI 서류 첨삭", description: "자기소개서 문장 다듬기", href: "/review" },
-  { title: "학습 로드맵", description: "1주차 · 분석 대시보드 만들기", href: "/roadmap" },
-];

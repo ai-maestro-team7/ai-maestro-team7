@@ -43,6 +43,10 @@ REGION = os.environ.get("AWS_REGION", "ap-northeast-2")
 MAX_AUDIO = 6 * 1024 * 1024
 MAX_IMAGE = 5 * 1024 * 1024
 MAX_ANSWER_TEXT = 3000  # 글로 쓴 답변 (텍스트 방식). 2분 말하기 분량의 서너 배
+# 채용공고 PDF (글자만 읽고 저장하지 않음). Lambda 동기 호출 한도(6MB)를 base64로 넘지 않게 4MB까지
+MAX_POSTING_PDF = 4 * 1024 * 1024
+POSTING_TEXT_MIN, POSTING_TEXT_MAX = 30, 4000  # C settings.JOB_POSTING_TEXT_MIN/MAX와 같은 값 (#158)
+POSTING_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]{0,199}$")  # '#' 금지 (B 키 구분자)
 TRANSCRIBE_WAIT_SEC = 240
 INTERVIEW_TYPES = {"PERSONALITY", "JOB", "MIXED"}
 FRAME_TYPES = {"CALIBRATION", "ANSWER"}
@@ -174,6 +178,37 @@ def load_resume_text(user_id, document_id):
     return obj["Body"].read().decode("utf-8")
 
 
+def load_b_posting(job_posting_id):
+    """B 공고 상세(최신 스냅샷)를 계약 키(camelCase)로 읽는다. C `job_posting_from_posting`이 읽는 값:
+    title, organization, jobDescription, requirements[].kind·sourceQuote·name (#158 인계 §4·§5)."""
+    import opportunities_api
+
+    if opportunities_api.IMPL_NAME is None:
+        raise TeamError(501, "NOT_IMPLEMENTED", "공고 기능이 아직 연결되지 않았어요.")
+    catalog = opportunities_api.deps().catalog
+    latest = catalog.get_latest(job_posting_id)
+    snapshot = catalog.get_snapshot(job_posting_id, latest.snapshot_id) if latest else None
+    if snapshot is None:
+        raise TeamError(404, "POSTING_NOT_FOUND", "공고를 찾을 수 없어요.")
+    return snapshot.to_api()
+
+
+def load_job_posting(data):
+    """`/start`의 채용공고. 글(`jobPosting`)이나 B 공고 ID(`jobPostingId`) 가운데 하나 (#167).
+
+    - jobPosting: C `normalize_job_posting`으로 검사한다 (본문 30~4,000자, 모르는 키 거절 → INVALID_INPUT)
+    - jobPostingId: B 공고를 읽어 C `job_posting_from_posting`으로 바꾼다. 본문이 30자 미만이면 None (공고 없이 면접)
+    """
+    posting_id = data.get("jobPostingId")
+    if posting_id is None:
+        return impl.normalize_job_posting(data.get("jobPosting"))
+    if data.get("jobPosting") is not None:
+        raise TeamError(400, "INVALID_INPUT", "채용공고는 글이나 공고 ID 가운데 하나만 보내 주세요.")
+    if not isinstance(posting_id, str) or not POSTING_ID_RE.match(posting_id):
+        raise TeamError(400, "INVALID_INPUT", "jobPostingId 형식이 올바르지 않아요.")
+    return impl.job_posting_from_posting(load_b_posting(posting_id))
+
+
 def load_latest_profile(user_id):
     """PROFILE#LATEST가 가리키는 역량 프로필을 면접 계약 형식으로 넘긴다."""
     latest = table().get_item(Key={"PK": pk(user_id), "SK": "PROFILE#LATEST"}).get("Item")
@@ -272,7 +307,7 @@ def save_next_question(user_id, iv_id, result, extra=None):
 def task_start(t):
     user_id, iv_id, inp = t["userId"], t["sessionId"], t["input"]
     result = call_ai(impl.start_interview, iv_id, inp["job"], inp["resumeText"], inp["interviewType"], inp["cameraConsent"],
-                     inp.get("profile"))
+                     inp.get("profile"), inp.get("jobPosting"))
     save_next_question(user_id, iv_id, result)
 
 
@@ -368,6 +403,8 @@ def h_start(event, user_id, params, request_id):
     if not resume_text or not 50 <= len(resume_text) <= 5000:
         raise TeamError(400, "INVALID_INPUT", "자소서는 50~5,000자로 입력해 주세요.")
     profile = data.get("profile") or load_latest_profile(user_id)
+    # 잘못된 공고로 세션이 만들어지지 않게 put_item 전에 검사한다. 공고 원문은 로그·INTERVIEW#에 남기지 않는다
+    job_posting = load_job_posting(data)
 
     iv_id = str(uuid.uuid4())  # 백엔드가 만들어 함수에 넘김 (202 응답에 바로 쓰기 위해)
     item = {"PK": pk(user_id), "SK": sk(iv_id), "entityType": "Interview", "schemaVersion": "1.0", "ownerUserId": user_id,
@@ -384,8 +421,9 @@ def h_start(event, user_id, params, request_id):
     table().put_item(Item=to_dynamo(item))
     enqueue({"task": "interview.start", "userId": user_id, "sessionId": iv_id, "requestId": request_id,
              "input": {"job": job, "resumeText": resume_text, "interviewType": interview_type,
-                       "cameraConsent": data["cameraConsent"], "profile": profile}})
-    return 202, {"sessionId": iv_id, "status": "PENDING", "stage": "QUESTION_GENERATING"}
+                       "cameraConsent": data["cameraConsent"], "profile": profile, "jobPosting": job_posting}})
+    # jobPostingUsed: 질문에 공고를 쓰는지. B 공고 본문이 너무 짧으면 공고 없이 만든다
+    return 202, {"sessionId": iv_id, "status": "PENDING", "stage": "QUESTION_GENERATING", "jobPostingUsed": job_posting is not None}
 
 
 def h_answer(event, user_id, params, request_id):
@@ -452,6 +490,34 @@ def h_answer(event, user_id, params, request_id):
     return 202, {"sessionId": iv_id, "answerId": answer_id, "status": "PROCESSING", "stage": "TRANSCRIBING"}
 
 
+def h_posting_text(event, user_id, params, request_id):
+    """채용공고 PDF에서 글자만 읽어 돌려준다 (#167). 파일과 글은 저장하지 않는다. 화면이 입력칸에 채워 고치게 한다.
+    글자 레이어만 읽는다 (스캔 PDF OCR은 하지 않음). 4,000자를 넘으면 앞부분만 주고 truncated=true."""
+    _, files = parse_multipart(event)
+    if "file" not in files:
+        raise TeamError(400, "INVALID_INPUT", "채용공고 PDF(file)가 필요해요.")
+    data, ctype = files["file"]
+    if ctype != "application/pdf" and not data.startswith(b"%PDF"):
+        raise TeamError(400, "INVALID_INPUT", "PDF 파일만 올릴 수 있어요.")
+    if len(data) > MAX_POSTING_PDF:
+        raise TeamError(413, "FILE_TOO_LARGE", f"{MAX_POSTING_PDF // (1024 * 1024)}MB 이하 PDF만 올릴 수 있어요.")
+    try:
+        from mentoring.extract import ExtractError, extract_text_layer
+    except ImportError:
+        raise TeamError(501, "NOT_IMPLEMENTED", "PDF 읽기가 아직 연결되지 않았어요.") from None
+    try:
+        extracted = extract_text_layer(data)
+    except ExtractError as e:
+        raise TeamError(422, "DOCUMENT_UNREADABLE", "PDF를 읽지 못했어요. 암호가 걸리지 않은 PDF인지 확인해 주세요.") from e
+    text = extracted.text.strip()
+    if extracted.quality.reason == "BROKEN_ENCODING" or len(text) < POSTING_TEXT_MIN:
+        raise TeamError(422, "DOCUMENT_UNREADABLE",
+                        "PDF에서 글자를 읽지 못했어요. 글자를 복사할 수 있는 PDF인지 확인하거나 공고 내용을 붙여 넣어 주세요.")
+    truncated = len(text) > POSTING_TEXT_MAX
+    return 200, {"text": text[:POSTING_TEXT_MAX].rstrip(), "charCount": len(text), "truncated": truncated,
+                 "pageCount": extracted.page_count}
+
+
 def h_status(event, user_id, params, request_id):
     return 200, status_body(user_id, get_interview(user_id, params["sessionId"]))
 
@@ -485,6 +551,7 @@ ROUTES = [
     ("POST", r"/api/v1/interview/start", h_start),
     ("POST", r"/api/v1/interview/answer", h_answer),
     ("POST", r"/api/v1/interview/frame", h_frame),
+    ("POST", r"/api/v1/interview/job-posting/text", h_posting_text),
     ("GET", r"/api/v1/interview/(?P<sessionId>[0-9a-f-]{36})/status", h_status),
 ]
 

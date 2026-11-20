@@ -39,14 +39,14 @@ export function Gnb() {
           </Link>
           <form role="search" onSubmit={handleSearch} className="relative w-full sm:w-85">
             <label htmlFor="gnb-search" className="sr-only">
-              공고, 정책 검색
+              기업, 공고 검색
             </label>
             <input
               id="gnb-search"
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="공고, 정책 검색"
+              placeholder="기업, 공고 검색"
               className="h-10 w-full rounded-control border border-grey-300 bg-white pr-10 pl-3.5 text-small text-grey-900 placeholder:text-grey-500 focus:border-blue-500 focus:outline-none"
             />
             <button
@@ -84,7 +84,7 @@ export function Gnb() {
                   href={item.href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex h-12 items-center whitespace-nowrap border-b-2 text-body",
+                    "flex h-12 items-center whitespace-nowrap border-b-2 text-body transition-colors",
                     active
                       ? "border-blue-500 font-bold text-blue-500"
                       : "border-transparent font-medium text-grey-800 hover:text-grey-900",

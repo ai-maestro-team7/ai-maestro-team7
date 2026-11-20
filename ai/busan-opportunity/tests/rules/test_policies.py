@@ -323,3 +323,15 @@ def test_policy_eligibility_defaults_unrestricted(deps):
     result = policies.judge_policy(policy, deps.users.get_basic_profile("demo1"), deps.users.get_prefs("demo1"),
                                    as_of=clock.parse_as_of(w.DEMO_AS_OF))
     assert result.status == S.ELIGIBLE and result.reasons == ["전국 대상"]
+
+
+def test_wallet_reads_alerts_once_and_marks_subscribed(deps, as_of, monkeypatch):
+    """정책 지갑은 알림 신청 여부를 정책마다 읽지 않고 한 번에 읽는다 (정책 수백 건이면 조회가 수백 번이라 느렸다)."""
+    assert deps.users.put_alert("demo1", PolicyAlert(policy_id=w.P_JOY_DOUBLE, scheduled_at=as_of, schedule_name="n"))
+    per_policy = []
+    monkeypatch.setattr(deps.users, "get_alert", lambda *args: per_policy.append(args))
+    wallet = policies.match_policies(deps, "demo1", as_of=as_of)
+    assert per_policy == []
+    flags = {card.policy_id: card.alert_subscribed for card in all_cards(wallet)}
+    assert flags[w.P_JOY_DOUBLE] is True
+    assert not any(v for k, v in flags.items() if k != w.P_JOY_DOUBLE)

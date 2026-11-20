@@ -1,6 +1,5 @@
 "use client";
 
-import { ChevronDown } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { ApiErrorNotice } from "@/features/auth/components/ApiFallback";
@@ -9,9 +8,9 @@ import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { Field, fieldA11y } from "@/components/ui/Field";
 import { TextField } from "@/components/ui/TextField";
+import { Select as SelectBox } from "@/components/ui/Select";
 import { PageSkeleton } from "@/components/ui/Skeleton";
 import { ApiError, getMyProfile, saveMyProfile } from "@/lib/api";
-import { cn } from "@/lib/cn";
 import { useApi } from "@/lib/useApi";
 import {
   BUSAN_SIDO,
@@ -53,33 +52,17 @@ function Select({
 }) {
   return (
     <Field id={id} label={label} error={error}>
-      {/* 브라우저 기본 화살표를 지우고 TextField와 같은 여백·화살표 아이콘을 쓴다. 펼친 목록은 기기 기본 목록 그대로다 */}
-      <div className="relative w-full">
-        <select
-          {...fieldA11y(id, error)}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          className={cn(
-            "h-12 w-full cursor-pointer appearance-none rounded-field border bg-white pr-11 pl-3.75 text-body transition-colors hover:border-grey-400 focus:border-blue-500 focus:outline-none",
-            value ? "text-grey-900" : "text-grey-500",
-            error ? "border-red-500 hover:border-red-500" : "border-grey-300",
-          )}
-        >
-          <option value="" disabled={required} className="text-grey-500">
-            {placeholder}
-          </option>
-          {options.map((option) => (
-            <option key={option.value} value={option.value} className="text-grey-900">
-              {option.label}
-            </option>
-          ))}
-        </select>
-        <ChevronDown
-          aria-hidden
-          className="pointer-events-none absolute top-1/2 right-3.75 size-5 -translate-y-1/2 text-grey-500"
-          strokeWidth={2}
-        />
-      </div>
+      {/* 브라우저 기본 목록 대신 서비스 모양의 목록을 쓴다 (components/ui/Select) */}
+      <SelectBox
+        id={id}
+        value={value}
+        onChange={onChange}
+        options={options}
+        placeholder={placeholder}
+        required={required}
+        invalid={Boolean(error)}
+        describedBy={fieldA11y(id, error)["aria-describedby"]}
+      />
     </Field>
   );
 }
