@@ -12,9 +12,13 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "AI 모의면접", href: "/interview", match: ["/interview"] },
 ];
 
-/** "채용·정책" 아래 하위 탭 (채용 공고 목록 · 청년 지원 정책 목록) */
+/**
+ * "채용·정책" 아래 하위 탭. 채용 공고는 로그인 없이 보고(분류·검색), 맞춤형 공고와 청년 지원 정책은 로그인해야 본다.
+ * GNB 검색은 채용 공고로 들어간다.
+ */
 export const OPPORTUNITY_TABS = [
   { key: "jobs", label: "채용 공고", href: "/jobs" },
+  { key: "recommended", label: "맞춤형 공고", href: "/jobs/recommended" },
   { key: "policies", label: "청년 지원 정책", href: "/policies" },
 ] as const satisfies ReadonlyArray<{ key: string; label: string; href: string }>;
 

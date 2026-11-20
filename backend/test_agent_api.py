@@ -202,6 +202,53 @@ def main():
     check("채팅 승낙 → PROFILE#BASIC 저장", int(basic["desiredSalaryMin"]) == 2500 and m["reply"] == "저장했어요.")
     check("저장 완료 카드", m["actions"] == [{"type": "CONDITIONS_SAVED", "conditions": ["연봉 2,500만 원 이상"]}])
 
+    # 5-5. 채팅 화면: 대화 목록·고정·삭제·멈추기
+    s, listed = call("GET", "/api/v1/agent/chat")
+    check("GET /agent/chat → 내 대화 목록 (메시지 없이)", s == 200 and any(x["sessionId"] == sid for x in listed["sessions"])
+          and all("messages" not in x and "ownerUserId" not in x for x in listed["sessions"]))
+    check("남의 목록에는 내 대화가 없다",
+          all(x["sessionId"] != sid for x in call("GET", "/api/v1/agent/chat", user="demo2")[1]["sessions"]))
+    runner.script = lambda tools: "새 대화예요."
+    s, other = call("POST", "/api/v1/agent/chat", {"message": "새 대화"})
+    rows = call("GET", "/api/v1/agent/chat")[1]["sessions"]
+    stamps = [r["lastMessageAt"] for r in rows]  # 초 단위라 같은 초에 말한 대화끼리는 순서가 정해지지 않는다
+    check("최근에 말한 순서 (lastMessageAt 내림차순)", stamps == sorted(stamps, reverse=True)
+          and any(r["sessionId"] == other["sessionId"] for r in rows))
+    s, pinned = call("PATCH", f"/api/v1/agent/chat/{sid}", {"pinned": True})
+    check("PATCH {pinned:true} → 고정", s == 200 and pinned["pinned"] is True and pinned["sessionId"] == sid)
+    check("고정한 대화가 맨 위", call("GET", "/api/v1/agent/chat")[1]["sessions"][0]["sessionId"] == sid)
+    check("pinned 말고는 400", call("PATCH", f"/api/v1/agent/chat/{sid}", {"title": "바꾸기"})[0] == 400)
+    check("남의 대화 고정은 404", call("PATCH", f"/api/v1/agent/chat/{sid}", {"pinned": False}, user="demo2")[0] == 404)
+
+    held = []  # 멈추기: 실행 이벤트를 바로 돌리지 않고 붙잡아 둔다 (답을 만드는 중인 상태)
+    dispatcher = agent_api.deps().dispatcher
+    dispatcher.dispatch = held.append
+    s, b = call("POST", "/api/v1/agent/chat", {"sessionId": other["sessionId"], "message": "오래 걸리는 질문"})
+    check("만드는 중인 답 PENDING", s == 202 and b["status"] == "PENDING")
+    cancel_path = f"/api/v1/agent/chat/{other['sessionId']}/messages/{b['messageId']}/cancel"
+    check("남의 답은 멈출 수 없다 (404)", call("POST", cancel_path, user="demo2")[0] == 404)
+    s, m = call("POST", cancel_path)
+    check("POST .../cancel → CANCELLED", s == 200 and m["status"] == "CANCELLED")
+    out = lambda_handler(held.pop(), None)
+    check("멈춘 답의 실행 이벤트는 SKIPPED", out["status"] == "SKIPPED")
+    s, b2 = call("POST", "/api/v1/agent/chat", {"sessionId": other["sessionId"], "message": "다시 물어볼게요"})
+    check("멈추면 바로 다음 말을 보낼 수 있다", s == 202)
+    del dispatcher.dispatch  # 인스턴스에 덮어쓴 것을 지워 원래 메서드로 돌린다
+    lambda_handler(held.pop(), None)
+    check("이어서 보낸 답은 완료", call("GET", f"/api/v1/agent/chat/{other['sessionId']}/messages/{b2['messageId']}")[1]["status"]
+          == "COMPLETED")
+    check("끝난 답을 멈춰도 그대로", call("POST", f"/api/v1/agent/chat/{other['sessionId']}/messages/{b2['messageId']}/cancel")[1][
+        "status"] == "COMPLETED")
+
+    check("남의 대화 삭제는 404", call("DELETE", f"/api/v1/agent/chat/{other['sessionId']}", user="demo2")[0] == 404)
+    s, gone = call("DELETE", f"/api/v1/agent/chat/{other['sessionId']}")
+    check("DELETE → 대화 지움", s == 200 and gone == {"sessionId": other["sessionId"], "deleted": True})
+    check("지운 대화는 404", call("GET", f"/api/v1/agent/chat/{other['sessionId']}")[0] == 404)
+    left = table.query(KeyConditionExpression="PK = :pk AND begins_with(SK, :sk)",
+                       ExpressionAttributeValues={":pk": "USER#demo1", ":sk": f"CHAT#{other['sessionId']}#"})["Items"]
+    check("지운 대화의 메시지도 남지 않는다", left == [])
+    check("고정 해제", call("PATCH", f"/api/v1/agent/chat/{sid}", {"pinned": False})[1]["pinned"] is False)
+
     # 6. 비동기 이벤트 입구 (같은 작업 두 번 → 한 번만)
     out = lambda_handler({"agentTask": {"userId": "demo1", "sessionId": sid, "messageId": mid}}, None)
     check("agentTask 이벤트: 끝난 턴은 SKIPPED", out["status"] == "SKIPPED")

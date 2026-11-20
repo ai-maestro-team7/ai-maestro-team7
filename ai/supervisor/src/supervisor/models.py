@@ -24,6 +24,7 @@ class MessageStatus(StrEnum):
     PROCESSING = "PROCESSING"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
+    CANCELLED = "CANCELLED"  # 사용자가 답을 만드는 중에 멈췄다. 늦게 나온 결과는 저장하지 않는다
 
 
 class CardType(StrEnum):
@@ -135,6 +136,7 @@ class ChatSession(SupModel):
     pending_message_id: str | None = None
     pending_since: str | None = None
     message_count: int = 0
+    pinned: bool = False  # 대화 목록 위에 고정
     created_at: str
     last_message_at: str
 

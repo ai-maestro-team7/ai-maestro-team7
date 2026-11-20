@@ -94,6 +94,19 @@ export async function getSocialProviders(): Promise<SocialProvider[]> {
 }
 
 /**
+ * 토큰 없이 부르는 공개 GET (예: 로그인 없이 보는 채용 공고 목록). 로그인했어도 토큰을 붙이지 않는다.
+ */
+export async function apiGetPublic<T>(path: string, query?: Record<string, string | number | undefined>): Promise<T> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(query ?? {})) {
+    if (value !== undefined && value !== "") params.set(key, String(value));
+  }
+  const response = await fetch(`${API_BASE}${path}${params.size ? `?${params}` : ""}`);
+  if (!response.ok) throw await toApiError(response);
+  return (await response.json()) as T;
+}
+
+/**
  * `POST /api/v1/auth/social/start` (토큰 없이). Cognito 로그인 화면 주소(`authorizeUrl`)를 받는다.
  * 제공자에게는 `openid`만 요청한다 (이름·이메일을 받지 않는다).
  */

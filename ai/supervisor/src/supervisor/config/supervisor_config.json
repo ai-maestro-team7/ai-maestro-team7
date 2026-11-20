@@ -1,5 +1,5 @@
 {
-  "configVersion": "1.3",
+  "configVersion": "1.4",
   "promptVersion": "chat-v5",
   "maxTokens": 3000,
   "maxTurns": 8,
@@ -11,6 +11,7 @@
   "maxPolicies": 5,
   "staleSeconds": 180,
   "titleMaxChars": 30,
+  "maxSessionsListed": 100,
   "reply": {
     "maxChars": 1200,
     "maxFollowUps": 3,
