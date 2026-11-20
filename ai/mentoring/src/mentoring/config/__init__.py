@@ -35,6 +35,8 @@ class ExtractionConfig(_ConfigModel):
     max_tokens: int = Field(ge=256)
     schema_retries: int = Field(ge=0, le=2)  # 형식 검사 실패 뒤 다시 요청하는 횟수 (tech.md "재시도 1회")
     fact_retries: int = Field(ge=0, le=2)    # 원문에 없는 사실을 고쳐 달라고 다시 요청하는 횟수 (A F-01 10단계)
+    max_candidate_units: int = Field(ge=0)   # 프롬프트에 넣는 NCS 능력단위 후보 최대 수 (희망 직무 합계, #104)
+    max_desired_jobs: int = Field(ge=0)      # 후보를 가져올 희망 직무 최대 수
 
 
 class ConfirmationConfig(_ConfigModel):

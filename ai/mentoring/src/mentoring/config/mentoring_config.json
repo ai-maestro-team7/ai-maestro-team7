@@ -6,10 +6,12 @@
     "titleMaxChars": 100
   },
   "extraction": {
-    "promptVersion": "profile-extract-v1",
+    "promptVersion": "profile-extract-v2",
     "maxTokens": 4096,
     "schemaRetries": 1,
-    "factRetries": 1
+    "factRetries": 1,
+    "maxCandidateUnits": 45,
+    "maxDesiredJobs": 3
   },
   "confirmation": {
     "maxAdditions": 30,
