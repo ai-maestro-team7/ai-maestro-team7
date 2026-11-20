@@ -37,7 +37,14 @@ def synthesize_question(text):
     return None  # 대역은 음성을 만들지 않는다 → audioUrl = null (명세상 허용)
 
 
-def start_transcription(s3_uri, job_name, media_format):
+def start_transcription(s3_uri, job_name, media_format, output_bucket, output_key):
+    """실제 함수처럼 변환 결과 JSON을 백엔드가 정한 위치에 쓴다 (내용은 가짜)."""
+    import json
+
+    import boto3
+
+    boto3.client("s3").put_object(Bucket=output_bucket, Key=output_key, ContentType="application/json",
+                                  Body=json.dumps({"jobName": job_name, "results": {"transcripts": [{"transcript": "(대역)"}]}}).encode())
     return job_name
 
 
@@ -71,12 +78,16 @@ def process_answer(session, answer_result):
 
 def analyze_face(image_bytes):
     if not image_bytes:
-        return {"valid": False, "reason": "NO_FACE", "gaze": None, "head": None}
-    return {"valid": True, "reason": None, "gaze": {"yaw": 1.5, "pitch": -2.0}, "head": {"yaw": 0.5, "pitch": 3.0}}
+        return {"valid": False, "reason": "NO_FACE", "gaze": None, "head": None, "eyesOpen": None}
+    return {"valid": True, "reason": None, "gaze": {"yaw": 1.5, "pitch": -2.0}, "head": {"yaw": 0.5, "pitch": 3.0},
+            "eyesOpen": {"value": True, "confidence": 98.5}}
 
 
 def compute_baseline(results):
-    return {"gaze": {"yaw": 0.0, "pitch": 0.0}, "head": {"yaw": 0.0, "pitch": 0.0}, "isDefault": True}
+    valid = [r for r in results if r.get("valid")]
+    if len(valid) < 3:  # C 명세: 유효 3장 미만이면 None → 태도 미측정
+        return None
+    return {"gaze": {"yaw": 0.0, "pitch": 0.0}, "head": {"yaw": 0.0, "pitch": 0.0}}
 
 
 def generate_report(session, frames):

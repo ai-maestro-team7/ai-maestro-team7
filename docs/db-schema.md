@@ -1,4 +1,4 @@
-# DB 스키마 (v1.3)
+# DB 스키마 (v1.3.1)
 
 7팀 · 부산 청년 취업 맞춤형 멘토링 Agent
 작성: 백엔드/DB 담당 · 기준: A(멘토링) 개발 명세서 v2.0, B(부산 기회 추천) DB·API 스키마 v0.1, C(AI 모의면접) 개발명세서
@@ -9,6 +9,7 @@
 | v1.0 | 초안 |
 | v1.1 | 면접 담당 요청, 멘토링 담당 피드백 반영 (Workspace, GSI에 userId, `*_LATEST#`, 문서 버전, TASK, 삭제 규칙, 평가 로그) |
 | v1.2 | B 피드백 반영: 공고·정책·기업은 `team07-catalog`(B 설계), B 사용자 데이터는 `career-mentor`의 `OPP#`, 공통 프로필은 `PROFILE#BASIC`로. 알림 ID 형식, 저장 공고 ↔ 워크스페이스 연결 규칙 추가 |
+| v1.3.1 | C 명세 변경 반영 (`transcriptKey`, `eyesOpen`, `baseline=None`) |
 | v1.3 | 파트 간 충돌 정리: `eligibilityRules[]` 구조와 공통 판정 함수, 고용24·NCS 직무 코드 병행 + 매핑(`MAP#WORK24#`), 요건 종류 `REQUIRED_SKILL`/`PREFERRED_SKILL`, 옛 테이블 4개 삭제, `team07-reference` 생성 |
 
 ---
@@ -91,13 +92,14 @@
 
 | SK | 내용 |
 |---|---|
-| `INTERVIEW#{ivId}` | `session`(면접 함수가 준 그대로) + 백엔드 관리 값: `status`, `stage`, `expectedAnswerId`, `submittedAnswerIds[]`, `transcribeJobs{answerId: {jobName, audioKey, timeLimitReached}}`, `nextQuestion`, `lastAnswer`, `jobRole`(= session.job), `workspaceId` |
-| `INTERVIEW#{ivId}#FRAME#{answerId}#{capturedAt}` | `type`(CALIBRATION/ANSWER), `accepted`, `valid`, `gaze`, `head`. **이미지는 저장하지 않음**. 보정 캡처는 answerId 자리에 `CALIBRATION` |
+| `INTERVIEW#{ivId}` | `session`(면접 함수가 준 그대로) + 백엔드 관리 값: `status`, `stage`, `expectedAnswerId`, `submittedAnswerIds[]`, `transcribeJobs{answerId: {jobName, audioKey, transcriptKey, timeLimitReached}}`, `nextQuestion`, `lastAnswer`, `jobRole`(= session.job), `workspaceId` |
+| `INTERVIEW#{ivId}#FRAME#{answerId}#{capturedAt}` | `type`(CALIBRATION/ANSWER), `accepted`, `valid`, `gaze`, `head`, `eyesOpen{value, confidence}` (눈 감음 판단은 점수 계산 단계). **이미지는 저장하지 않음**. 보정 캡처는 answerId 자리에 `CALIBRATION` |
 | `INTERVIEW#{ivId}#REPORT` | `report`. 다시 열면 이 값을 그대로 반환 |
 | `INTERVIEW#{ivId}#Q#{questionId}` (선택) | 조회용 요약만 |
 
 - `ivId` = 면접 명세의 `sessionId` (UUID, 백엔드 생성). 중복 제출은 조건부 쓰기 → 409. 제출 뒤 캡처는 `accepted=false`
-- `compute_baseline`은 리포트 직전 `CALIBRATION` 캡처로 → `session.baseline`
+- `compute_baseline`은 리포트 직전 `CALIBRATION` 캡처로 → `session.baseline`. 유효 3장 미만이면 `None`(태도 미측정)이고 백엔드는 대체값을 넣지 않는다
+- Transcribe 결과는 백엔드가 정한 `uploads/interview/{ivId}/transcripts/{answerId}.json`에 저장(`start_transcription`의 `output_bucket`·`output_key`). 답변 원문이 들어 있어 녹음과 함께 바로 삭제
 - `start_interview` 입력: `resumeText` 또는 `documentId` → `DOC_LATEST#`의 `extractedTextKey`. `profile` = `PROFILE#LATEST` 최신 버전의 `projects`, `skills`, `needsConfirmation`
 - 녹음은 변환 끝나면 바로 삭제, `uploads/` 7일 자동 삭제는 안전장치
 - 구현 `backend/interview_api.py` · 테스트 `backend/test_interview.py`
@@ -242,7 +244,7 @@ ID 안에는 `#`를 쓰지 않는다. 키 구분자이고, 주소에 들어가�
 |---|---|---|
 | `team07-career-docs-<계정ID>` | 개인 문서 원본·추출본·첨삭 결과 | `users/{hashedUserId}/documents/{docId}/v{n}/…`, `users/{hashedUserId}/reviews/{reviewId}.json` |
 | `team07-kb-source-<계정ID>` | KB 원천 (13쌍) | `docs/` |
-| `team07-uploads-<계정ID>` | 면접 녹음(변환 후 삭제), 질문 음성. 7일 자동 삭제 | `uploads/interview/{ivId}/…` |
+| `team07-uploads-<계정ID>` | 면접 녹음(변환 후 삭제), 질문 음성. 7일 자동 삭제 | `uploads/interview/{ivId}/{answers,transcripts,questions}/…` |
 | `team07-opp-data-<계정ID>` | B: 공공 API 원본, 정규화본, 시드, 데모 스냅샷, 수집 기록 | `raw/{출처}/{날짜}/`, `normalized/{날짜}/`, `seed/`, `snapshots/demo-2026-11-21/`, `runs/{날짜}.json` |
 | S3 Vectors `team07-opp-vectors` | B: 공고 임베딩 검색 | 인덱스 `postings-v1` (1024차원, 코사인). 키 `jobPostingId`. 필터 메타데이터 `isBusan`, `sido`, `jobMajor`, `active`, `deadline`(YYYYMMDD 숫자), 필터 불가 `title` |
 
