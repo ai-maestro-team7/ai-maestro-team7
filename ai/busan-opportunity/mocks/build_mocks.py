@@ -186,6 +186,7 @@ MOCKS = {
         "schedules": [{"type": "TARGET_DEADLINE", "at": "2026-11-23T09:00:00+09:00", "label": "마감 D-7"},
                       {"type": "TARGET_DEADLINE", "at": "2026-11-27T09:00:00+09:00", "label": "마감 D-3"}],
         "askLeaveReason": False, "created": True}),
+    "DELETE_saved_id": (m.UnsaveResponse, {"jobPostingId": "alio-DEMO0001", "deleted": True}),
     "GET_saved": (m.SavedListResponse, {"items": [
         {"jobPostingId": "alio-DEMO0001", "kind": "TARGET", "status": "PLANNED", "isBusan": True, "savedAt": "2026-11-21T10:12:00+09:00",
          "workspaceId": "ws-alio-DEMO0001", "title": "2026년 신입직원 채용 (데이터)", "organization": "가상금융공사", "closesAt": "2026-11-30"}]}),

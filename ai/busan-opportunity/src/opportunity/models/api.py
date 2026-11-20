@@ -310,6 +310,11 @@ class SavedListResponse(OppModel):
     items: list[SavedView] = Field(default_factory=list)
 
 
+class UnsaveResponse(OppModel):
+    job_posting_id: str
+    deleted: bool  # 저장돼 있지 않았으면 false
+
+
 # ---------------------------------------------------------------- 설정 (B-07)
 class PreferencesView(OppModel):
     sort: Sort

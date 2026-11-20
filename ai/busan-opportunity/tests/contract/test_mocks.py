@@ -40,7 +40,7 @@ def test_mock_keys_are_camel_case():
 def test_every_rest_route_has_a_mock():
     """rest_handler의 모든 경로에 가짜 응답 파일이 있다. 파일 이름은 `메서드_경로`(`<x>`는 id)이다."""
     source = (Path(__file__).parents[2] / "src/opportunity/api/rest_handler.py").read_text(encoding="utf-8")
-    routes = re.findall(r'@app\.(get|post|put)\(f"\{PREFIX\}/([^"]+)"\)', source)
+    routes = re.findall(r'@app\.(get|post|put|delete)\(f"\{PREFIX\}/([^"]+)"\)', source)
     assert len(routes) >= 20
     for method, path in routes:
         name = method.upper() + "_" + re.sub(r"<[^>]+>", "id", path).replace("/", "_")

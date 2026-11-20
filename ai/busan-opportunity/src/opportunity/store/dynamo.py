@@ -451,6 +451,10 @@ class DynamoUsers:
         self.t.upsert(self._pk(user_id), f"OPP#SAVED#{item.job_posting_id}", "SavedItem", item, owner=user_id,
                       gsi=watch, drop_gsi=watch is None)
 
+    def delete_saved(self, user_id, job_posting_id):
+        """`OPP#SAVED#`만 지운다. 워크스페이스는 공통 백엔드 소유라 두고 간다."""
+        self.t.delete(self._pk(user_id), f"OPP#SAVED#{job_posting_id}")
+
     # -- 정책 알림 신청
     def get_alert(self, user_id, policy_id):
         item = self.t.get(self._pk(user_id), f"OPP#ALERT#{policy_id}")

@@ -22,7 +22,7 @@ from ..core.policies import get_policy, match_policies
 from ..core.posting_detail import get_posting
 from ..core.preferences import get_preferences, set_preferences
 from ..core.ranking import search_postings
-from ..core.saved import add_target_posting, list_saved
+from ..core.saved import add_target_posting, list_saved, remove_saved
 from ..deps import Deps
 from ..enrich.ask import ask_policies, ask_policy, ask_posting
 from ..enrich.explain import explain_posting
@@ -236,6 +236,11 @@ def rest_list_saved():
 def rest_add_saved():
     result = add_target_posting(_deps(), _user_id(), _body(SaveRequest), idempotency_key=_header("Idempotency-Key"))
     return _json(201 if result.created else 200, result.to_api())
+
+
+@app.delete(f"{PREFIX}/saved/<job_posting_id>")
+def rest_remove_saved(job_posting_id: str):
+    return remove_saved(_deps(), _user_id(), _id(job_posting_id, "jobPostingId")).to_api()
 
 
 # ---------------------------------------------------------------- 알림

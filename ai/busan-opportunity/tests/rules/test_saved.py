@@ -183,6 +183,49 @@ def test_list_saved_reads_status_from_workspace(deps):
     assert saved.list_saved(deps, "demo2").items == []
 
 
+# ---------------------------------------------------------------- 저장 풀기
+def test_remove_interest_keeps_workspace(deps):
+    save(deps, "demo1", w.BUSAN_DATA)
+    ws_id = deps.workspaces.workspace_id(w.BUSAN_DATA)
+    deps.workspaces.set_status("demo1", ws_id, "PREPARING")
+    result = saved.remove_saved(deps, "demo1", w.BUSAN_DATA)
+    assert result.to_api() == {"jobPostingId": w.BUSAN_DATA, "deleted": True}
+    assert deps.users.get_saved("demo1", w.BUSAN_DATA) is None and saved.list_saved(deps, "demo1").items == []
+    assert deps.workspaces.get_status("demo1", ws_id) == "PREPARING"  # 분석·첨삭 기록이 붙은 워크스페이스는 남긴다
+
+
+def test_remove_target_deletes_its_schedules_only(deps):
+    save(deps, "demo3", w.BUSAN_FINANCE_PUBLIC, SavedKind.TARGET)
+    save(deps, "demo1", w.BUSAN_DATA_PUBLIC, SavedKind.TARGET)
+    others = set(deps.users.get_saved("demo1", w.BUSAN_DATA_PUBLIC).schedule_names)
+    assert len(deps.scheduler.schedules) == 4
+    saved.remove_saved(deps, "demo3", w.BUSAN_FINANCE_PUBLIC)
+    assert set(deps.scheduler.schedules) == others
+
+
+def test_remove_twice_or_unknown_changes_nothing(deps):
+    save(deps, "demo1", w.BUSAN_DATA)
+    assert saved.remove_saved(deps, "demo2", w.BUSAN_DATA).deleted is False  # 다른 사용자의 저장은 건드리지 않는다
+    assert deps.users.get_saved("demo1", w.BUSAN_DATA) is not None
+    assert saved.remove_saved(deps, "demo1", w.BUSAN_DATA).deleted is True
+    assert saved.remove_saved(deps, "demo1", w.BUSAN_DATA).to_api() == {"jobPostingId": w.BUSAN_DATA, "deleted": False}
+
+
+def test_remove_id_with_hash_is_400(deps):
+    with pytest.raises(OppError) as e:
+        saved.remove_saved(deps, "demo1", "wk24#1")
+    assert e.value.status == 400 and e.value.code == "INVALID_INPUT"
+
+
+def test_save_again_after_remove(deps):
+    save(deps, "demo1", w.BUSAN_DATA)
+    deps.workspaces.set_status("demo1", deps.workspaces.workspace_id(w.BUSAN_DATA), "APPLIED")
+    saved.remove_saved(deps, "demo1", w.BUSAN_DATA)
+    again = save(deps, "demo1", w.BUSAN_DATA)
+    assert again.created is True and again.saved.status == WorkspaceStatus.APPLIED  # 같은 워크스페이스에 다시 붙는다
+    assert len(deps.users.workspace_txs) == 1
+
+
 # ---------------------------------------------------------------- 설정 (B-07)
 def test_get_preferences_defaults(deps):
     view = preferences.get_preferences(deps, "demo1")

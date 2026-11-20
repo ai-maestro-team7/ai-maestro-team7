@@ -184,13 +184,13 @@ export async function getMyProfile(): Promise<BasicProfile | null> {
 }
 
 /**
- * 토큰이 필요한 쓰기 호출 (POST·PUT). 본문은 JSON 값이거나 `FormData`(녹음·이미지 업로드)다.
+ * 토큰이 필요한 쓰기 호출 (POST·PUT·DELETE). 본문은 JSON 값이거나 `FormData`(녹음·이미지 업로드)이고, DELETE는 본문 없이 보낸다.
  * 401이면 한 번 갱신하고 다시 보낸다. `FormData`는 브라우저가 경계 문자열을 붙이므로 content-type을 직접 넣지 않는다.
  */
 export async function apiSend<T>(
-  method: "POST" | "PUT",
+  method: "POST" | "PUT" | "DELETE",
   path: string,
-  body: FormData | object,
+  body: FormData | object | undefined,
   /** 더 붙일 헤더 (예: 저장 요청의 `Idempotency-Key`) */
   extraHeaders?: Record<string, string>,
 ): Promise<T> {
@@ -199,11 +199,12 @@ export async function apiSend<T>(
   if (session.expiresAt - Date.now() < REFRESH_MARGIN_MS) session = (await refresh(session)) ?? session;
 
   const isForm = typeof FormData !== "undefined" && body instanceof FormData;
+  const isJson = body !== undefined && !isForm;
   const call = (token: string) =>
     fetch(`${API_BASE}${path}`, {
       method,
-      headers: { ...extraHeaders, authorization: `Bearer ${token}`, ...(isForm ? {} : { "content-type": "application/json" }) },
-      body: isForm ? body : JSON.stringify(body),
+      headers: { ...extraHeaders, authorization: `Bearer ${token}`, ...(isJson ? { "content-type": "application/json" } : {}) },
+      body: isJson ? JSON.stringify(body) : body,
     });
 
   let response = await call(session.accessToken);
