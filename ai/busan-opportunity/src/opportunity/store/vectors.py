@@ -14,6 +14,17 @@ SERVICE = "s3vectors"
 MAX_TOP_K = 100  # S3 Vectors가 질의 한 번에 돌려주는 최대 개수
 
 
+def to_s3_filter(filter: dict) -> dict:
+    """S3 Vectors 필터 형식으로 바꾼다. 최상위에 조건이 둘 이상이면 `$and`로 묶어야 한다.
+
+    `{"isBusan": True, "active": True}`는 S3 Vectors가 "Invalid filter"로 거절한다 (2026-11-20 서울 리전 확인).
+    조건이 하나이거나 이미 `$and`/`$or`로 묶인 필터는 그대로 둔다. 의미는 바뀌지 않는다.
+    """
+    if len(filter) <= 1 or any(key.startswith("$") for key in filter):
+        return filter
+    return {"$and": [{key: value} for key, value in filter.items()]}
+
+
 class S3VectorIndex:
     def __init__(self, client=None, bucket: str | None = None, index: str | None = None):
         if client is None:
@@ -30,7 +41,7 @@ class S3VectorIndex:
         params: dict = {**self._target(), "queryVector": {"float32": [float(x) for x in vector]},
                         "topK": min(top_k, MAX_TOP_K), "returnMetadata": True, "returnDistance": True}
         if filter:
-            params["filter"] = filter
+            params["filter"] = to_s3_filter(filter)
         with aws_errors(SERVICE):
             response = self.client.query_vectors(**params)
         hits = [VectorHit(row["key"], _similarity(row.get("distance")), dict(row.get("metadata") or {}))
