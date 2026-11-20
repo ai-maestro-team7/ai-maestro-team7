@@ -1,0 +1,103 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/reviews/review-0002"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "schemaVersion": "1.0",
+      "reviewId": "review-0002",
+      "status": "COMPLETED",
+      "taskId": "task-review-0002",
+      "documentType": "COVER_LETTER",
+      "analysisId": "analysis-0001",
+      "sourceJobSnapshotId": "20261120-10c26293",
+      "questionText": "직무 관련 경험을 설명해 주세요",
+      "maxCharacters": 500,
+      "storyIds": [],
+      "issueCount": 2,
+      "factCheckStatus": "NEEDS_CONFIRMATION",
+      "usedStoryIds": [],
+      "modelId": "mock-fit",
+      "promptVersion": "review-v1",
+      "createdAt": "2026-11-21T10:00:00+09:00",
+      "updatedAt": "2026-11-21T10:00:00+09:00",
+      "completedAt": "2026-11-21T10:00:00+09:00",
+      "questionIntent": "JOB_EXPERIENCE",
+      "overallFeedback": "운영 경험이 직무와 이어지지만 본인이 한 일과 결과가 짧아요.",
+      "strengths": [
+        "직무와 관련된 경험을 골랐어요."
+      ],
+      "issues": [
+        {
+          "issueId": "issue-1",
+          "sourceSpan": {
+            "startChar": 42,
+            "endChar": 54
+          },
+          "originalText": "다양한 데이터를 다뤘고",
+          "issueType": "MISSING_ACTION",
+          "reason": "본인이 직접 한 일이 보이지 않아요.",
+          "improvementAction": "직접 한 작업을 사실대로 적어 주세요.",
+          "needsUserConfirmation": true,
+          "questions": [
+            "스터디에서 직접 맡은 일은 무엇이었나요?"
+          ],
+          "usedStoryIds": [],
+          "factCheck": "NOT_APPLICABLE",
+          "detectedBy": "MODEL"
+        },
+        {
+          "issueId": "issue-2",
+          "sourceSpan": {
+            "startChar": 71,
+            "endChar": 81
+          },
+          "originalText": "결과가 좋았습니다.",
+          "issueType": "MISSING_RESULT",
+          "reason": "결과가 구체적이지 않아요.",
+          "improvementAction": "결과를 확인할 수 있게 적어 주세요.",
+          "needsUserConfirmation": true,
+          "questions": [
+            "수정 예시에 넣을 숫자·기간·날짜가 있다면 실제 값을 알려 주세요."
+          ],
+          "usedStoryIds": [],
+          "factCheck": "REJECTED",
+          "detectedBy": "MODEL"
+        }
+      ],
+      "missingQuestions": [
+        "스터디 결과를 어떻게 확인했나요?"
+      ],
+      "charCount": {
+        "withSpaces": 81,
+        "withoutSpaces": 65,
+        "utf8Bytes": 197,
+        "maxCharacters": 500,
+        "overLimit": false
+      },
+      "postingBasis": {
+        "mode": "POSTING",
+        "jobPostingId": "job-demo-busan-001",
+        "snapshotId": "20261120-10c26293",
+        "analysisId": "analysis-0001",
+        "requirementNames": [
+          "SQL 데이터 추출",
+          "Python 분석",
+          "시각화 도구"
+        ]
+      },
+      "warnings": [
+        {
+          "code": "DRAFT_NOTICE",
+          "message": "첨삭은 제안이에요. 제출 전에 내용이 사실인지 꼭 확인해 주세요."
+        },
+        {
+          "code": "FACT_CHECK",
+          "message": "수정 예시에 원문에서 확인되지 않는 내용이 있어 예시 대신 확인 질문을 드려요."
+        }
+      ]
+    }
+  }
+}

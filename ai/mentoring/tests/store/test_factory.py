@@ -80,3 +80,14 @@ def test_factory_wires_job_fit_dependencies_only_when_configured(monkeypatch):
     assert isinstance(deps.catalog, DynamoCatalogReader)
     assert isinstance(deps.ncs, DynamoReferenceLookup)
     assert isinstance(deps.knowledge, KnowledgeRetriever)
+
+
+def test_factory_wires_review_and_learning_dependencies(monkeypatch):
+    from mentoring.store.results import DynamoExamSchedules, DynamoResultStore
+
+    _set_required_env(monkeypatch)
+    monkeypatch.delenv("TABLE_CACHE", raising=False)
+    deps = build_aws_deps()
+    assert isinstance(deps.results, DynamoResultStore) and deps.exams is None
+    monkeypatch.setenv("TABLE_CACHE", "cache")
+    assert isinstance(build_aws_deps().exams, DynamoExamSchedules)

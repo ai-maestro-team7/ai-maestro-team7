@@ -21,6 +21,8 @@ from ..errors import MentoringError, invalid_input, not_implemented, unauthorize
 from ..models import ConfirmRequest, TextDocumentRequest, UploadUrlRequest
 from ..fit.analysis import analysis_view, create_analysis, get_analysis
 from ..fit.records import AnalysisRequest
+from ..learning import LearningPathRequest, create_learning_path, get_learning_path
+from ..review import ReviewRequest, create_review, get_review
 from ..stories import AnswerStoryRequest, CreateStoryRequest, get_story, list_stories
 from ..stories.flow import start_story, story_view, update_story
 from . import errors
@@ -160,10 +162,31 @@ def rest_get_analysis(analysis_id: str):
     return analysis_view(get_analysis(_deps(), _user_id(), _id(analysis_id, "analysisId")))
 
 
+# ---------------------------------------------------------------- 첨삭 (Req 9~11)·학습 경로 (Req 12~14)
+@app.post(f"{PREFIX}/reviews")
+def rest_create_review():
+    body = create_review(_deps(), _user_id(), _body(ReviewRequest), _header("Idempotency-Key"))
+    return _json(202, body)
+
+
+@app.get(f"{PREFIX}/reviews/<review_id>")
+def rest_get_review(review_id: str):
+    return get_review(_deps(), _user_id(), _id(review_id, "reviewId"))
+
+
+@app.post(f"{PREFIX}/learning-paths")
+def rest_create_learning_path():
+    body = create_learning_path(_deps(), _user_id(), _body(LearningPathRequest), _header("Idempotency-Key"))
+    return _json(202, body)
+
+
+@app.get(f"{PREFIX}/learning-paths/<learning_path_id>")
+def rest_get_learning_path(learning_path_id: str):
+    return get_learning_path(_deps(), _user_id(), _id(learning_path_id, "learningPathId"))
+
+
 # ---------------------------------------------------------------- 아직 만들지 않은 경로 (개발계획서1 §6.1)
 _LATER = [
-    ("POST", "/reviews"), ("GET", "/reviews/<review_id>"),
-    ("POST", "/learning-paths"), ("GET", "/learning-paths/<learning_path_id>"),
     ("POST", "/agent/chat"), ("GET", "/health/readiness"),
 ]
 

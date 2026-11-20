@@ -1,0 +1,279 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/learning-paths/path-0003"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "schemaVersion": "1.0",
+      "learningPathId": "path-0003",
+      "status": "COMPLETED",
+      "taskId": "task-path-0003",
+      "analysisId": "analysis-0001",
+      "version": 1,
+      "ncsCode": "20010105",
+      "ncsName": "빅데이터분석",
+      "weeklyStudyHours": 8,
+      "preferredFormat": "HYBRID",
+      "startDate": "2026-11-21",
+      "targetDate": "2027-01-16",
+      "totalWeeks": 8,
+      "totalHours": 64,
+      "estimated": true,
+      "targets": [
+        {
+          "targetId": "t-1",
+          "kind": "STRENGTHEN_EVIDENCE",
+          "name": "SQL 데이터 추출",
+          "category": "REQUIRED",
+          "requirementId": "req-1"
+        },
+        {
+          "targetId": "t-2",
+          "kind": "NCS_UNIT",
+          "name": "빅데이터 분석 기획",
+          "ncsUnitCode": "2001010501_23v2"
+        },
+        {
+          "targetId": "t-3",
+          "kind": "NCS_UNIT",
+          "name": "빅데이터 처리",
+          "ncsUnitCode": "2001010502_23v2"
+        }
+      ],
+      "verificationTasks": [],
+      "weeks": [
+        {
+          "week": 1,
+          "startDate": "2026-11-21",
+          "targetIds": [
+            "t-1"
+          ],
+          "goals": [
+            "1주차 학습 목표"
+          ],
+          "activities": [
+            "1주차 짧은 실습"
+          ],
+          "deliverable": "1주차 실습 기록",
+          "estimatedHours": 8,
+          "officialSources": []
+        },
+        {
+          "week": 2,
+          "startDate": "2026-11-28",
+          "targetIds": [
+            "t-1"
+          ],
+          "goals": [
+            "2주차 학습 목표"
+          ],
+          "activities": [
+            "2주차 짧은 실습"
+          ],
+          "deliverable": "2주차 실습 기록",
+          "estimatedHours": 8,
+          "officialSources": []
+        },
+        {
+          "week": 3,
+          "startDate": "2026-12-05",
+          "targetIds": [
+            "t-1"
+          ],
+          "goals": [
+            "3주차 학습 목표"
+          ],
+          "activities": [
+            "3주차 짧은 실습"
+          ],
+          "deliverable": "3주차 실습 기록",
+          "estimatedHours": 8,
+          "officialSources": []
+        },
+        {
+          "week": 4,
+          "startDate": "2026-12-12",
+          "targetIds": [
+            "t-2"
+          ],
+          "goals": [
+            "4주차 학습 목표"
+          ],
+          "activities": [
+            "4주차 짧은 실습"
+          ],
+          "deliverable": "4주차 실습 기록",
+          "estimatedHours": 8,
+          "officialSources": [
+            {
+              "type": "NCS_UNIT",
+              "unitCode": "2001010501_23v2",
+              "name": "빅데이터 분석 기획"
+            }
+          ]
+        },
+        {
+          "week": 5,
+          "startDate": "2026-12-19",
+          "targetIds": [
+            "t-2"
+          ],
+          "goals": [
+            "5주차 학습 목표"
+          ],
+          "activities": [
+            "5주차 짧은 실습"
+          ],
+          "deliverable": "5주차 실습 기록",
+          "estimatedHours": 8,
+          "officialSources": [
+            {
+              "type": "NCS_UNIT",
+              "unitCode": "2001010501_23v2",
+              "name": "빅데이터 분석 기획"
+            }
+          ]
+        },
+        {
+          "week": 6,
+          "startDate": "2026-12-26",
+          "targetIds": [
+            "t-2"
+          ],
+          "goals": [
+            "6주차 학습 목표"
+          ],
+          "activities": [
+            "6주차 짧은 실습"
+          ],
+          "deliverable": "6주차 실습 기록",
+          "estimatedHours": 8,
+          "officialSources": [
+            {
+              "type": "NCS_UNIT",
+              "unitCode": "2001010501_23v2",
+              "name": "빅데이터 분석 기획"
+            }
+          ]
+        },
+        {
+          "week": 7,
+          "startDate": "2027-01-02",
+          "targetIds": [
+            "t-3"
+          ],
+          "goals": [
+            "7주차 학습 목표"
+          ],
+          "activities": [
+            "7주차 짧은 실습"
+          ],
+          "deliverable": "7주차 실습 기록",
+          "estimatedHours": 8,
+          "officialSources": [
+            {
+              "type": "NCS_UNIT",
+              "unitCode": "2001010502_23v2",
+              "name": "빅데이터 처리"
+            }
+          ]
+        },
+        {
+          "week": 8,
+          "startDate": "2027-01-09",
+          "targetIds": [
+            "t-3"
+          ],
+          "goals": [
+            "8주차 학습 목표"
+          ],
+          "activities": [
+            "8주차 짧은 실습"
+          ],
+          "deliverable": "8주차 실습 기록",
+          "estimatedHours": 8,
+          "officialSources": [
+            {
+              "type": "NCS_UNIT",
+              "unitCode": "2001010502_23v2",
+              "name": "빅데이터 처리"
+            }
+          ]
+        }
+      ],
+      "certificates": [
+        {
+          "qualificationCode": "G521",
+          "name": "사회조사분석사2급",
+          "examAgency": "가상 시행기관",
+          "linkedUnitCodes": [
+            "2001010501_23v2",
+            "2001010502_23v2"
+          ],
+          "reason": "학습 대상 NCS 능력단위와 공식 연계된 자격이에요. 이 공고의 필수 자격은 아니에요.",
+          "requiredByPosting": false,
+          "schedule": [
+            {
+              "round": "제4회",
+              "dates": {
+                "writtenRegistrationStart": "2026-11-24",
+                "writtenRegistrationEnd": "2026-11-27",
+                "writtenExamStart": "2026-12-05",
+                "writtenResultDate": "2026-12-15",
+                "practicalExamStart": "2026-12-12",
+                "finalResultDate": "2026-12-23"
+              },
+              "resultAfterPostingDeadline": true
+            }
+          ],
+          "verificationStatus": "VERIFIED",
+          "officialUrl": "https://www.data.go.kr/data/example",
+          "checkedAt": "2026-11-21T06:00:00+09:00"
+        }
+      ],
+      "courses": [],
+      "sourceVerificationStatus": {
+        "qualifications": "REFERENCE_DATA",
+        "examSchedule": "VERIFIED",
+        "courses": "NOT_CONNECTED"
+      },
+      "relatedLinks": [
+        {
+          "type": "POLICY_WALLET",
+          "path": "/policies",
+          "label": "부산 청년 지원 정책은 정책 지갑에서 확인해요"
+        },
+        {
+          "type": "EXAM_GUIDE",
+          "url": "https://www.q-net.or.kr",
+          "label": "국가자격 시험 공식 안내"
+        }
+      ],
+      "warnings": [
+        {
+          "code": "ESTIMATED",
+          "message": "기간과 시간은 주당 학습 시간으로 계산한 추정이에요. NCS 훈련시간은 참고값이에요."
+        },
+        {
+          "code": "NO_LIVE_COURSES",
+          "message": "모집 중인 교육과정은 아직 연결하지 않았어요. 실습 계획만 드려요."
+        },
+        {
+          "code": "NCS_LINK_NOTE",
+          "message": "추천 자격은 NCS 능력단위와 연계된 자격이에요. 이 공고의 필수 자격이라는 뜻은 아니에요."
+        },
+        {
+          "code": "RESULT_AFTER_DEADLINE",
+          "message": "일부 시험은 합격 발표가 공고 마감 뒤예요. 공고의 자격 인정 기준일을 확인해 주세요."
+        }
+      ],
+      "modelId": "mock-fit",
+      "promptVersion": "learning-v1",
+      "createdAt": "2026-11-21T10:00:00+09:00",
+      "updatedAt": "2026-11-21T10:00:00+09:00",
+      "completedAt": "2026-11-21T10:00:00+09:00"
+    }
+  }
+}

@@ -22,6 +22,7 @@ from mentoring.text_tools import load_text_tools
 from .dispatch import LambdaTaskDispatcher
 from .dynamo import DynamoUserRepo
 from .reference_adapter import ReferenceUnitAdapter
+from .results import DynamoExamSchedules, DynamoResultStore
 from .s3 import S3ObjectStore
 
 
@@ -81,6 +82,10 @@ def build_aws_deps(
         catalog = DynamoCatalogReader(dynamodb.Table(catalog_table))
     if os.environ.get("KB_ID", "").strip():
         knowledge = KnowledgeRetriever.from_environment()
+    exams = None
+    cache_table = os.environ.get("TABLE_CACHE", "").strip()  # 시험일정 캐시 (#95가 매일 채움)
+    if cache_table:
+        exams = DynamoExamSchedules(dynamodb.Table(cache_table))
 
     return Deps(
         config=config or get_config(),
@@ -96,6 +101,8 @@ def build_aws_deps(
         catalog=catalog,
         ncs=ncs,
         knowledge=knowledge,
+        results=DynamoResultStore(table),
+        exams=exams,
         # eligibility는 백엔드가 backend/eligibility.py의 evaluate_eligibility로 넣는다 (BE-8, D-11)
         # 텍스트 레이어 먼저, 부족할 때만 Textract OCR (이슈 #41 결정). OCR은 career-docs 원본을 직접 읽는다
         extractor=PdfExtractor(ocr=TextractOcr(_client("textract", region)), bucket=bucket),

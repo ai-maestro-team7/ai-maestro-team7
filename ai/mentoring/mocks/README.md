@@ -12,6 +12,22 @@
 
 `REQUIRES_USER_REVIEW`는 실패가 아니라 사용자 확인이 필요한 상태다. 해당 근거에는 “확인 필요”를 표시하고 원문 근거를 여는 버튼은 “근거 보기”로 쓴다.
 
+이어지는 화면 (모두 202 → 2초마다 GET, 상태가 `PENDING`·`PROCESSING`이 아니면 멈춤)
+
+| 화면 | 요청 | 가짜 응답 |
+|---|---|---|
+| PDF 업로드 | `POST /documents/upload-url` → 브라우저가 `uploadUrl`로 PUT → `POST /documents/{id}/complete` | `POST_documents_upload_url` |
+| 경험 블록 | `POST /stories`(201, 질문 최대 3개) · `GET /stories` · `PATCH /stories/{id}` | `POST_stories`, `GET_stories`, `PATCH_stories_id` |
+| 직무 적합도 | `POST /analyses` `{profileId, jobPostingId 또는 targetNcsCode}` → `GET /analyses/{id}` | `POST_analyses`, `GET_analyses_id_PENDING`, `GET_analyses_id_COMPLETED` |
+| 첨삭 | `POST /reviews` `{inputText 또는 documentId, analysisId?, questionText?, maxCharacters?, storyIds?}` → `GET /reviews/{id}` | `POST_reviews`, `GET_reviews_id_COMPLETED` |
+| 학습 경로 | `POST /learning-paths` `{analysisId, weeklyStudyHours, targetDate?}` → `GET /learning-paths/{id}` | `POST_learning_paths`, `GET_learning_paths_id_COMPLETED` |
+
+- 적합도: `eligibility`를 점수보다 먼저 보여 준다. `unverifiedSkills[].question`은 "확인 질문"으로 보여 준다.
+- 첨삭: 각 `issues[]`의 `sourceSpan`으로 원문에 밑줄을 긋는다. `factCheck: REJECTED`이면 수정 예시 대신 `questions`를 보여 준다.
+  제안일 뿐이라 원문을 자동으로 바꾸지 않는다.
+- 학습 경로: `verificationTasks`(먼저 확인할 것)를 주차 계획보다 앞에 둔다. 자격의 `verificationStatus: SCHEDULE_UNVERIFIED`이면
+  날짜 대신 `officialUrl`만 보여 준다. 기간·시간에는 "추정"을 붙인다.
+
 ## 문구와 상태
 
 - 적합도 화면에는 “적합도는 실제 합격 확률이 아닙니다”를 함께 표시한다.

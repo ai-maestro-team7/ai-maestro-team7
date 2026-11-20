@@ -1,0 +1,20 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/stories"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "stories": [
+        {
+          "storyId": "story-0001",
+          "title": "가상 고객 인터뷰 프로젝트",
+          "status": "QUESTIONS_READY",
+          "latestVersion": 2,
+          "updatedAt": "2026-11-21T10:00:00+09:00"
+        }
+      ]
+    }
+  }
+}

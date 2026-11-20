@@ -44,5 +44,46 @@
     "summaryMaxChars": 500,
     "bannedSummaryPatterns": ["합격\\s*(확률|가능성|률)", "합격에\\s*유리", "붙을\\s*(확률|가능성)", "\\d+\\s*%", "퍼센트"],
     "notice": "적합도는 실제 합격 확률이 아닙니다"
+  },
+  "review": {
+    "promptVersion": "review-v1",
+    "maxTokens": 4096,
+    "schemaRetries": 1,
+    "textMinChars": 50,
+    "textMaxChars": 10000,
+    "questionMaxChars": 300,
+    "maxCharactersLimit": 5000,
+    "maxIssues": 8,
+    "maxQuestions": 3,
+    "maxStories": 5,
+    "intents": ["MOTIVATION", "JOB_EXPERIENCE", "COLLABORATION", "CONFLICT", "PROBLEM_SOLVING", "GROWTH", "OTHER"],
+    "issueTypes": ["MISSING_ACTION", "MISSING_RESULT", "VAGUE_ROLE", "WEAK_JOB_RELEVANCE", "LOGIC", "FACT_CONSISTENCY", "LENGTH", "BLIND_RISK", "OTHER"],
+    "blindRiskPatterns": ["\\d{2}\\s*(세|살)", "(남자|여자|남성|여성)(로서|으로서|이라)", "(아버지|어머니|부모님)(께서|의 직업|는 [가-힣]+(사|원|님))", "[가-힣]+(시|도|군) 출신", "[가-힣]+(대학교|고등학교)"]
+  },
+  "learning": {
+    "promptVersion": "learning-v1",
+    "maxTokens": 3000,
+    "schemaRetries": 1,
+    "defaultWeeks": 8,
+    "minWeeks": 1,
+    "maxWeeks": 26,
+    "maxTargets": 8,
+    "maxUnitsPerPosting": 4,
+    "maxCertificates": 5,
+    "examLookaheadYears": 1,
+    "examDateFields": {
+      "docRegStartDt": "writtenRegistrationStart",
+      "docRegEndDt": "writtenRegistrationEnd",
+      "docExamStartDt": "writtenExamStart",
+      "docExamEndDt": "writtenExamEnd",
+      "docPassDt": "writtenResultDate",
+      "pracRegStartDt": "practicalRegistrationStart",
+      "pracRegEndDt": "practicalRegistrationEnd",
+      "pracExamStartDt": "practicalExamStart",
+      "pracExamEndDt": "practicalExamEnd",
+      "pracPassDt": "finalResultDate"
+    },
+    "examGuideUrl": "https://www.q-net.or.kr",
+    "policyWalletPath": "/policies"
   }
 }

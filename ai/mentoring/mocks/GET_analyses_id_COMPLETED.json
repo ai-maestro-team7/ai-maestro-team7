@@ -1,0 +1,158 @@
+{
+  "request": {
+    "method": "GET",
+    "path": "/analyses/analysis-0001"
+  },
+  "response": {
+    "status": 200,
+    "body": {
+      "analysisId": "analysis-0001",
+      "status": "COMPLETED",
+      "taskId": "task-analysis-0001-fit",
+      "assessmentMode": "POSTING",
+      "profileId": "profile-1",
+      "profileVersion": 1,
+      "createdAt": "2026-11-21T10:00:00+09:00",
+      "updatedAt": "2026-11-21T10:00:00+09:00",
+      "posting": {
+        "jobPostingId": "job-demo-busan-001",
+        "snapshotId": "20261120-10c26293",
+        "title": "데이터 분석 신입",
+        "organization": "가상 데이터랩 부산",
+        "officialUrl": "https://example.com/postings/job-demo-busan-001",
+        "closesAt": "2026-12-04",
+        "isExpired": false,
+        "checkedAt": "2026-11-20T04:30:00+09:00"
+      },
+      "ncs": {
+        "code": "20010105",
+        "name": "빅데이터분석"
+      },
+      "eligibility": {
+        "status": "ELIGIBLE",
+        "ruleVersion": "elig-test",
+        "conditions": [
+          {
+            "ruleId": "rule-1",
+            "type": "CERTIFICATE",
+            "result": "MET",
+            "reason": "CERTIFICATE MET",
+            "sourceQuote": "데이터분석 준전문가(ADsP) 소지자"
+          }
+        ]
+      },
+      "scoreType": "DOCUMENT_BASED_MATCH",
+      "scoreStatus": "SCORED",
+      "fitScore": 81,
+      "potentialUpperBound": 81,
+      "scorePolicyVersion": "fit-v1",
+      "categoryBreakdown": {
+        "REQUIRED": {
+          "lowerBound": 0.75,
+          "upperBound": 0.75,
+          "requirementCount": 2
+        },
+        "PREFERRED": {
+          "lowerBound": 1.0,
+          "upperBound": 1.0,
+          "requirementCount": 1
+        }
+      },
+      "strengths": [
+        {
+          "requirementId": "req-2",
+          "name": "Python 분석",
+          "category": "REQUIRED",
+          "evidenceLevel": "EVIDENCED",
+          "sourceQuote": "Python 기반 데이터 분석 가능자",
+          "evidenceIds": [
+            "ev-1"
+          ],
+          "evidence": [
+            {
+              "evidenceId": "ev-1",
+              "quotedText": "Python pandas로 결측치를 처리하고 정류장별 이용량을 집계했습니다."
+            }
+          ],
+          "skills": [
+            "데이터 전처리"
+          ]
+        },
+        {
+          "requirementId": "req-3",
+          "name": "시각화 도구",
+          "category": "PREFERRED",
+          "evidenceLevel": "EVIDENCED",
+          "sourceQuote": "Tableau 등 시각화 도구 사용 경험 우대",
+          "evidenceIds": [
+            "ev-2"
+          ],
+          "evidence": [
+            {
+              "evidenceId": "ev-2",
+              "quotedText": "분석 결과를 Tableau 대시보드로 만들어 발표했습니다."
+            }
+          ],
+          "skills": [
+            "데이터 시각화"
+          ]
+        }
+      ],
+      "partialEvidence": [
+        {
+          "requirementId": "req-1",
+          "name": "SQL 데이터 추출",
+          "category": "REQUIRED",
+          "evidenceLevel": "PARTIAL",
+          "sourceQuote": "SQL을 활용한 데이터 추출 및 가공 경험",
+          "evidenceIds": [
+            "ev-3"
+          ],
+          "evidence": [
+            {
+              "evidenceId": "ev-3",
+              "quotedText": "교내 데이터 분석 동아리에서 SQL 스터디를 1년 동안 운영했습니다."
+            }
+          ],
+          "skills": [
+            "SQL"
+          ]
+        }
+      ],
+      "unverifiedSkills": [],
+      "confirmedGaps": [],
+      "summary": "SQL과 Python 분석 경험이 공고 요건과 연결돼요. SQL은 본인 역할을 더 적어 주시면 좋아요.",
+      "sources": [
+        {
+          "documentId": "job_profile_20010105_빅데이터분석",
+          "documentType": "ncs_job_profile",
+          "role": "NCS_JOB_PROFILE",
+          "sourceUrl": "https://www.data.go.kr/data/15175388/fileData.do",
+          "checkedAt": "2026-11-20",
+          "excerpt": "빅데이터분석은 데이터를 수집·처리한다.",
+          "retrievedAt": "2026-11-21T10:00:00+09:00"
+        },
+        {
+          "documentId": "team_career_mentoring_methodology_v1",
+          "documentType": "career_mentoring_methodology",
+          "role": "GUIDANCE",
+          "sourceUrl": "https://example.com/method",
+          "checkedAt": "2026-11-20",
+          "excerpt": "경험은 STAR로 정리한다.",
+          "retrievedAt": "2026-11-21T10:00:00+09:00"
+        }
+      ],
+      "warnings": [
+        {
+          "code": "NOT_PROBABILITY",
+          "message": "적합도는 실제 합격 확률이 아닙니다"
+        }
+      ],
+      "modelId": "mock-fit",
+      "promptVersion": "job-fit-link-v1+job-fit-summary-v1",
+      "schemaVersion": "1.0",
+      "completedAt": "2026-11-21T10:00:00+09:00",
+      "sourceCheckedAt": "2026-11-20T04:30:00+09:00"
+    }
+  }
+}

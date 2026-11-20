@@ -1,0 +1,22 @@
+{
+  "request": {
+    "method": "POST",
+    "path": "/documents/upload-url",
+    "body": {
+      "fileName": "resume.pdf",
+      "contentType": "application/pdf",
+      "sizeBytes": 184000,
+      "documentType": "RESUME"
+    }
+  },
+  "response": {
+    "status": 201,
+    "body": {
+      "documentId": "doc-0001",
+      "version": 1,
+      "status": "PENDING",
+      "uploadUrl": "https://upload.invalid/c4046e025c0dd62d?expires=300",
+      "expiresInSeconds": 300
+    }
+  }
+}

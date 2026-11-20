@@ -79,6 +79,46 @@ class JobFitConfig(_ConfigModel):
     notice: str = Field(min_length=1)  # "적합도는 실제 합격 확률이 아닙니다" (docs/api.md §6.3)
 
 
+class ReviewConfig(_ConfigModel):
+    """자기소개서·이력서 첨삭 (개발계획서1 F-03, mentoring-fit-review-learning Requirement 9~11)."""
+    prompt_version: str = Field(min_length=1)
+    max_tokens: int = Field(ge=256)
+    schema_retries: int = Field(ge=0, le=2)
+    text_min_chars: int = Field(ge=1)
+    text_max_chars: int = Field(ge=1)
+    question_max_chars: int = Field(ge=1)
+    max_characters_limit: int = Field(ge=1)  # 요청 maxCharacters의 상한
+    max_issues: int = Field(ge=1)
+    max_questions: int = Field(ge=1, le=3)   # STAR가 빠졌을 때 묻는 확인 질문 수 (패키지 03 절차 4)
+    max_stories: int = Field(ge=0)
+    intents: list[str] = Field(min_length=1)       # 문항 의도 (F-03 처리 3단계)
+    issue_types: list[str] = Field(min_length=1)
+    blind_risk_patterns: list[str] = Field(default_factory=list)  # 직무와 무관한 개인정보 (F-03 "블라인드 공채")
+
+
+class LearningConfig(_ConfigModel):
+    """학습·자격 경로 (개발계획서1 F-05, mentoring-fit-review-learning Requirement 12~14)."""
+    prompt_version: str = Field(min_length=1)
+    max_tokens: int = Field(ge=256)
+    schema_retries: int = Field(ge=0, le=2)
+    default_weeks: int = Field(ge=1)
+    min_weeks: int = Field(ge=1)
+    max_weeks: int = Field(ge=1)
+    max_targets: int = Field(ge=1)
+    max_units_per_posting: int = Field(ge=0)
+    max_certificates: int = Field(ge=0)
+    exam_lookahead_years: int = Field(ge=0, le=2)
+    exam_date_fields: dict[str, str] = Field(min_length=1)  # 공단 시험일정 원본 칸 → 우리 칸 (#95 수집 형식)
+    exam_guide_url: str = Field(min_length=1)               # 일정을 확인하지 못했을 때 붙이는 공식 안내
+    policy_wallet_path: str = Field(min_length=1)           # 부산 청년정책은 B 정책 지갑으로 안내 (M-10)
+
+    @model_validator(mode="after")
+    def _weeks(self):
+        if not self.min_weeks <= self.default_weeks <= self.max_weeks:
+            raise ValueError("learning: minWeeks ≤ defaultWeeks ≤ maxWeeks 이어야 한다")
+        return self
+
+
 class MentoringConfig(_ConfigModel):
     config_version: str
     document: DocumentConfig
@@ -88,6 +128,8 @@ class MentoringConfig(_ConfigModel):
     upload: UploadConfig
     metrics: MetricsConfig
     job_fit: JobFitConfig
+    review: ReviewConfig
+    learning: LearningConfig
 
 
 def load_config(path: Path | str | None = None, *, data: dict | None = None) -> MentoringConfig:
