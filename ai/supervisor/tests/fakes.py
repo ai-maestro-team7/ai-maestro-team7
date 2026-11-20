@@ -52,15 +52,19 @@ class FakeOpportunities:
 
 
 class FakeDocs:
-    def __init__(self, documents=None, terms=None):
+    def __init__(self, documents=None, terms=None, summary=None):
         self.documents = list(documents or [])
         self.terms = list(terms or [])
+        self.summary = dict(summary or {})
 
     def latest_documents(self, user_id):
         return [d for d in self.documents if d.document_id.startswith(user_id + ":") or ":" not in d.document_id]
 
     def resume_terms(self, user_id):
         return list(self.terms)
+
+    def career_summary(self, user_id):
+        return dict(self.summary)
 
 
 class FakeProfiles:
@@ -102,9 +106,9 @@ def cover_letter(doc_id="doc-cl", status="COMPLETED", has_text=True):
                         has_text=has_text, updated_at="2026-11-20T10:00:00+09:00")
 
 
-def build_deps(runner, *, documents=None, terms=None, profiles=None):
+def build_deps(runner, *, documents=None, terms=None, profiles=None, summary=None):
     clock = {"now": NOW}
-    deps = Deps(store=MemoryChatStore(), opportunities=FakeOpportunities(), docs=FakeDocs(documents, terms),
+    deps = Deps(store=MemoryChatStore(), opportunities=FakeOpportunities(), docs=FakeDocs(documents, terms, summary),
                 profiles=FakeProfiles(profiles if profiles is not None else {"demo1": {
                     "desiredJobs": [{"name": "데이터 분석", "ncsCode": "20010105"}], "desiredRegion": "26"}}),
                 runner=runner, dispatcher=Dispatcher(), model_id="test-model", now=lambda: clock["now"])

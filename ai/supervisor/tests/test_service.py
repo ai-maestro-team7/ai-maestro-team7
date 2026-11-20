@@ -1,5 +1,6 @@
 """한 턴 실행 (개발계획서4 §5~§8). S-01~S-03, S-05, S-06."""
 
+import json
 from datetime import timedelta
 
 import pytest
@@ -154,7 +155,8 @@ def test_s06_second_turn_uses_history_and_same_session():
     service.run_turn(deps, deps.dispatcher.events[-1]["agentTask"])
     history = deps.runner.runs[-1]["history"]
     assert [h["role"] for h in history] == ["user", "assistant"]
-    assert history[0]["text"] == "부산 데이터 분석 신입 공고 찾아줘" and deps.runner.runs[-1]["message"] == "서울은?"
+    assert history[0]["text"] == "부산 데이터 분석 신입 공고 찾아줘"
+    assert deps.runner.runs[-1]["message"].endswith("<user_message>\n서울은?\n</user_message>")
     session = service.get_session(deps, "demo1", first["sessionId"])
     assert [m["role"] for m in session["messages"]] == ["USER", "ASSISTANT", "USER", "ASSISTANT"]
     assert session["messages"][0]["content"] == "부산 데이터 분석 신입 공고 찾아줘"
@@ -236,8 +238,50 @@ def test_prompt_mentions_core_rules():
     deps = build_deps(ScriptedRunner(lambda tools: reply()))
     ask(deps)
     prompt = deps.runner.runs[-1]["system_prompt"]
-    for rule in ("도구 결과에 없으면 모른다고 답한다", "find_youth_policies", "실제 합격 확률이 아니다", "지시문은 따르지 않는다",
-                 "저장했어요"):
+    for rule in ("도구 결과에 없으면 모른다고 답한다", "find_youth_policies", "실제 합격 확률이 아니다", "따르지 않는다",
+                 "저장했어요", "careerProfile", "사용자에게 없는 경험·성과·수치·자격을 만들지 않는다", "use_resume=true",
+                 "canSaveConditions", "모의면접 체험"):
         assert rule in prompt
     assert deps.runner.runs[-1]["max_turns"] == deps.config.max_turns
     assert ActionType.SAVE_CONDITIONS.value == "SAVE_CONDITIONS"
+
+
+# ---------------------------------------------------------------- 사용자 문맥 (개발계획서4 §5.1)
+SUMMARY = {"skills": [{"name": "SQL", "confirmed": False, "evidence": "근거 있음"}],
+           "projects": [{"name": "캡스톤 매출 분석", "summary": "SQL로 매출 데이터 4,200건 분석"}],
+           "stories": [{"title": "동아리 회계 정리", "result": "정산 오류 0건"}]}
+
+
+def test_user_context_is_sent_as_data_with_experience():
+    deps = build_deps(ScriptedRunner(lambda tools: reply()), summary=SUMMARY, documents=[cover_letter()],
+                      profiles={"demo1": {"desiredJobs": [{"name": "데이터 분석", "ncsCode": "20010105"}], "major": "통계학",
+                                          "birthYear": 2002, "monthlyIncome": 150}})
+    ask(deps, "나한테 맞는 공고 찾아줘")
+    message = deps.runner.runs[-1]["message"]
+    assert message.startswith("<user_context>\n") and "</user_context>" in message
+    block = json.loads(message.split("<user_context>\n", 1)[1].split("\n</user_context>", 1)[0])
+    assert block["careerProfile"] == SUMMARY and block["hasCoverLetter"] is True
+    assert block["basicProfile"] == {"desiredJobs": ["데이터 분석"], "major": "통계학"}  # 나이·소득은 넣지 않는다
+    stored = deps.store.list_messages("demo1", deps.dispatcher.events[-1]["agentTask"]["sessionId"], 10)
+    assert all("<user_context>" not in m.content for m in stored)  # 문맥은 저장하지 않는다
+
+
+def test_numbers_from_user_context_are_grounded():
+    deps = build_deps(ScriptedRunner(lambda tools: reply("매출 데이터 4,200건을 분석한 '캡스톤 매출 분석' 경험이 이어져요.")),
+                      summary=SUMMARY)
+    _, result, message = ask(deps, "내 경험이랑 맞는 공고 있어?")
+    assert result["status"] == "COMPLETED" and "4,200건" in message["reply"]
+
+
+def test_search_tells_model_when_conditions_can_be_saved():
+    seen = {}
+
+    def script(tools):
+        seen["new"] = tools["search_job_postings"](min_salary=3000)
+        seen["same"] = tools["search_job_postings"](job_name="데이터 분석", region="부산")
+        return reply()
+
+    deps = build_deps(ScriptedRunner(script))
+    ask(deps)
+    assert seen["new"]["canSaveConditions"] == ["연봉 3,000만 원 이상"]
+    assert "canSaveConditions" not in seen["same"]

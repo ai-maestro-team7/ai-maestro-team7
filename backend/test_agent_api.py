@@ -142,6 +142,30 @@ def main():
     stored = table.get_item(Key={"PK": "USER#demo1", "SK": f"CHAT#{sid}#{mid}"})["Item"]
     check("toolCalls에는 이름·성공·시간만", all(set(c) == {"name", "ok", "durationMs"} for c in stored["toolCalls"]))
 
+    # 5-1. 이력서·경험 요약이 모델 문맥으로 간다 (개발계획서4 §5.1). 원문·인용문은 빠진다
+    table.put_item(Item={"PK": "USER#demo1", "SK": "PROFILE#LATEST", "latestProfileId": "p-1", "latestVersion": 1})
+    table.put_item(Item={"PK": "USER#demo1", "SK": "PROFILE#p-1#V#0001", "profileId": "p-1", "profileVersion": 1,
+                         "skills": [{"name": "SQL", "factStatus": "VERIFIED", "evidenceLevel": "EVIDENCED"},
+                                    {"name": "Tableau", "factStatus": "NEEDS_CONFIRMATION", "evidenceLevel": "SELF_REPORTED"},
+                                    {"name": "Java", "factStatus": "VERIFIED", "evidenceLevel": "USER_CONFIRMED_GAP"}],
+                         "projects": [{"name": "캡스톤 매출 분석", "summary": "SQL로 매출 데이터 분석", "factStatus": "NEEDS_CONFIRMATION"}],
+                         "evidence": [{"quotedText": "이력서 원문 인용"}], "needsConfirmation": ["통계 분석 경험"]})
+    table.put_item(Item={"PK": "USER#demo1", "SK": "STORY_LATEST#st-1", "storyId": "st-1", "latestVersion": 1,
+                         "updatedAt": "2026-11-20T09:00:00+09:00"})
+    table.put_item(Item={"PK": "USER#demo1", "SK": "STORY#st-1#V#0001", "storyId": "st-1", "version": 1,
+                         "title": "동아리 회계 정리", "rawExperience": "원문 경험 전체", "result": "정산 오류 0건"})
+    runner.script = lambda tools: "SQL을 쓴 캡스톤 매출 분석 경험이 데이터 분석 공고와 이어져요."
+    s, b = call("POST", "/api/v1/agent/chat", {"sessionId": sid, "message": "내 경험이랑 맞는 공고 있어?"})
+    context = runner.runs[-1]["message"]
+    check("모델 문맥에 역량·프로젝트·경험 블록", all(t in context for t in ("SQL", "Tableau", "캡스톤 매출 분석", "동아리 회계 정리", "정산 오류 0건")))
+    check("원문·인용문·미보유 확인 역량은 문맥에서 뺀다",
+          "이력서 원문 인용" not in context and "원문 경험 전체" not in context and "Java" not in context)
+    check("확인 여부를 구분해 넘긴다", '"name":"SQL","confirmed":true' in context and '"name":"Tableau","confirmed":false' in context)
+    check("CHAT_MODEL_ID가 없으면 MODEL_ID", agent_api.model_id() == "test-model")
+    os.environ["CHAT_MODEL_ID"] = "chat-model"
+    check("CHAT_MODEL_ID가 있으면 그 값", agent_api.model_id() == "chat-model")
+    os.environ.pop("CHAT_MODEL_ID")
+
     # 6. 비동기 이벤트 입구 (같은 작업 두 번 → 한 번만)
     out = lambda_handler({"agentTask": {"userId": "demo1", "sessionId": sid, "messageId": mid}}, None)
     check("agentTask 이벤트: 끝난 턴은 SKIPPED", out["status"] == "SKIPPED")

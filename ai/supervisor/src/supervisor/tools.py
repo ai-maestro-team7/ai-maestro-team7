@@ -219,7 +219,13 @@ class TurnTools:
             applied.append("이력서 역량 함께 사용" if terms else "이력서 역량 없음 (분석 전이거나 이력서가 없어요)")
         saved_job = next((j.get("name") for j in saved.get("desiredJobs") or [] if j.get("name")), None)
         self.record.search = SearchRecord(feed=feed, chat_conditions=chat, job_name=job or saved_job)
-        return {**feed, "appliedConditions": applied}
+        result = {**feed, "appliedConditions": applied}
+        from .compose import profile_patch  # 순환 import 방지
+
+        patch, labels = profile_patch(self.deps, chat, saved) if chat else ({}, [])
+        if patch:
+            result["canSaveConditions"] = labels  # 화면에 [저장하기]가 뜬다. 모델은 한 번 묻기만 한다
+        return result
 
     def _policies(self, stage: str | None) -> dict:
         stage = (stage or "").strip().upper() or None

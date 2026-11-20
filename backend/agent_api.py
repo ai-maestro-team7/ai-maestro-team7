@@ -36,6 +36,24 @@ REGION = os.environ.get("AWS_REGION", "ap-northeast-2")
 TEXT_STATUSES = {"EXTRACTED", "ANALYZING", "REQUIRES_USER_REVIEW", "COMPLETED"}  # 정규화 텍스트가 있는 A 문서 상태
 NOT_SKILL = {"NOT_FOUND", "USER_CONFIRMED_GAP"}  # 검색 질의에 넣지 않는 역량 (서류에 없음, 미보유 확인)
 MAX_RESUME_TERMS = 15
+SUMMARY_LIMITS = {"skills": 20, "projects": 6, "experiences": 6, "certificates": 10, "needsConfirmation": 8, "stories": 5}
+EVIDENCE_WORDS = {"EVIDENCED": "근거 있음", "PARTIAL": "부분 근거", "SELF_REPORTED": "본인 기재"}
+
+
+def clip(value, max_chars):
+    text = " ".join(str(value or "").split())
+    return text[:max_chars] if text else None
+
+
+def entries(items, limit):
+    out = []
+    for item in items or []:
+        name = clip(item.get("name"), 60)
+        if not name:
+            continue
+        entry = {"name": name, "summary": clip(item.get("summary"), 120), "period": clip(item.get("period"), 30)}
+        out.append({k: v for k, v in entry.items() if v})
+    return out[:limit]
 
 
 @lru_cache(maxsize=1)
@@ -118,22 +136,58 @@ class CareerDocsAdapter:
                                      updated_at=item.get("updatedAt")))
         return docs
 
-    def resume_terms(self, user_id):
+    def _profile(self, user_id):
         latest = table().get_item(Key={"PK": pk(user_id), "SK": "PROFILE#LATEST"}).get("Item")
         if not latest:
-            return []
+            return {}
         version = int(latest["latestVersion"])
         item = table().get_item(Key={"PK": pk(user_id),
                                      "SK": f"PROFILE#{latest['latestProfileId']}#V#{version:04d}"}).get("Item")
-        skills = (to_plain(item) or {}).get("skills") or [] if item else []
-        terms = []
-        for skill in skills:
-            name = (skill.get("name") or "").strip()
-            if name and skill.get("evidenceLevel") not in NOT_SKILL and name not in terms:
-                terms.append(name[:50])
-            if len(terms) == MAX_RESUME_TERMS:
-                break
-        return terms
+        return to_plain(item) if item else {}
+
+    def resume_terms(self, user_id):
+        return [s["name"] for s in self.career_summary(user_id).get("skills", [])][:MAX_RESUME_TERMS]
+
+    def career_summary(self, user_id):
+        """A 역량 프로필과 경험 블록의 요약만 (원문·인용문·근거 위치는 뺀다). 목록마다 앞에서부터 자른다."""
+        profile = self._profile(user_id)
+        skills = []
+        for skill in profile.get("skills") or []:
+            name = clip(skill.get("name"), 50)
+            if name and skill.get("evidenceLevel") not in NOT_SKILL and name not in [s["name"] for s in skills]:
+                skills.append({"name": name, "confirmed": skill.get("factStatus") == "VERIFIED",
+                               "evidence": EVIDENCE_WORDS.get(skill.get("evidenceLevel"), "확인 필요")})
+        summary = {
+            "skills": skills[:SUMMARY_LIMITS["skills"]],
+            "projects": entries(profile.get("projects"), SUMMARY_LIMITS["projects"]),
+            "experiences": entries(profile.get("experiences"), SUMMARY_LIMITS["experiences"]),
+            "certificates": [clip(c.get("name"), 50) for c in profile.get("certificates") or []
+                             if clip(c.get("name"), 50)][:SUMMARY_LIMITS["certificates"]],
+            "needsConfirmation": [clip(n, 80) for n in profile.get("needsConfirmation") or []
+                                  if clip(n, 80)][:SUMMARY_LIMITS["needsConfirmation"]],
+            "stories": self._stories(user_id),
+        }
+        return {k: v for k, v in summary.items() if v}
+
+    def _stories(self, user_id):
+        """경험 블록(STORY_LATEST# → STORY#…#V#) 최근 것부터. STAR 칸만 짧게."""
+        from boto3.dynamodb.conditions import Key
+
+        latest = table().query(KeyConditionExpression=Key("PK").eq(pk(user_id)) & Key("SK").begins_with("STORY_LATEST#"),
+                               Limit=50).get("Items", [])
+        latest = sorted(map(to_plain, latest), key=lambda i: i.get("updatedAt") or "", reverse=True)
+        stories = []
+        for item in latest[:SUMMARY_LIMITS["stories"]]:
+            version = table().get_item(Key={"PK": pk(user_id), "SK": f"STORY#{item['storyId']}#V#{int(item['latestVersion']):04d}"}).get("Item")
+            if not version:
+                continue
+            version = to_plain(version)
+            story = {"title": clip(version.get("title"), 60), "situation": clip(version.get("situation"), 120),
+                     "result": clip(version.get("result"), 120), "learning": clip(version.get("learning"), 120)}
+            story = {k: v for k, v in story.items() if v}
+            if story:
+                stories.append(story)
+        return stories
 
 
 class ProfileAdapter:
@@ -174,7 +228,8 @@ def build_runner():
 
 
 def model_id():
-    value = os.environ.get("MODEL_ID", "").strip()
+    """채팅 전용 CHAT_MODEL_ID (기본 Sonnet 5.5, infra/config.sh). 없으면 팀 공통 MODEL_ID."""
+    value = os.environ.get("CHAT_MODEL_ID", "").strip() or os.environ.get("MODEL_ID", "").strip()
     if not value:
         raise TeamError(501, "NOT_IMPLEMENTED", "채팅 모델 설정이 없어요.")
     return value

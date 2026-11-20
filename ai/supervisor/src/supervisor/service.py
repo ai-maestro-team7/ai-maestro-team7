@@ -12,6 +12,7 @@ from pydantic import ValidationError
 
 from . import compose
 from .checks import check_reply
+from .context import build_user_context, context_block
 from .deps import Deps
 from .errors import (
     OutputInvalid,
@@ -109,19 +110,21 @@ def _history(messages: list[ChatMessage], current_id: str, keep: int) -> tuple[l
     return (pairs[-size:] if size > 0 else []), current_user
 
 
-def _model_message(user_message: ChatMessage) -> str:
+def _model_message(user_message: ChatMessage, context: str) -> str:
+    """사용자 문맥(데이터)과 이번 사용자 말을 태그로 나눠 넘긴다."""
     text = user_message.content
     if user_message.attachments:
-        text += f"\n\n(이번 메시지에 문서 {len(user_message.attachments)}개를 붙였어요. 내용은 get_my_status로 확인하세요.)"
-    return text
+        text += f"\n\n(이번 메시지에 문서 {len(user_message.attachments)}개를 붙였어요.)"
+    return f"{context}\n\n<user_message>\n{text}\n</user_message>"
 
 
 def _run_once(deps: Deps, user_id: str, history: list[dict], user_message: ChatMessage) -> tuple[ChatReply, TurnTools]:
     tools = TurnTools(deps, user_id, attachments=[a.document_id for a in user_message.attachments])
+    context = context_block(build_user_context(tools))  # 이력서·경험 요약. 저장하지 않고 턴마다 새로 만든다
     reply = deps.runner.run(system_prompt=system_prompt(deps.config.prompt_version), history=history,
-                            message=_model_message(user_message), tools=tools.functions(),
+                            message=_model_message(user_message, context), tools=tools.functions(),
                             max_turns=deps.config.max_turns)
-    sources = [*tools.record.texts, user_message.content, *(h["text"] for h in history)]
+    sources = [*tools.record.texts, context, user_message.content, *(h["text"] for h in history)]
     return check_reply(deps.config, reply, sources), tools
 
 

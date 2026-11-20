@@ -64,6 +64,14 @@ class CareerDocsPort(Protocol):
         """최신 역량 프로필의 역량 이름 (확인 전 포함, 부족으로 확인한 것은 뺌). 없으면 빈 목록."""
         ...
 
+    def career_summary(self, user_id: str) -> dict:
+        """이력서·자소서·경험 블록 요약 (개발계획서4 §5.1). 원문·인용문·연락처는 넣지 않는다. 없으면 빈 dict.
+
+        {skills[{name, confirmed, evidence}], projects[{name, summary, period}], experiences[…], certificates[],
+         needsConfirmation[], stories[{title, situation, result, learning}]}
+        """
+        ...
+
 
 class ProfilePort(Protocol):
     def get_basic_profile(self, user_id: str) -> dict | None:
