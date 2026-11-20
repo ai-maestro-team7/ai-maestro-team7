@@ -20,6 +20,7 @@ PUBLIC = {"InterviewError", "start_interview", "process_answer", "synthesize_que
 # 아래 "#158 연결 뒤"는 백엔드가 채용공고를 연결하면 쓸 호출 형태다 (인계 문서)
 BACKEND_CALLS = [
     ("start_interview", 6),          # 244행: iv_id, job, resumeText, interviewType, cameraConsent, profile
+    ("start_interview", 7),          # #158 연결 뒤: ... profile, jobPosting
     ("normalize_job_posting", 1),    # #158 연결 뒤: h_start에서 body.get("jobPosting")
     ("job_posting_from_posting", 1),  # #158 연결 뒤: B 공고 상세 posting
     ("process_answer", 2),           # 270행: session, answer_result

@@ -65,4 +65,5 @@ def test_thinking_off_returns_copy():
 
 def test_versions():
     assert versions.SCORING_VERSION == "v2.0"  # 4차(#108) 분석 제외 기준 추가
-    assert versions.PROMPT_VERSION == "A-v2/B-v2"  # #109 꼬리질문 판단 에이전트
+    assert versions.PROMPT_A_VERSION == "A-v3"  # #158 채용공고에 맞춘 질문
+    assert versions.PROMPT_VERSION == "A-v3/B-v2"  # B-v2: #109 꼬리질문 판단 에이전트
