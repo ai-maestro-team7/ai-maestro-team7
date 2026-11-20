@@ -1,13 +1,18 @@
 {
   "scoring_version": "v1.0",
+  "recording_limit_sec": 120,
   "delivery": {
     "time_management": {
       "enabled": true,
-      "weight": 10
+      "weight": 10,
+      "before_limit": 10,
+      "at_limit": 8
     },
     "speech_rate": {
       "enabled": true,
       "weight": 30,
+      "full": [240, 360],
+      "half": [180, 420],
       "min_answer_sec": 15,
       "max_non_hangul_ratio": 0.2
     },
@@ -19,5 +24,27 @@
       "min_answer_sec": 15,
       "long_pause_sec": 2
     }
-  }
+  },
+  "attitude": {
+    "gaze_yaw_limit": 15,
+    "gaze_pitch_limit": 8,
+    "head_angle_limit": 20,
+    "eyes_closed_min_confidence": 80,
+    "frontal_full_min": 80,
+    "frontal_zero_max": 40,
+    "min_valid_count": 10,
+    "calibration_min_valid": 3
+  },
+  "total_weights": {
+    "all": {"content": 50, "delivery": 25, "attitude": 25},
+    "no_attitude": {"content": 70, "delivery": 30},
+    "no_delivery": {"content": 75, "attitude": 25},
+    "content_only": {"content": 100}
+  },
+  "grades": [
+    {"min": 90, "label": "우수"},
+    {"min": 75, "label": "양호"},
+    {"min": 60, "label": "보통"},
+    {"min": 0, "label": "보완 필요"}
+  ]
 }

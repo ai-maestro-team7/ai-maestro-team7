@@ -12,11 +12,13 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from .versions import PROMPT_A_VERSION, PROMPT_B_VERSION
+from .versions import (PROMPT_A_VERSION, PROMPT_B_VERSION, PROMPT_C1_VERSION, PROMPT_C2_VERSION,
+                       PROMPT_EVAL_SYSTEM_VERSION)
 
 PROMPT_DIR = Path(__file__).resolve().parent / "prompts"
 
-DATA_TAGS = ("job", "interview_type", "resume", "profile", "question", "answer")
+DATA_TAGS = ("job", "interview_type", "resume", "profile", "question", "answer",
+             "question_type", "follow_up_question", "follow_up_answer")
 
 _TAG_RE = re.compile(r"<(/?)(" + "|".join(DATA_TAGS) + r")\b", re.IGNORECASE)
 _PLACEHOLDER_RE = re.compile(r"\{\{([A-Z_]+)\}\}")
@@ -29,6 +31,9 @@ def _file_for(version: str, stem: str) -> str:
 SYSTEM_FILE = "system_v1.md"
 QUESTIONS_FILE = _file_for(PROMPT_A_VERSION, "a_questions")
 FOLLOW_UP_FILE = _file_for(PROMPT_B_VERSION, "b_follow_up")
+EVAL_SYSTEM_FILE = _file_for(PROMPT_EVAL_SYSTEM_VERSION, "system_eval")
+CONTENT_FILE = _file_for(PROMPT_C1_VERSION, "c1_content")
+FEEDBACK_FILE = _file_for(PROMPT_C2_VERSION, "c2_feedback")
 
 
 def neutralize(text: str) -> str:
@@ -82,3 +87,29 @@ def follow_up_prompt(job: str, resume_text: str, question: str, answer_text: str
         "QUESTION": wrap("question", question),
         "ANSWER": wrap("answer", answer_text),
     })
+
+
+def eval_system_prompt() -> str:
+    """C-1·C-2 시스템 프롬프트 (report 결정 6: system_v1의 '점수를 말하지 않는다'와 충돌해 따로 둔다)."""
+    return load(EVAL_SYSTEM_FILE)
+
+
+def content_prompt(job: str, resume_text: str, question_type: str, question: str, answer_text: str,
+                   follow_up_question: str, follow_up_answer: str, rubric: str) -> str:
+    """C-1 사용자 메시지. 꼬리질문이 없으면 follow_up 태그는 비운다. rubric은 코드가 정한 평가표 문장."""
+    return fill(load(CONTENT_FILE), {
+        "JOB": wrap("job", job),
+        "RESUME": wrap("resume", resume_text),
+        "QUESTION_TYPE": wrap("question_type", question_type),
+        "QUESTION": wrap("question", question),
+        "ANSWER": wrap("answer", answer_text),
+        "FOLLOW_UP_QUESTION": wrap("follow_up_question", follow_up_question),
+        "FOLLOW_UP_ANSWER": wrap("follow_up_answer", follow_up_answer),
+        "RUBRIC": rubric,
+    })
+
+
+def feedback_prompt(questions: list[tuple[str, str, str]]) -> str:
+    """C-2 사용자 메시지. (questionId, 질문 유형, 질문 문장)만 넣고 점수·답변은 에이전트가 툴로 가져온다."""
+    blocks = [f"- questionId: {qid} / 유형: {qtype}\n{wrap('question', text)}" for qid, qtype, text in questions]
+    return fill(load(FEEDBACK_FILE), {"QUESTIONS": "\n".join(blocks)})

@@ -265,6 +265,82 @@ class FollowUpOutput(_LLMOutputModel):
         return self
 
 
+# ---------------------------------------------------------------- 채점 (3차, report design §4·§5)
+
+EvidenceType = Literal["quote", "missing"]
+AreaReason = Literal["CAMERA_NOT_USED", "ATTITUDE_NOT_READY", "NOT_ENOUGH_SPEECH"]
+
+
+class ContentItem(_CamelModel):
+    """C-1 항목 하나. 점수는 1~5 정수, 근거는 답변 속 문장(quote) 또는 빠진 요소(missing)."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid", frozen=True)
+
+    key: str
+    score: int = Field(ge=1, le=5)
+    evidence_type: EvidenceType
+    evidence: str | None  # 대조에 실패한 인용은 None으로 지운다
+    evidence_verified: bool
+
+
+class ContentEvaluation(_CamelModel):
+    """묶음 하나의 C-1 결과 (검증·근거 대조를 마친 값)."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid", frozen=True)
+
+    question_id: str
+    question_type: QuestionType
+    items: tuple[ContentItem, ...]
+
+    @property
+    def raw_score(self) -> float:
+        """항목 합계 ÷ 만점 × 100 (노션 6-①: 4개 × 5점 = 20)."""
+        return sum(i.score for i in self.items) / (len(self.items) * 5) * 100
+
+
+class AreaScore(_CamelModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid", frozen=True)
+
+    score: int | None = Field(ge=0, le=100)
+    not_measured_reason: AreaReason | None
+
+    @model_validator(mode="after")
+    def _one(self) -> "AreaScore":
+        if (self.score is None) == (self.not_measured_reason is None):
+            raise ValueError("area needs a score or a reason")
+        return self
+
+
+class Areas(_CamelModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid", frozen=True)
+
+    content: AreaScore
+    delivery: AreaScore
+    attitude: AreaScore
+
+
+class BundleScore(_CamelModel):
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid", frozen=True)
+
+    question_id: str
+    content_score: int = Field(ge=0, le=100)
+    delivery_score: float | None = Field(ge=0, le=100)  # 측정된 답변이 없으면 None
+
+
+class ScoreResult(_CamelModel):
+    """calculate_interview_scores 결과. 점수는 코드가 계산한 값이고 합격 확률이 아니다."""
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid", frozen=True)
+
+    total_score: int = Field(ge=0, le=100)
+    grade: str
+    weight_basis: str
+    areas: Areas
+    not_measured_messages: tuple[str, ...]
+    evaluated_base_questions: int = Field(ge=1)
+    bundles: tuple[BundleScore, ...]
+
+
 # ---------------------------------------------------------------- 변환
 
 
