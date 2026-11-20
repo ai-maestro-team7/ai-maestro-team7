@@ -5,9 +5,10 @@ export type NavItem = {
   match: string[];
 };
 
-/** GNB 탭 3개 (Figma GNB 27:1616 변형 순서에서 진단·첨삭·로드맵을 뺐다, #155) */
+/** GNB 탭 4개 (Figma GNB 27:1616 변형 순서에서 진단·첨삭·로드맵을 뺐다, #155). AI 채팅은 채팅 Agent 전용 화면이다 */
 export const NAV_ITEMS: NavItem[] = [
   { label: "홈", href: "/", match: ["/"] },
+  { label: "AI 채팅", href: "/chat", match: ["/chat"] },
   { label: "채용·정책", href: "/jobs", match: ["/jobs", "/policies"] },
   { label: "AI 모의면접", href: "/interview", match: ["/interview"] },
 ];
