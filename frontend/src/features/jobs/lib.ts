@@ -71,15 +71,6 @@ export function salaryText(salary?: Salary): string {
   return `${fmt((salary.min ?? salary.max) as number)}${unit}`;
 }
 
-/** 로고 자리 첫 글자. 앞의 "(주)", "(재)", "주식회사" 같은 말은 건너뛴다. */
-export function orgInitial(organization: string): string {
-  const name = organization
-    .replace(/^\s*[(（][^)）]*[)）]\s*/, "")
-    .replace(/^(주식회사|株式会社|재단법인|사단법인)\s*/, "")
-    .trim();
-  return (name || organization).charAt(0);
-}
-
 /** 표에 보이는 짧은 근거. 마감 사실은 마감 칸에 따로 있으니 뺀다. */
 export function matchReason(facts: string[]): string {
   return facts.find((fact) => !fact.startsWith("마감")) ?? "";

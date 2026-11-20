@@ -26,7 +26,6 @@ import {
   jobDetailHref,
   MATCH_LABELS,
   ORG_TYPE_LABELS,
-  orgInitial,
   salaryText,
 } from "../lib";
 import type { PostingDetailResponse } from "../types";
@@ -98,12 +97,6 @@ function PostingView({ detail }: { detail: PostingDetailResponse }) {
           <article className="flex flex-col">
             <header className="flex flex-col gap-3.5 pb-7">
               <div className="flex items-center gap-2.5">
-                <span
-                  aria-hidden
-                  className="flex size-10 items-center justify-center rounded-control bg-grey-100 text-small font-bold text-grey-600"
-                >
-                  {orgInitial(posting.organization)}
-                </span>
                 <span className="text-body font-bold text-grey-900">{posting.organization}</span>
                 {detail.isSample && <span className="text-small text-grey-500">시연용 예시</span>}
               </div>
