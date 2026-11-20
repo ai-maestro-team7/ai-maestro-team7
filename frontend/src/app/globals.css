@@ -135,33 +135,88 @@
     animation: hero-title-failsafe 0.3s 3s forwards;
   }
 
-  /* 갈매기 날개: 옆에서 본 날갯짓이라 어깨를 축으로 위아래로 접힌다. 짐이 있을 때는 빠르게, 놓은 뒤에는 느긋하게 */
-  .gull-wing {
+  /* 갈매기: 날개는 어깨를 축으로 퍼덕이고, 발은 허공을 젓고, 목도리 자락은 나부낀다.
+     짐이 있을 때(carry)는 바쁘게, 놓은 뒤(free)에는 느긋하게 움직인다. 축은 그림(viewBox) 좌표다 */
+  .gull-wing,
+  .gull-leg,
+  .gull-scarf,
+  .gull-beak-lower {
     transform-box: view-box;
-    transform-origin: 62px 47px;
-    animation: gull-flap var(--gull-flap, 0.17s) ease-in-out infinite alternate;
+  }
+
+  .gull-wing {
+    transform-origin: 73px 76px;
+    animation: gull-flap var(--gull-flap, 0.13s) ease-in-out infinite alternate;
   }
 
   .gull-wing-far {
-    animation-delay: -0.04s;
+    transform-origin: 81px 69px;
+    animation-delay: -0.035s;
+  }
+
+  .gull-leg {
+    transform-origin: 68.5px 111px;
+    animation: gull-kick 0.16s ease-in-out infinite alternate;
+  }
+
+  .gull-leg-far {
+    transform-origin: 86.5px 110px;
+    animation-delay: -0.16s;
+  }
+
+  .gull-scarf {
+    transform-origin: 90px 52px;
+    animation: gull-scarf 0.22s ease-in-out infinite alternate;
+  }
+
+  .gull-beak-lower {
+    transform-origin: 132px 67px;
+    transition: transform 0.16s ease;
   }
 
   .gull-string,
-  .gull-sweat {
-    transition: opacity 0.15s ease;
+  .gull-sweat,
+  .gull-eyes-strain,
+  .gull-eyes-happy,
+  .gull-mouth {
+    transition: opacity 0.12s ease;
   }
 
   .gull-sweat {
-    animation: gull-sweat 0.6s ease-out infinite;
+    animation: gull-sweat 0.46s ease-out infinite;
+  }
+
+  .gull-eyes-happy,
+  .gull-mouth {
+    opacity: 0;
   }
 
   .gull[data-phase="free"] {
-    --gull-flap: 0.3s;
+    --gull-flap: 0.24s;
   }
 
   .gull[data-phase="free"] .gull-string,
-  .gull[data-phase="free"] .gull-sweat {
+  .gull[data-phase="free"] .gull-sweat,
+  .gull[data-phase="free"] .gull-eyes-strain {
     opacity: 0;
+  }
+
+  .gull[data-phase="free"] .gull-eyes-happy,
+  .gull[data-phase="free"] .gull-mouth {
+    opacity: 1;
+  }
+
+  /* 땀방울은 움직임이 투명도를 쥐고 있어서, 움직임까지 꺼야 사라진다 */
+  .gull[data-phase="free"] .gull-sweat {
+    animation: none;
+  }
+
+  .gull[data-phase="free"] .gull-beak-lower {
+    transform: rotate(18deg);
+  }
+
+  .gull[data-phase="free"] .gull-leg {
+    animation-duration: 0.4s;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -181,6 +236,8 @@
     }
 
     .gull-wing,
+    .gull-leg,
+    .gull-scarf,
     .gull-sweat {
       animation: none;
     }
@@ -195,20 +252,41 @@
 
 @keyframes gull-flap {
   from {
-    transform: scaleY(1) rotate(5deg);
+    transform: rotate(-26deg);
   }
   to {
-    transform: scaleY(-0.8) rotate(-10deg);
+    transform: rotate(58deg);
+  }
+}
+
+@keyframes gull-kick {
+  from {
+    transform: rotate(-22deg);
+  }
+  to {
+    transform: rotate(24deg);
+  }
+}
+
+@keyframes gull-scarf {
+  from {
+    transform: rotate(-8deg) scaleX(1.06);
+  }
+  to {
+    transform: rotate(10deg) scaleX(0.92);
   }
 }
 
 @keyframes gull-sweat {
   from {
-    opacity: 0.9;
-    transform: translate(0, 0);
+    opacity: 0;
+    transform: translate(0, 7px);
+  }
+  25% {
+    opacity: 0.95;
   }
   to {
     opacity: 0;
-    transform: translate(-9px, 7px);
+    transform: translate(3px, -11px);
   }
 }
