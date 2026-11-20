@@ -127,7 +127,7 @@ def test_scheduler_create_once_request(sched):
         "ScheduleExpressionTimezone": "Asia/Seoul", "ActionAfterCompletion": "DELETE",
         "FlexibleTimeWindow": {"Mode": "OFF"},
         "Target": {"Arn": ARN, "RoleArn": ROLE,
-                   "Input": json.dumps(payload, ensure_ascii=False, separators=(",", ":"))}})
+                   "Input": json.dumps({"oppSchedule": payload}, ensure_ascii=False, separators=(",", ":"))}})
     assert scheduler.create_once("opp-abc", clock.parse_as_of("2026-11-23T09:00:00+09:00"), payload) is True
     stub.assert_no_pending_responses()
 
@@ -138,7 +138,7 @@ def test_scheduler_converts_other_zones_to_seoul_time(sched):
     stub.add_response("create_schedule", {"ScheduleArn": "a"}, expected_params={
         "Name": "n", "ScheduleExpression": "at(2026-11-23T09:30:00)", "ScheduleExpressionTimezone": "Asia/Seoul",
         "ActionAfterCompletion": "DELETE", "FlexibleTimeWindow": {"Mode": "OFF"},
-        "Target": {"Arn": ARN, "RoleArn": ROLE, "Input": "{}"}})
+        "Target": {"Arn": ARN, "RoleArn": ROLE, "Input": "{\"oppSchedule\":{}}"}})
     assert scheduler.create_once("n", utc, {}) is True
 
 
@@ -174,7 +174,7 @@ def test_scheduler_group_name_is_passed_when_given():
         stub.add_response("create_schedule", {"ScheduleArn": "a"}, expected_params={
             "Name": "n", "GroupName": "team07-opp", "ScheduleExpression": "at(2026-11-23T09:00:00)",
             "ScheduleExpressionTimezone": "Asia/Seoul", "ActionAfterCompletion": "DELETE",
-            "FlexibleTimeWindow": {"Mode": "OFF"}, "Target": {"Arn": ARN, "RoleArn": ROLE, "Input": "{}"}})
+            "FlexibleTimeWindow": {"Mode": "OFF"}, "Target": {"Arn": ARN, "RoleArn": ROLE, "Input": "{\"oppSchedule\":{}}"}})
         scheduler.create_once("n", clock.parse_as_of("2026-11-23T09:00:00+09:00"), {})
         stub.add_response("delete_schedule", {}, expected_params={"Name": "n", "GroupName": "team07-opp"})
         scheduler.delete("n")
@@ -323,3 +323,18 @@ def test_emf_default_output_is_one_stdout_line(capsys):
     EmfEvents().emit("alert_created", policy="seed-busan-joy-double")
     out = capsys.readouterr().out
     assert out.count("\n") == 1 and json.loads(out)["policy"] == "seed-busan-joy-double"
+
+
+def test_vector_filter_wraps_multiple_conditions_in_and():
+    """core가 만드는 평평한 필터를 S3 Vectors가 받는 `$and` 형식으로 바꾼다 (서울 리전에서 평평한 필터는 Invalid filter)."""
+    from opportunity.core.ranking import active_filter
+    from opportunity.store.vectors import to_s3_filter
+
+    flat = {"isBusan": True, "active": True, "deadline": {"$gte": 20261121}}
+    assert to_s3_filter(flat) == {"$and": [{"isBusan": True}, {"active": True}, {"deadline": {"$gte": 20261121}}]}
+    assert to_s3_filter({"isBusan": True}) == {"isBusan": True}  # 조건 하나는 그대로
+    already = {"$and": [{"isBusan": {"$eq": True}}]}
+    assert to_s3_filter(already) is already  # 이미 묶인 필터는 그대로
+    from datetime import datetime, timedelta, timezone
+    built = to_s3_filter(active_filter(datetime(2026, 11, 21, 10, tzinfo=timezone(timedelta(hours=9))), isBusan=True))
+    assert set(built) == {"$and"} and len(built["$and"]) == 3  # core 필터가 실제로 S3 형식이 된다

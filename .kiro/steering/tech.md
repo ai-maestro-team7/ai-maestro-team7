@@ -17,7 +17,7 @@ inclusion: always
 - Python 3.13 (`.python-version`, Lambda `python3.13` arm64), 실행 도구 `uv`
 - IaC: CloudFormation 권한이 없어 AWS CLI 셸 스크립트를 썼다. 이 제약이 그대로라면 CDK·SAM처럼 CloudFormation을 거치는 도구는 쓸 수 없다.
 - 배포: 단일 Lambda `team07-api`(타임아웃 30초) + HTTP API `team07-http-api`, 공용 실행 역할 `team07-lambda-role`. 모든 경로가 mock 응답이었다. 새 Lambda와 권한은 백엔드 담당에게 요청한다.
-- Bedrock 모델 (이전 team-guide, 2026-11-20 확인): `global.anthropic.claude-haiku-5-5`(라우팅·짧은 답변), `global.anthropic.claude-sonnet-5-5`(분석·첨삭). 임베딩 후보 `cohere.embed-v4:0`, `amazon.titan-embed-text-v2:0`. 코드에는 환경변수나 설정 파일로 넣는다 (C `MODEL_ID`, B `opportunity_config.json`).
+- Bedrock 모델 (이전 team-guide, 2026-11-20 확인): `global.anthropic.claude-haiku-5-5`(라우팅·짧은 답변), `global.anthropic.claude-sonnet-5-5`(분석·첨삭). 임베딩 후보 `global.cohere.embed-v4:0`, `amazon.titan-embed-text-v2:0`. 코드에는 환경변수나 설정 파일로 넣는다 (C `MODEL_ID`, B `opportunity_config.json`).
 
 ## 라이브러리 (명세 기준)
 - boto3, Pydantic v2(입출력·LLM 출력 검사), pytest
@@ -132,7 +132,7 @@ inclusion: always
 | 8 | C 명세 + 면접 담당 요청으로 구현·배포 | D-20 CONFIRMED |
 | 9 | 이력서 `career-docs`, 면접 녹음 `uploads` | D-14 CONFIRMED |
 | 10 | Lambda 비동기 자기 호출 | D-19 CONFIRMED |
-| 11 | S3 Vectors 1024차원 코사인, `cohere.embed-v4:0` | D-22 CONFIRMED |
+| 11 | S3 Vectors 1024차원 코사인, `global.cohere.embed-v4:0` | D-22 CONFIRMED |
 | 12 | 미정 (FRONTEND) | D-24 OPEN |
 | 13 | Python 3.13, AWS CLI 스크립트 | D-15·D-16 CONFIRMED |
 | 14 | 정리해 재사용 (PR #9~#14) | D-25 CONFIRMED |
