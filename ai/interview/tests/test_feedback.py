@@ -159,6 +159,31 @@ def test_invalid_feedback_twice_raises(bad):
     assert len(fake.runs) == 2
 
 
+def test_more_than_two_strengths_keeps_first_two_without_retry():
+    # 실제 Bedrock에서 강점 3개를 써서 스키마 실패가 났다 (#92 수동 확인). 실패시키지 않고 앞의 2개만 남긴다
+    three = ["첫 번째 강점 문장입니다.", "두 번째 강점 문장입니다.", "세 번째 강점 문장입니다."]
+    data = _with(lambda d: d["questions"][0].update(strengths=three, improvements=three))
+    fake = FakeToolLLM([data])
+    item = feedback.write_feedback(context(), llm=fake).by_question()["q1"]
+    assert item.strengths == three[:2] and item.improvements == three[:2]
+    assert len(fake.runs) == 1
+
+
+def test_dropped_third_item_is_not_checked():
+    # 버린 세 번째 문장은 검사하지 않는다 (남긴 2개만 검사)
+    data = _with(lambda d: d["questions"][0].update(
+        strengths=["첫 번째 강점 문장입니다.", "두 번째 강점 문장입니다.", "합격에 가까운 문장"]))
+    assert feedback.write_feedback(context(), llm=FakeToolLLM([data])).by_question()["q1"].strengths[1] == \
+        "두 번째 강점 문장입니다."
+
+
+def test_kept_items_still_checked():
+    data = _with(lambda d: d["questions"][0].update(strengths=["합격에 가까운 답변이에요.", "두 번째 강점 문장입니다.",
+                                                              "세 번째 강점 문장입니다."]))
+    with pytest.raises(InterviewError):
+        feedback.write_feedback(context(), llm=FakeToolLLM([data, data]))
+
+
 def test_banned_word_retried_then_ok():
     bad = _with(lambda d: d["questions"][0].update(comment="합격에 가까운 답변이에요."))
     fake = FakeToolLLM([bad, OK])

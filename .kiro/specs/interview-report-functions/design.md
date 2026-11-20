@@ -171,6 +171,7 @@ write_feedback(context: FeedbackContext, *, llm=None) -> FeedbackOutput
 
 ### 6.4 출력과 검사
 - `FeedbackOutput`: `{"questions": [{"questionId", "strengths": [..1~2], "improvements": [..1~2], "direction", "comment"}]}`. 점수 필드 없음.
+- 강점·보완이 3개 이상이면 앞의 2개만 남긴다(버린 문장은 검사하지 않는다). 프롬프트에도 "1개 또는 2개만"을 적었다.
 - 검사: 묶음 ID 집합이 평가 가능한 묶음과 같음(`call_json_with_tools`의 `check`), 문장 5~200자, 금지 표현(`settings.FEEDBACK_BANNED_WORDS`: 합격, 불합격, 확률) 없음. "떨어지다"는 일반 표현에도 쓰여 넣지 않았다.
 - 프롬프트 `c2_feedback_v1.md`(시스템 `system_eval_v1.md`):
   - 묶음마다 `get_confirmed_scores`와 `get_answer_text`를 먼저 보라

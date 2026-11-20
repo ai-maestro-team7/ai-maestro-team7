@@ -87,7 +87,7 @@ AI 모의면접 함수의 3차 단계다 (이슈 #92). 면접이 끝나면 답�
 ### Requirement 4: 피드백 에이전트 (`write_feedback`, 프롬프트 C-2)
 
 #### Acceptance Criteria
-1. THE 함수 SHALL 점수 계산이 끝난 뒤에만 불리고, Evaluable_Bundle마다 `strengths`(1~2개), `improvements`(1~2개), `direction`(1문장), `comment`(1문장)를 돌려준다.
+1. THE 함수 SHALL 점수 계산이 끝난 뒤에만 불리고, Evaluable_Bundle마다 `strengths`(1~2개), `improvements`(1~2개), `direction`(1문장), `comment`(1문장)를 돌려준다. 모델이 강점·보완을 3개 이상 쓰면 실패시키지 않고 앞의 2개만 남겨 검사한다 (수동 확인에서 3개를 써 스키마 실패가 났다).
 2. THE 함수 SHALL Strands 에이전트에 읽기 전용 툴 4개를 주고, 에이전트가 필요한 툴을 골라 불러 정보를 모은 뒤 피드백 JSON을 쓰게 한다 (결정 7).
    - `get_confirmed_scores(question_id)`: 확정된 내용 점수, 항목별 점수와 검증된 근거, 전달력 점수
    - `get_delivery_metrics(question_id)`: 말 속도, 분당 긴 침묵, 시간 제한 도달, 미측정 사유

@@ -28,6 +28,7 @@ RESUME_PASSAGE_LIMIT = 3
 PASSAGE_MAX_CHARS = 200
 KEYWORD_MAX_CHARS = 30
 TEXT_MIN, TEXT_MAX = 5, 200
+FEEDBACK_LIST_MAX = 2  # 강점·보완은 질문마다 최대 2개
 
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?。])\s+|\n+")
 
@@ -199,10 +200,16 @@ def _sentence(value: str) -> str:
 
 class FeedbackItem(_LLMOutputModel):
     question_id: str
-    strengths: list[str] = Field(min_length=1, max_length=2)
-    improvements: list[str] = Field(min_length=1, max_length=2)
+    strengths: list[str] = Field(min_length=1, max_length=FEEDBACK_LIST_MAX)
+    improvements: list[str] = Field(min_length=1, max_length=FEEDBACK_LIST_MAX)
     direction: str
     comment: str
+
+    @field_validator("strengths", "improvements", mode="before")
+    @classmethod
+    def _keep_first(cls, values):
+        # 모델이 3개 이상 써도 실패시키지 않고 앞의 2개만 남긴다. 남긴 것만 아래에서 검사한다
+        return values[:FEEDBACK_LIST_MAX] if isinstance(values, list) else values
 
     @field_validator("strengths", "improvements")
     @classmethod
