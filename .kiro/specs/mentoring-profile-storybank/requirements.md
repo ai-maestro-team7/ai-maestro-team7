@@ -180,7 +180,7 @@ mentoring-profile-storybank는 A 파트(`docs/개발계획서1.md`)의 첫 후�
 
 #### Acceptance Criteria
 
-1. WHEN 사용자가 `POST /api/v1/mentoring/stories`로 `rawExperience`와 선택 `targetRole`, `sourceDocumentId`, `existingStoryId`를 보내면, THE Mentoring_API SHALL 사용자 원문을 첫 Story_Item 버전에 `DRAFT` 상태로 저장하고 202로 `storyId`, `status`를 돌려준다 (A F-01B 처리 1단계, §6.1).
+1. WHEN 사용자가 `POST /api/v1/mentoring/stories`로 `rawExperience`와 선택 `targetRole`, `sourceDocumentId`, `title`을 보내면, THE Mentoring_API SHALL 사용자 원문을 첫 Story_Item 버전에 `DRAFT` 상태로 저장한 뒤 기준 2의 확인 질문을 같은 요청 안에서 만들어 201로 경험 블록을 돌려준다. 질문 생성이 실패해도 `DRAFT` 버전은 남고, 같은 `Idempotency-Key`로 다시 보내면 그 초안에서 질문 생성만 다시 한다 (A F-01B 처리 1단계, §6.1. 202 대신 동기 201은 M-7 결정).
 2. THE Task_Runner SHALL 원문에서 Situation·Task·Action·Result·Learning에 해당하는 사실을 나누고, 빠진 항목에 대한 확인 질문을 최대 3개 만들어 같은 Story_Item의 새 버전에 저장한다 (A F-01B 처리 2~3단계, 패키지 `01_STORY_BANK_COMPETENCY.md` 절차 1~4).
 3. THE Task_Runner SHALL 원문에 없는 Task, Action, Result, 성과 수치, KPI를 만들지 않는다. `DRAFT` 상태의 내용으로 완성된 STAR 성과를 만들지 않는다 (A F-01B "DRAFT 상태의 내용으로 완성된 STAR 성과나 KPI 생성 금지").
 4. THE Task_Runner SHALL 경험의 주체가 사용자 본인인지, 팀 성과와 개인 기여가 구분되는지 확인하고, 수치의 측정 기준이나 기간이 분명하지 않으면 그 필드를 `NEEDS_CONFIRMATION`으로 둔다 (A F-01B 처리 2단계, 패키지 `01` 제약).
@@ -248,7 +248,7 @@ A 기능이 실제로 돌려면 BACKEND 소유 파일이 바뀌어야 한다. �
 | BE-4 | A 전용 환경변수를 Lambda 설정에 넣는다: `team07-reference` 테이블 이름, 업로드·텍스트 한도 등. 이름은 이 스펙의 design에서 정해 전달한다 | `infra/setup-api.sh` (`ENV_VARS`) | `TABLE_CAREER_MENTOR`, `CAREER_DOCS_BUCKET`, `MODEL_ID`, `EMBEDDING_MODEL_ID`는 있다 (PR #29). A는 `MODEL_ID`를 그대로 쓴다. 참조 테이블 이름과 한도 값은 없다 | Requirement 1 기준 5, Requirement 6 기준 9 |
 | BE-5 | 면접 시작 때 역량 프로필을 그대로 넘기지 말고 A의 요약 변환 함수 결과를 넘긴다. 변환 결과가 없거나 계약 검사에 실패하면 `profile=None` | `backend/interview_api.py` (`load_latest_profile()`) | 역량 프로필 버전의 `skills`·`projects`·`needsConfirmation`을 그대로 넘긴다. A 형식이면 `skills`가 객체 목록이라 `CareerProfileSummary`와 맞지 않는다 | Requirement 8 기준 1, 기반 design.md "Career_Profile_Summary" 절 |
 | BE-6 | 개인 문서 경로의 `hashedUserId`를 만드는 방식을 정한다. 회원 탈퇴 삭제(db §2.6 3단계)가 같은 값으로 `users/{hashedUserId}/`를 지워야 하므로 A와 백엔드가 같은 함수를 써야 한다 | `backend/common.py` 또는 `contracts/` (위치는 결정 필요) | 해시 함수가 없다 | Requirement 2 기준 4, 미결정 M-1 |
-| BE-7 | 경험 질문 생성을 202 비동기로 두면 `TASK#.taskType`에 그 값을 추가한다 | `docs/db-schema.md` §2.5 | `taskType`에 `DOCUMENT_EXTRACT`, `PROFILE_EXTRACT` 등은 있고 경험 블록용 값은 없다 | Requirement 9 기준 1, 미결정 M-7 |
+| BE-7 | (M-7에서 동기로 정해 지금은 필요 없음) 경험 질문 생성을 202 비동기로 두면 `TASK#.taskType`에 그 값을 추가한다 | `docs/db-schema.md` §2.5 | `taskType`에 `DOCUMENT_EXTRACT`, `PROFILE_EXTRACT` 등은 있고 경험 블록용 값은 없다 | Requirement 9 기준 1, 미결정 M-7 |
 
 ### 이미 있어서 바꿀 필요 없는 것
 
@@ -279,4 +279,4 @@ A 기능이 실제로 돌려면 BACKEND 소유 파일이 바뀌어야 한다. �
 | M-4 | `career.profile.completed` 이벤트 | 이벤트 버스 권한 전까지 발행하지 않고 `TASK#` 완료로 대신 / 다른 수단 | A F-01 처리 12단계. EventBridge 권한 없음 (tech.md "착수 전 확인") |
 | M-5 | 요약 한도를 넘는 항목을 고르는 규칙 | 최근 버전 순 / 근거 강도 순 / 사용자 지정 순 | Requirement 8 기준 4, D-40 |
 | M-6 | 패키지 CSV를 저장소에 넣을지 | `structured/` CSV를 `ai/mentoring/` 아래에 넣기 / 실행할 때 경로를 받기 | Requirement 10. 라이선스 열은 "이용허락범위 제한 없음"이지만 패키지 `LICENSE_AND_LIMITATIONS.md` 확인 필요. 저장소는 공개 |
-| M-7 | 경험 질문 생성을 202 비동기로 둘지 | A §6.1대로 202 / 응답 시간이 짧으면 동기 200 | Requirement 9 기준 1, BE-7 (202면 `taskType` 추가 필요) |
+| M-7 | 경험 질문 생성을 202 비동기로 둘지 | **결정 (2026-11-20, A): 동기 201.** 모델 호출 1회(실패 시 재시도 1회)라 API Gateway 30초 안에 끝나고, `TASK#.taskType`을 늘리지 않아 BE-7이 필요 없다. 응답이 느려지면 202 + `taskType` 추가로 바꾼다 | Requirement 9 기준 1, BE-7(불필요), #85 |

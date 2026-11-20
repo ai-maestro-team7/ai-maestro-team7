@@ -22,9 +22,26 @@ AWS와 네트워크를 부르지 않는다. 메모리 저장소(`store/memory.py
 | `mentoring.api.task_handler.handle(event, deps)` | 이벤트에 `mentoringTask` 키가 있을 때 | Lambda 비동기 자기 호출 (D-19, BE-2) |
 | `mentoring.core.summary.to_career_profile_summary(profile_item)` | 면접 시작 때 | 저장된 역량 프로필 항목 → `CareerProfileSummary` dict 또는 None (BE-5) |
 
-`Deps`(`deps.py`)는 입구를 부르는 쪽이 만든다. AWS 구현과 `build_aws_deps()`는 #61이다.
-PDF 업로드를 받으려면 `Deps.extractor`에 `core.pdf_extractor.PdfExtractor(ocr=TextractOcr(textract 클라이언트),
-bucket=개인 문서 버킷)`을 넣는다. 없으면 업로드 완료가 501이다.
+`Deps`(`deps.py`)는 입구를 부르는 쪽이 만든다. 운영에서는 `store/factory.py`의 `build_aws_deps()`를 인자 없이 부르고,
+백엔드가 `hash_user_id`를 `backend/common.py`의 함수로 바꿔 넣는다 (`backend/mentoring_api.py`).
+`build_aws_deps()`는 PDF 추출기(`PdfExtractor` + Textract OCR)와 경험 블록 저장소(`DynamoStoryRepo`)를 함께 넣는다.
+`Deps.extractor`가 없으면 업로드 완료가, `Deps.stories`가 없으면 경험 블록 경로가 501이다.
+
+## 경험 블록 경로 (Requirement 9)
+
+| 요청 | 응답 | 모델 호출 |
+|---|---|---|
+| `POST /stories` `{rawExperience, targetRole?, sourceDocumentId?, title?}` | 201 경험 블록 (`status: QUESTIONS_READY`, `questions` 최대 3개) | 있음 |
+| `GET /stories` | 200 `{stories: [{storyId, title, status, latestVersion, updatedAt}]}` | 없음 |
+| `GET /stories/{storyId}` | 200 경험 블록 최신 버전 | 없음 |
+| `PATCH /stories/{storyId}` `{baseVersion, answers?, confirmFields?, edits?}` | 200 경험 블록. 답변이 있으면 질문을 다시 만든다 | 답변이 있을 때만 |
+
+- 질문 생성은 동기다 (M-7, 2026-11-20). 그래서 `POST`는 개발계획서1 §6.1의 202가 아니라 201로 결과를 바로 준다.
+- `POST`가 모델 오류(`AI_OUTPUT_INVALID` 500, `AWS_SERVICE_ERROR` 503, 둘 다 `retryable: true`)로 실패해도 초안은 `DRAFT`로 남는다.
+  같은 `Idempotency-Key`로 다시 보내면 새 경험 블록을 만들지 않고 그 초안에서 질문만 다시 만든다.
+- `PATCH`에서 질문 갱신만 실패하면 답변은 저장하고 `warnings: ["QUESTIONS_NOT_REFRESHED"]`를 붙여 200으로 준다.
+- `baseVersion`이 최신이 아니면 409 `PRECONDITION_NOT_MET`. `VERIFIED`는 사용자가 확인하거나 고친 필드에만 생기고,
+  질문을 다시 만들어도 그 값은 모델 출력으로 바뀌지 않는다.
 
 ## PDF 업로드 흐름
 
@@ -58,6 +75,7 @@ presigned URL은 응답에만 넣고 DB·멱등 결과·로그에 남기지 않�
 | `src/mentoring/privacy/` | (#42) 개인정보 가리기 |
 | `src/mentoring/verify/` | (#43) 근거 인용·지어낸 수치 검사 |
 | `src/mentoring/reference/` | (#37) NCS 기준 데이터 적재·조회 |
+| `src/mentoring/stories/` | (#62) 경험 블록 모델·저장소·규칙. `flow.py`가 REST 입구용 순서(멱등·재시도)를 정한다 |
 | `evals/` | (#44) 가상 이력서 정답셋, KB 검색 평가 도구 |
 
 `mentoring`은 네임스페이스 패키지다(`src/mentoring/__init__.py`가 없다). 여러 작업이 하위 패키지를 따로 만들어도
@@ -75,6 +93,5 @@ presigned URL은 응답에만 넣고 DB·멱등 결과·로그에 남기지 않�
 
 ## 아직 정하지 않은 것
 
-- `hashedUserId` 방식 (M-1, BE-6): `Deps.hash_user_id`로 받는다. 회원 탈퇴 삭제와 같은 함수를 써야 한다
 - 면접 요약 한도를 넘을 때 고르는 규칙 (M-5): 지금은 저장 순서대로 앞에서부터 자른다
 - 추출 텍스트 확인·수정 경로 (M-2), 개별 삭제 (M-3), 완료 이벤트 (M-4)
