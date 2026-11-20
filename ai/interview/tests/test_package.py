@@ -13,11 +13,16 @@ from conftest import REPO_ROOT
 PACKAGE_DIR = Path(interview.__file__).resolve().parent
 
 PUBLIC = {"InterviewError", "start_interview", "process_answer", "synthesize_question", "start_transcription",
-          "get_transcription_result", "analyze_face", "compute_baseline", "generate_report"}
+          "get_transcription_result", "analyze_face", "compute_baseline", "generate_report",
+          "normalize_job_posting", "job_posting_from_posting"}  # 채용공고 함수 2개 (#158)
 
 # backend/interview_api.py의 현재 호출 형태 (위치 인자 개수). 행 번호는 a556a31 기준
+# 아래 "#158 연결 뒤"는 백엔드가 채용공고를 연결하면 쓸 호출 형태다 (인계 문서)
 BACKEND_CALLS = [
     ("start_interview", 6),          # 244행: iv_id, job, resumeText, interviewType, cameraConsent, profile
+    ("start_interview", 7),          # #158 연결 뒤: ... profile, jobPosting
+    ("normalize_job_posting", 1),    # #158 연결 뒤: h_start에서 body.get("jobPosting")
+    ("job_posting_from_posting", 1),  # #158 연결 뒤: B 공고 상세 posting
     ("process_answer", 2),           # 270행: session, answer_result
     ("synthesize_question", 1),      # 234행
     ("start_transcription", 5),      # 387행: s3_uri, job_name, media_format, UPLOAD_BUCKET, transcript_key
@@ -47,6 +52,8 @@ def test_public_functions_come_from_real_modules():
     assert interview.generate_report.__module__ == "interview.report"
     for name in ("analyze_face", "compute_baseline"):
         assert getattr(interview, name).__module__ == "interview.camera"
+    for name in ("normalize_job_posting", "job_posting_from_posting"):  # #158
+        assert getattr(interview, name).__module__ == "interview.job_posting"
     assert not (PACKAGE_DIR / "placeholders.py").exists()  # 임시 구현은 모두 바뀌었다
 
 

@@ -4,7 +4,7 @@
 """
 
 SCORING_VERSION = "v2.0"  # C §3 점수 설정 파일 버전 (config/scoring_v2.json). v2.0은 4차 분석 제외 기준 추가
-PROMPT_A_VERSION = "A-v2"  # 질문 생성
+PROMPT_A_VERSION = "A-v3"  # 질문 생성 (A-v3: 채용공고가 있으면 공고에 맞춘 질문, #158)
 PROMPT_B_VERSION = "B-v2"  # 꼬리질문 판단 (B-v2: 툴 에이전트, 질문 유형별 기준, #109)
 PROMPT_VERSION = f"{PROMPT_A_VERSION}/{PROMPT_B_VERSION}"  # Session에 남기는 값 (질문 생성·꼬리질문)
 

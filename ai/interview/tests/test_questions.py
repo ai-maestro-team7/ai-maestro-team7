@@ -36,6 +36,24 @@ def test_prompt_contents():
     assert "실무 데이터 파이프라인 경험" in call["user"]
 
 
+def test_job_posting_keyword_reaches_prompt():
+    # #158: generate_questions도 같은 공고 입력을 받는다 (키워드 인자)
+    posting = sample_json("job_posting_data_analysis.json")
+    fake = FakeLLM([OK])
+    generate_questions("데이터 분석", RESUME, "JOB", job_posting=posting, llm=fake)
+    assert "<job_posting>\n제목: " + posting["title"] in fake.calls[0]["user"]
+    fake = FakeLLM([OK])
+    generate_questions("데이터 분석", RESUME, "JOB", llm=fake)
+    assert "<job_posting>\n\n</job_posting>" in fake.calls[0]["user"]
+
+
+def test_invalid_job_posting_does_not_call_llm():
+    fake = FakeLLM([OK])
+    with pytest.raises(InterviewError) as exc:
+        generate_questions("데이터 분석", RESUME, "JOB", job_posting={"text": "짧음"}, llm=fake)
+    assert exc.value.code == INVALID_INPUT and fake.calls == []
+
+
 def test_retry_then_success():
     fake = FakeLLM([sample_text("llm/questions_two_only.json"), OK])
     assert len(generate_questions("데이터 분석", RESUME, "MIXED", llm=fake)) == 3

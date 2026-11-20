@@ -19,7 +19,7 @@ def generate_from_request(request: QuestionRequest, llm=None) -> list[Question]:
         client,
         system_prompt=prompting.system_prompt(),
         user_prompt=prompting.questions_prompt(request.job, request.interview_type, request.resume_text,
-                                               request.profile),
+                                               request.profile, request.job_posting),
         schema=QuestionsOutput,
         stage=STAGE,
     )
@@ -27,7 +27,8 @@ def generate_from_request(request: QuestionRequest, llm=None) -> list[Question]:
             for i, q in enumerate(output.questions, start=1)]
 
 
-def generate_questions(job, resume_text, interview_type, profile=None, *, llm=None) -> list[dict]:
+def generate_questions(job, resume_text, interview_type, profile=None, *, job_posting=None, llm=None) -> list[dict]:
+    """job_posting은 {title?, company?, text} (#158). 없으면 직무·자소서만으로 만든다."""
     request = parse_input(QuestionRequest, {"job": job, "resume_text": resume_text, "interview_type": interview_type,
-                                            "profile": profile}, stage=STAGE)
+                                            "profile": profile, "job_posting": job_posting}, stage=STAGE)
     return [dump(q) for q in generate_from_request(request, llm)]

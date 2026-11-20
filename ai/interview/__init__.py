@@ -4,11 +4,14 @@
 `import interview as impl`로 부른다. 아래 8개 함수와 InterviewError가 백엔드와의 계약이다.
 음성 함수 3개는 2차(voice.py)부터 Polly·Transcribe를 실제로 부른다. 리포트는 3차(report.py)부터 실제로 채점한다.
 카메라 함수 2개는 4차(camera.py)부터 Rekognition을 실제로 부르고, 리포트가 태도 점수를 채운다.
+채용공고 함수 2개(#158)는 AWS를 부르지 않는 보조 함수다. 백엔드가 /start의 jobPosting을 검사하고(normalize),
+B 공고에서 면접을 시작할 때 공고를 jobPosting 값으로 바꾼다(from_posting).
 """
 
 from .camera import analyze_face, compute_baseline
 from .errors import InterviewError
 from .flow import process_answer, start_interview
+from .job_posting import job_posting_from_posting, normalize_job_posting
 from .report import generate_report
 from .voice import get_transcription_result, start_transcription, synthesize_question
 
@@ -22,4 +25,6 @@ __all__ = [
     "analyze_face",
     "compute_baseline",
     "generate_report",
+    "normalize_job_posting",
+    "job_posting_from_posting",
 ]
