@@ -1,74 +1,79 @@
 import type { JobPosting } from "./types";
 
-/** Mock 데이터 기준일. D-day 계산과 "기준" 표시에 쓴다. */
-export const DATA_AS_OF = "2026-11-20";
+/** Mock 데이터 기준일. B 데모 데이터(`ai/busan-opportunity` seeds `DATA_AS_OF`)와 같은 날이다. */
+export const DATA_AS_OF = "2026-11-21";
 
-/** 추천 기준 프로필 표시 (공고 목록 상단) */
+/**
+ * 추천 기준 프로필 표시 (공고 목록 상단).
+ * 통합 데모 페르소나 ①: 부산 소재 대학 4학년, 통계학 전공, 희망 직무 데이터 분석 (NCS 20010105, D-37).
+ */
 export const RECOMMEND_BASIS = {
-  role: "백엔드 개발",
-  skills: ["Python", "REST API", "PostgreSQL"],
+  role: "데이터 분석",
+  skills: ["SQL", "Python", "통계 분석"],
 } as const;
 
 /**
- * 시연용 예시 공고. 기업·공고는 모두 가상이다.
- * 첫 공고는 Figma 화면 값 그대로이고, 나머지 상세 내용은 같은 틀에 채운 예시다.
+ * 시연용 예시 공고. 기업·기관과 공고는 모두 가상이고, B 데모 데이터
+ * (`ai/busan-opportunity/src/opportunity/seeds/demo_world.py`)의 부산 공고와 이름·근무지·마감·요건을 맞췄다.
+ * 업무 설명은 같은 공고의 직무 설명을 화면용으로 나눈 예시다.
  */
 export const jobPostings: JobPosting[] = [
   {
-    id: "centum-backend",
-    company: "센텀테크",
-    companyInitial: "센",
+    id: "wk24-DEMO0001",
+    company: "(주)가상데이터",
+    companyInitial: "데",
     companyNote: "시연용 예시 기업",
-    title: "백엔드 개발자",
-    skills: ["Python", "REST API"],
+    title: "데이터 분석 신입",
+    skills: ["SQL", "Python"],
     district: "해운대구",
     employmentType: "정규직",
     careerLevel: "신입",
     deadline: "2026-12-05",
-    match: { level: "GOOD", reason: "Python, REST API 일치" },
+    match: { level: "GOOD", reason: "SQL, Python 일치" },
     recommendRank: 1,
-    duties: ["서비스 REST API 설계와 개발", "PostgreSQL 데이터 모델링과 운영", "배포 자동화와 서비스 모니터링"],
-    requirements: ["Python 기반 웹 개발 경험", "SQL 활용 경험", "Git 협업 경험"],
-    matchedSkills: ["Python", "REST API", "PostgreSQL"],
-    gapAdvice: "배포 자동화 경험을 포트폴리오에 추가해 보세요.",
+    duties: ["서비스 지표 분석과 리포트 작성", "SQL로 데이터 추출과 가공", "통계 모델링으로 사용자 행동 분석"],
+    requirements: ["SQL 활용 (필수)", "Python 활용 (필수)", "ADsP (우대)"],
+    matchedSkills: ["SQL", "Python", "통계 분석"],
+    gapAdvice: "우대 자격인 ADsP 준비 계획이 있다면 이력서에 적어 보세요.",
     applyNote: "시연용 공고라 실제 지원 페이지와는 연결되어 있지 않아요.",
   },
   {
-    id: "yeongdo-data-platform",
-    company: "영도데이터",
-    companyInitial: "영",
-    companyNote: "시연용 예시 기업",
-    title: "데이터 플랫폼 개발자",
-    skills: ["SQL", "ETL"],
-    district: "영도구",
-    employmentType: "계약직",
+    id: "alio-DEMO0001",
+    company: "가상금융공사",
+    companyInitial: "금",
+    companyNote: "시연용 예시 기관 · 부산 이전 공공기관",
+    title: "2026년 신입직원 채용 (데이터)",
+    skills: ["통계 분석", "SQL"],
+    district: "남구",
+    employmentType: "정규직",
     careerLevel: "신입",
-    deadline: "2026-12-12",
-    match: { level: "FAIR", reason: "SQL 일치" },
+    deadline: "2026-11-30",
+    match: { level: "FAIR", reason: "통계 분석 일치" },
     recommendRank: 2,
-    duties: ["데이터 수집·적재(ETL) 파이프라인 개발", "SQL 기반 데이터 마트 설계", "데이터 품질 점검 자동화"],
-    requirements: ["SQL 활용 경험", "ETL 스크립트 작성 경험", "Python 또는 Java 기초"],
-    matchedSkills: ["SQL", "PostgreSQL"],
-    gapAdvice: "ETL 파이프라인을 직접 만든 사례를 정리해 보세요.",
-    applyNote: "시연용 공고라 실제 지원 페이지와는 연결되어 있지 않아요.",
+    duties: ["기금 운용 데이터 분석", "통계 분석으로 운용 지표 점검", "분석 결과 보고서 작성"],
+    requirements: ["통계 분석 (필수)", "SQL (우대)"],
+    matchedSkills: ["통계 분석", "SQL"],
+    gapAdvice: "기금·금융 데이터를 다뤄 본 경험이 있다면 사례로 정리해 보세요.",
+    applyNote:
+      "지역인재 전형 대상일 수 있어요 · 공고문 확인. 시연용 공고라 실제 지원 페이지와는 연결되어 있지 않아요.",
   },
   {
-    id: "dongbaek-server-intern",
-    company: "동백소프트",
-    companyInitial: "동",
+    id: "wk24-DEMO0012",
+    company: "(주)가상소프트",
+    companyInitial: "소",
     companyNote: "시연용 예시 기업",
-    title: "서버 개발 인턴",
-    skills: ["Java", "Spring Boot"],
-    district: "부산진구",
-    employmentType: "인턴",
+    title: "백엔드 개발자",
+    skills: ["Python"],
+    district: "해운대구",
+    employmentType: "정규직",
     careerLevel: "신입",
-    deadline: null,
-    match: { level: "FAIR", reason: "백엔드 직무 일치" },
+    deadline: "2026-12-11",
+    match: { level: "LOW", reason: "Python 일치" },
     recommendRank: 3,
-    duties: ["Spring Boot 기반 API 개발 보조", "테스트 코드 작성", "운영 이슈 확인과 기록"],
-    requirements: ["Java 기초 문법", "웹 서비스 구조 이해", "Git 사용 경험"],
-    matchedSkills: ["REST API", "Git"],
-    gapAdvice: "Java·Spring Boot 학습 이력을 이력서에 보강해 보세요.",
+    duties: ["서버 백엔드 개발", "API 설계와 테스트", "운영 이슈 확인과 기록"],
+    requirements: ["Python 활용 (필수)"],
+    matchedSkills: ["Python"],
+    gapAdvice: "희망 직무와 다른 직종이에요. 서버 개발 경험이 있다면 사례로 정리해 보세요.",
     applyNote: "시연용 공고라 실제 지원 페이지와는 연결되어 있지 않아요.",
   },
 ];

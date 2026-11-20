@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Bookmark, Search } from "lucide-react";
+import { Bookmark, Search } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
@@ -50,14 +50,10 @@ export function Gnb() {
           </form>
         </div>
         <div className="flex items-center gap-5 text-small">
-          {/* 저장한 공고·알림은 Figma에 이동할 화면이 없어 표시만 한다 (requirements 열린 항목) */}
+          {/* 저장한 공고는 Figma에 이동할 화면이 없어 표시만 한다. 알림은 프론트 담당 결정으로 뺐다. */}
           <span className="hidden items-center gap-1 text-grey-700 md:flex">
             <Bookmark className="size-4" strokeWidth={2} aria-hidden />
             저장한 공고
-          </span>
-          <span className="hidden items-center gap-1 text-grey-700 md:flex">
-            <Bell className="size-4" strokeWidth={2} aria-hidden />
-            알림
           </span>
           <span aria-hidden className="hidden h-3 w-px bg-grey-300 md:block" />
           <span className="font-medium text-grey-900">{demoUser.displayName} 님</span>

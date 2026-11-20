@@ -50,10 +50,10 @@ src/
   - 모서리 `rounded-control`(8) · `rounded-field`(10) · `rounded-card`(12) · `rounded-check`(5), 폭 `max-w-content`(1080) · `max-w-main`(700) · `w-rail`(332)
 - 컴포넌트는 데이터를 props로만 받는다. API를 붙일 때는 `features/*/data.ts`를 바꾸는 쪽에서 시작한다.
 - 기본은 Server Component다. 상태·이벤트·URL 쿼리가 필요한 곳만 `"use client"`를 붙인다.
+- Mock 데이터는 통합 데모 페르소나 ①(데이터 분석, D-37)에 맞춘다. 공고는 B 데모 데이터(`ai/busan-opportunity/src/opportunity/seeds/demo_world.py`)와 이름·근무지·마감을 맞췄다.
 - 화면 문구는 개발계획서2 §4.7 문구 규칙과 `docs/api.md` §6.3 점수 표시 규칙을 따른다 ("합격 확률이 아니에요").
 
 ## 아직 하지 않은 것
 
 - API 연동, 로그인, 실제 녹음·카메라·파일 업로드 (C §5.6 전달 규칙은 연동 단계에서 구현)
-- GNB "저장한 공고"·"알림" 화면 (Figma에 없음)
-- 데모 직무: Mock 데이터는 Figma대로 "백엔드 개발자"다. 통합 데모 직무는 "데이터 분석"(D-37)이라 바꿀지 정해야 한다.
+- GNB "저장한 공고" 화면 (Figma에 없음). "알림"은 GNB에서 뺐다.
