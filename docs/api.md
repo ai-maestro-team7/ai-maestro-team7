@@ -103,6 +103,7 @@ A의 REST 요청은 백엔드에서 확인한 사용자 ID를 `mentoring.api.res
 ### 6.0 워크스페이스는 공통 함수로
 
 - B의 `POST /saved`는 `backend/workspace.py`의 `workspace_put()`을 `OPP#SAVED#`와 **한 트랜잭션**으로 쓴다. 지원 상태는 `set_status()`로 워크스페이스에만 쓴다.
+- B의 `DELETE /saved/{id}`는 `OPP#SAVED#`와 마감 일정만 지우고 워크스페이스는 지우지 않는다. 분석·첨삭·면접 기록이 붙어 있을 수 있어서다. 다시 저장하면 같은 워크스페이스에 이어 붙는다.
 - A·C는 결과를 저장할 때 `GSI1PK = USER#{userId}#WS#{workspaceId}`, `GSI1SK = {ANALYSIS|REVIEW|PATH|INTERVIEW}#{createdAt}#{id}`를 넣으면 워크스페이스 상세에 자동으로 나온다.
 
 

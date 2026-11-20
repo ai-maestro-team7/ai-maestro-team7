@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, type ReactNode, useState } from "react";
 import { ApiErrorNotice } from "@/features/auth/components/ApiFallback";
@@ -35,6 +36,7 @@ function Select({
   options,
   placeholder,
   error,
+  required = false,
 }: {
   id: string;
   label: string;
@@ -43,32 +45,45 @@ function Select({
   options: ReadonlyArray<Option>;
   placeholder: string;
   error?: string;
+  /** 꼭 골라야 하는 칸이면 펼친 목록에서 안내 문구를 고를 수 없게 한다 */
+  required?: boolean;
 }) {
   return (
     <Field id={id} label={label} error={error}>
-      <select
-        {...fieldA11y(id, error)}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className={cn(
-          "h-12 w-full rounded-field border bg-white px-3 text-body focus:border-blue-500 focus:outline-none",
-          value ? "text-grey-900" : "text-grey-500",
-          error ? "border-red-500" : "border-grey-300",
-        )}
-      >
-        <option value="">{placeholder}</option>
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
+      {/* 브라우저 기본 화살표를 지우고 TextField와 같은 여백·화살표 아이콘을 쓴다. 펼친 목록은 기기 기본 목록 그대로다 */}
+      <div className="relative w-full">
+        <select
+          {...fieldA11y(id, error)}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className={cn(
+            "h-12 w-full cursor-pointer appearance-none rounded-field border bg-white pr-11 pl-3.75 text-body transition-colors hover:border-grey-400 focus:border-blue-500 focus:outline-none",
+            value ? "text-grey-900" : "text-grey-500",
+            error ? "border-red-500 hover:border-red-500" : "border-grey-300",
+          )}
+        >
+          <option value="" disabled={required} className="text-grey-500">
+            {placeholder}
           </option>
-        ))}
-      </select>
+          {options.map((option) => (
+            <option key={option.value} value={option.value} className="text-grey-900">
+              {option.label}
+            </option>
+          ))}
+        </select>
+        <ChevronDown
+          aria-hidden
+          className="pointer-events-none absolute top-1/2 right-3.75 size-5 -translate-y-1/2 text-grey-500"
+          strokeWidth={2}
+        />
+      </div>
     </Field>
   );
 }
 
 function Row({ children }: { children: ReactNode }) {
-  return <div className="flex w-full flex-col gap-5 sm:flex-row">{children}</div>;
+  // 두 칸 격자: 칸이 하나뿐이어도(부산이 아닌 지역) 반 폭을 지켜 구·군이 나타날 때 왼쪽 칸이 줄어들지 않는다
+  return <div className="grid w-full gap-5 sm:grid-cols-2">{children}</div>;
 }
 
 /** 만 15~75세가 고를 수 있는 출생 연도. 백엔드는 1950~2015를 받는다. */
@@ -197,6 +212,7 @@ function ProfileFields({ profile }: { profile: BasicProfile | null }) {
           onChange={(value) => set("birthYear", value)}
           options={BIRTH_YEARS}
           placeholder="선택"
+          required
           error={errors.birthYear}
         />
         <Select
@@ -206,6 +222,7 @@ function ProfileFields({ profile }: { profile: BasicProfile | null }) {
           onChange={(value) => set("employmentStatus", value)}
           options={EMPLOYMENT_OPTIONS}
           placeholder="선택"
+          required
           error={errors.employmentStatus}
         />
       </Row>
@@ -220,6 +237,7 @@ function ProfileFields({ profile }: { profile: BasicProfile | null }) {
           }}
           options={SIDO_OPTIONS}
           placeholder="선택"
+          required
           error={errors.residenceSido}
         />
         {inBusan && (
@@ -230,6 +248,7 @@ function ProfileFields({ profile }: { profile: BasicProfile | null }) {
             onChange={(value) => set("residenceSigungu", value)}
             options={BUSAN_SIGUNGU_OPTIONS}
             placeholder="선택"
+            required
             error={errors.residenceSigungu}
           />
         )}
@@ -242,6 +261,7 @@ function ProfileFields({ profile }: { profile: BasicProfile | null }) {
           onChange={(value) => set("educationLevel", value)}
           options={EDUCATION_OPTIONS}
           placeholder="선택"
+          required
           error={errors.educationLevel}
         />
         <Select
@@ -269,6 +289,7 @@ function ProfileFields({ profile }: { profile: BasicProfile | null }) {
           onChange={(value) => set("jobField", value)}
           options={JOB_FIELD_OPTIONS}
           placeholder="선택"
+          required
           error={errors.jobField}
         />
         <TextField

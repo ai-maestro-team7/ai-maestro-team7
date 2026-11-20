@@ -68,11 +68,22 @@ export function useSavedIds(): ReadonlySet<string> {
 
 /**
  * 공고를 저장한다 (`POST /saved`, 관심 공고). 같은 요청이 두 번 가도 한 번만 저장되게 `Idempotency-Key`를 붙인다.
- * 저장을 푸는 API는 아직 없다.
+ * 저장을 푸는 것은 `unsaveJob`이다.
  */
 export async function saveJob(jobPostingId: string): Promise<void> {
   // 키에는 `#`을 넣지 않는다 (ai/busan-opportunity/API.md)
   const key = `save-${jobPostingId}-${crypto.randomUUID()}`.replaceAll("#", "-");
   await apiSend("POST", BASE, { jobPostingId, kind: "INTEREST" }, { "Idempotency-Key": key });
   update({ ...store, ids: new Set(store.ids).add(jobPostingId) });
+}
+
+/**
+ * 저장을 푼다 (`DELETE /saved/{id}`). 목표 공고의 마감 일정도 서버가 지운다. 워크스페이스(분석·첨삭 기록)는 남는다.
+ * 이미 풀려 있어도 오류가 아니라서 여러 번 불러도 된다.
+ */
+export async function unsaveJob(jobPostingId: string): Promise<void> {
+  await apiSend("DELETE", `${BASE}/${encodeURIComponent(jobPostingId)}`, undefined);
+  const ids = new Set(store.ids);
+  ids.delete(jobPostingId);
+  update({ ...store, ids });
 }

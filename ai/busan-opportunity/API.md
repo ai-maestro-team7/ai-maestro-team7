@@ -39,6 +39,7 @@
 | PUT | `/me/preferences` | 설정 변경. 보낸 필드만 바뀐다 | 본문 `sort`, `leaveReason`, `notifications`, `receivingPolicies` | `PUT_me_preferences.json` |
 | GET | `/saved` | 저장한 공고 | - | `GET_saved.json` |
 | POST | `/saved` | 공고 저장·목표 담기 | `Idempotency-Key`, 본문 `jobPostingId`, `kind`(`INTEREST`·`TARGET`), `fromAlternativeOf` | `POST_saved.json` |
+| DELETE | `/saved/{id}` | 저장 풀기. 목표 공고의 마감 일정도 지운다. 워크스페이스는 남는다. 저장돼 있지 않았으면 200에 `deleted: false` | - | `DELETE_saved_id.json` |
 | GET | `/notifications` | 알림 목록 | 쿼리 `cursor`, `limit` | `GET_notifications.json` |
 | POST | `/notifications/{id}/read` | 알림 읽음 | - | `POST_notifications_id_read.json` |
 | POST | `/track` | 화면 이벤트 기록 | 본문 `event`(`ALT_CLICKED`·`COMPARE_OPENED`·`COST_TOGGLE_ON`·`BUSAN_FIRST_OFF`·`POLICY_LINK_CLICKED`), `jobPostingId`, `policyId` | `POST_track.json` |

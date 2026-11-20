@@ -123,6 +123,9 @@ class MemoryUsers:
     def update_saved(self, user_id, item):
         self.saved[(user_id, item.job_posting_id)] = item
 
+    def delete_saved(self, user_id, job_posting_id):
+        self.saved.pop((user_id, job_posting_id), None)
+
     def get_alert(self, user_id, policy_id):
         return self.alerts.get((user_id, policy_id))
 

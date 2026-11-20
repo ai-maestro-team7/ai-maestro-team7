@@ -10,7 +10,7 @@ import { saveJob, useSavedIds } from "../saved";
 
 /**
  * 공고 저장 아이콘. 누르면 관심 공고로 저장한다 (`POST /api/v1/opportunities/saved`).
- * 저장한 공고는 오른쪽 위 "저장한 공고"에서 볼 수 있다. 저장을 푸는 API는 아직 없어서 다시 눌러도 그대로다.
+ * 저장한 공고는 오른쪽 위 "저장한 공고"에서 볼 수 있다. 저장은 그 화면의 "관심 해제"로 풀고, 여기서 다시 눌러도 그대로다.
  */
 export function SaveToggle({ jobPostingId, jobTitle, className }: { jobPostingId: string; jobTitle: string; className?: string }) {
   const router = useRouter();
