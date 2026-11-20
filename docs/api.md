@@ -51,6 +51,20 @@ A의 REST 요청은 백엔드에서 확인한 사용자 ID를 `mentoring.api.res
 - 계정은 관리자만 만든다 (회원가입 없음). 계정 추가: `infra/seed_demo.py`에 추가 후 실행.
 - Bedrock Agent의 Action Group(B)은 `sessionAttributes.userId`만 쓴다 (A 백엔드가 InvokeAgent 때 토큰의 sub를 넣음).
 
+**소셜 로그인 (Google·카카오, Cognito 외부 로그인 · 이슈 #98)** · OAuth 2.0 인가 코드 + PKCE
+
+| 경로 | 토큰 | 하는 일 |
+|---|---|---|
+| `GET /api/v1/auth/social/providers` | 없이 | `{providers: [{id, label}]}`. 설정이 없으면 빈 목록 (오류 아님) |
+| `POST /api/v1/auth/social/start` `{provider, redirectUri, state, codeChallenge}` | 없이 | `{authorizeUrl}` (Cognito `/oauth2/authorize`, `scope=openid`, `S256`). 모르는 제공자·형식 오류는 400, 설정이 없으면 503 |
+| `POST /api/v1/auth/social/token` `{code, redirectUri, codeVerifier}` | 없이 | 로그인 응답 + `username`("Google 계정", "카카오 계정"). 코드가 틀리거나 만료면 `401 INVALID_CREDENTIALS`, Cognito 연결 실패는 503 |
+
+흐름: 화면의 버튼 → `start` → `authorizeUrl`로 이동 → 제공자 로그인 → `/login/callback/?code=…&state=…` → 화면이 `state`를 확인하고 `token` → 그다음은 아이디 로그인과 같다 (갱신도 `/auth/refresh`).
+- 제공자에게는 `openid`만 요청한다. 이름·이메일·전화번호는 받지도 저장하지도 로그에 남기지도 않는다. 인가 코드와 토큰도 로그에 남기지 않는다.
+- `redirectUri`는 `https://`(로컬 개발은 `http://localhost`)여야 하고 경로가 `/login/callback/`로 끝나야 한다. Cognito 앱 클라이언트에 등록한 주소와 글자까지 같아야 한다.
+- 설정은 `infra/setup-social-login.sh`로 한다. 클라이언트 ID와 비밀값은 Secrets Manager `team07/social-login`에만 둔다.
+- 소셜 로그인 사용자 계정은 처음 들어올 때 Cognito가 만든다고 보고 있다. 관리자만 계정을 만드는 지금 설정에서도 그런지는 미확인이다.
+
 ## 4. 오래 걸리는 처리 (상태 값 D-05 · 처리 방식 D-19 CONFIRMED)
 
 - `202` + 리소스 ID (`taskId`, `sessionId` 등) → 화면이 상태 API를 2초마다 조회
