@@ -9,7 +9,8 @@
 import logging
 from typing import Any, Literal, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, ValidationError, field_validator, model_validator
+from pydantic import (BaseModel, ConfigDict, Field, FiniteFloat, StrictBool, ValidationError, field_validator,
+                      model_validator)
 from pydantic.alias_generators import to_camel
 from team07_contracts import CareerProfileSummary
 
@@ -82,6 +83,61 @@ class StartInterviewInput(QuestionRequest):
     @classmethod
     def _session_id(cls, value: str) -> str:
         return _non_blank(value)
+
+
+# ---------------------------------------------------------------- 카메라 (4차, camera design §6.1)
+
+FrameType = Literal["CALIBRATION", "ANSWER"]
+
+
+class Angle(_CamelModel):
+    """좌우(yaw)·위아래(pitch) 각도(도). DynamoDB를 거치면 정수 값은 int가 된다."""
+
+    yaw: FiniteFloat
+    pitch: FiniteFloat
+
+
+class EyesOpen(_CamelModel):
+    value: bool
+    confidence: FiniteFloat = Field(ge=0, le=100)
+
+
+class Baseline(_CamelModel):
+    """compute_baseline 결과. 백엔드가 session.baseline에 그대로 넣는다 (camera 결정 6)."""
+
+    gaze: Angle
+    head: Angle
+
+
+class FaceResult(BaseModel):
+    """analyze_face 결과 (★ 형식). compute_baseline 입력 검사에 쓴다.
+
+    모르는 키는 무시한다. 백엔드가 저장 키를 더해도 캡처가 빠지지 않게 하려는 것이다 (camera 결정 5).
+    """
+
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="ignore")
+
+    valid: StrictBool
+    reason: str | None = None
+    gaze: Angle | None = None
+    head: Angle | None = None
+    eyes_open: EyesOpen | None = None
+
+    @model_validator(mode="after")
+    def _angles_when_valid(self) -> "FaceResult":
+        if self.valid and (self.gaze is None or self.head is None):
+            raise ValueError("valid result needs gaze and head")
+        return self
+
+
+class Frame(FaceResult):
+    """백엔드가 FaceResult에 캡처 정보를 붙여 저장한 값 (C ★ frames)."""
+
+    type: FrameType
+    question_id: str | None = None
+    answer_id: str | None = None
+    captured_at: str | None = None
+    accepted: StrictBool
 
 
 # ---------------------------------------------------------------- Session
@@ -164,7 +220,7 @@ class Session(_CamelModel):
     follow_up_used: bool
     current_question: NextQuestion | None
     answers: list[AnswerRecord]
-    baseline: dict[str, Any] | None = None  # 백엔드가 compute_baseline 결과를 넣는다. 형식은 4차에서 정함
+    baseline: Baseline | None = None  # 백엔드가 compute_baseline 결과를 넣는다. None이면 태도 미측정
 
     # pydantic이 model_ 접두사를 예약어로 보지 않게 한다 (model_id 필드)
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid",

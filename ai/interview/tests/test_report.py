@@ -68,7 +68,7 @@ def test_report_shape_and_scores():
     assert report["weightBasis"] == "내용 70% · 전달력 30% 기준"
     assert report["notMeasuredMessages"] == ["카메라 분석은 다음 단계에서 제공돼 태도는 제외했어요."]
     assert report["modelId"] == "test-model" and report["promptVersion"] == "C1-v1/C2-v1"
-    assert report["scoringVersion"] == "v1.0" and "합격 확률이 아니에요" in report["notice"]
+    assert report["scoringVersion"] == "v2.0" and "합격 확률이 아니에요" in report["notice"]
     assert "interviewDate" not in report  # 백엔드가 넣는다
     assert len(llm.calls) == 3 and len(llm.runs) == 1
 

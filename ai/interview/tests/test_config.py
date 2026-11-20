@@ -57,6 +57,22 @@ def test_grade_for(score, label):
     assert config.load_scoring_config().grade_for(score) == label
 
 
+def test_v2_adds_face_check_and_keeps_v1_values():
+    # 4차(#108): 분석 제외 기준을 더해 v2.0. 나머지 값은 v1.0과 같다 (report 결정 2: v1 파일은 바꾸지 않음)
+    v1 = json.loads((config.CONFIG_DIR / "scoring_v1.json").read_text(encoding="utf-8"))
+    v2 = raw_config()
+    assert config.SCORING_CONFIG_PATH.name == "scoring_v2.json"
+    assert v1["scoring_version"] == "v1.0" and v2["scoring_version"] == "v2.0" == versions.SCORING_VERSION
+    assert "face_check" not in v1
+    assert {k: v for k, v in v2.items() if k not in ("scoring_version", "face_check")} == \
+           {k: v for k, v in v1.items() if k != "scoring_version"}
+    fc = config.load_scoring_config().face_check
+    assert (fc.min_face_confidence, fc.min_eye_direction_confidence, fc.occluded_min_confidence,
+            fc.min_brightness, fc.min_sharpness) == (90, 50, 80, 20, 10)  # 제안값 (camera design §3)
+    assert config.load_scoring_config().attitude.eyes_closed_min_confidence == 80
+    assert config.load_scoring_config().attitude.calibration_min_valid == 3
+
+
 def test_config_has_no_model_id():
     assert "model_id" not in json.dumps(raw_config())
 
@@ -78,7 +94,11 @@ def _broken(mutate):
 @pytest.mark.parametrize("data", [
     "{not json",
     [],
-    _broken(lambda d: d.update(scoring_version="v2.0")),
+    _broken(lambda d: d.update(scoring_version="v1.0")),                              # 예전 버전 파일
+    _broken(lambda d: d.pop("face_check")),
+    _broken(lambda d: d["face_check"].update(min_brightness=0)),
+    _broken(lambda d: d["face_check"].update(min_face_confidence=101)),
+    _broken(lambda d: d["face_check"].update(extra=1)),
     _broken(lambda d: d.update(model_id="x")),
     _broken(lambda d: d["delivery"].pop("speech_rate")),
     _broken(lambda d: d["delivery"]["speech_rate"].update(max_non_hangul_ratio=1.5)),

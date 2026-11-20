@@ -11,9 +11,9 @@ import pytest
 
 import interview
 from conftest import sample_json, sample_text
-from fakes import FakeLLM, FakePolly, FakeS3, FakeToolLLM, FakeTranscribe
+from fakes import FakeLLM, FakePolly, FakeRekognition, FakeS3, FakeToolLLM, FakeTranscribe
+from interview import camera, voice
 from interview import llm as interview_llm
-from interview import voice
 from interview.content import RUBRIC_KEYS
 from interview.models import Session
 
@@ -47,12 +47,16 @@ def env(monkeypatch):
 
 
 class FakeAWS:
-    """voice.py가 쓰는 Polly·Transcribe·S3 가짜 묶음. 결과 파일은 모두 같은 정상 답변이다."""
+    """voice.py가 쓰는 Polly·Transcribe·S3, camera.py가 쓰는 Rekognition 가짜 묶음.
+
+    결과 파일은 모두 같은 정상 답변이다. Rekognition은 기본으로 노트북 카메라 정면 얼굴(시선 위아래 약 -10°)을 준다.
+    """
 
     def __init__(self, polly_error=None):
         self.polly = FakePolly(error=polly_error)
         self.transcribe = FakeTranscribe(pending_polls=1)  # 첫 조회는 IN_PROGRESS, 다음 조회에 완료
         self.s3 = FakeS3(default_body=sample_text("transcribe/result_normal.json"))
+        self.rekognition = FakeRekognition()
 
 
 @pytest.fixture
@@ -61,6 +65,7 @@ def aws(monkeypatch):
     monkeypatch.setattr(voice, "_polly_client", lambda: fake.polly)
     monkeypatch.setattr(voice, "_transcribe_client", lambda: fake.transcribe)
     monkeypatch.setattr(voice, "_s3_client", lambda: fake.s3)
+    monkeypatch.setattr(camera, "_rekognition_client", lambda: fake.rekognition)
     return fake
 
 
@@ -149,11 +154,13 @@ def test_backend_flow_with_follow_up_and_baseline(aws, report_llm):
     deliveries = [a["delivery"] for a in session["answers"]]
     assert all(19.5 <= d["answerSec"] <= 19.6 and d["longPauseCount"] == 1 and d["speechRate"] for d in deliveries)
     assert "words" not in json.dumps(session)
-    assert session["baseline"] == {"gaze": {"yaw": 0, "pitch": 0}, "head": {"yaw": 0, "pitch": 0}}  # 0.0 → 0
+    assert session["baseline"] == {"gaze": {"yaw": 0, "pitch": -10}, "head": {"yaw": 0, "pitch": 5}}  # 0.0 → 0
     assert session["profile"]["profileVersion"] == 2
     Session.model_validate(session)  # 저장·조회와 기준값 추가 뒤에도 Session 형식 그대로
     assert len(answer_frames) == 4
-    assert all(f["eyesOpen"] == {"value": True, "confidence": 98.5} for f in answer_frames)
+    assert all(f["eyesOpen"] == {"value": True, "confidence": 98} for f in answer_frames)
+    # 이미지는 bytes로만 넘기고 S3에 올리지 않는다
+    assert all(set(c["Image"]) == {"Bytes"} for c in aws.rekognition.calls) and aws.s3.puts == []
     # 리포트: 기준값이 있어도 3차는 태도 미측정 (임시 카메라 값으로 점수를 만들지 않는다)
     assert report["evaluatedBaseQuestions"] == 3 and report["interviewDate"] == "2026-11-21"
     assert report["areas"]["attitude"] == {"score": None, "notMeasuredReason": "ATTITUDE_NOT_READY"}

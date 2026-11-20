@@ -1,13 +1,15 @@
-"""점수 설정 파일 읽기 (voice design §9, report design §8).
+"""점수 설정 파일 읽기 (voice design §9, report design §8, camera design §3).
 
-`config/scoring_v1.json`을 프로세스에서 한 번 읽고 검사한다. 모르는 키는 보관만 한다.
-v1.0 파일은 3차 머지 뒤 값을 바꾸지 않는다. 바꾸려면 scoring_v2.json을 새로 만든다 (report 결정 2).
+`config/scoring_v2.json`을 프로세스에서 한 번 읽고 검사한다. 모르는 키는 보관만 한다.
+v1.0 파일(scoring_v1.json)은 3차 머지 뒤 바꾸지 않았다. 4차(#108)에서 분석 제외 기준(face_check)을 더하며
+v2.0 파일을 새로 만들었다 (report 결정 2). v1 파일은 기록으로만 남고 읽지 않는다.
 
 기준값 출처:
 - 가중치 시간 관리 10·발화 속도 30·긴 침묵 30, 종합 50/25/25: docs/개발계획서3.md §4.3
 - 15초 미만 답변은 발화 속도·침묵 미측정, 2분 초과 8점: §7 품질 검증 표
 - 나머지(숫자·영문 비율 0.2, 긴 침묵 2초, 속도 구간, 침묵 구간, 태도 기준, 종합 비율, 등급):
   노션 "AI 모의면접 에이전트 기능" 6-②~⑤ (저장소에 없음). 등급은 노션 표의 값을 설정 파일로 옮겼다
+- face_check(얼굴 신뢰도, 시선 신뢰도, 가림, 밝기, 선명도): 노션에 없는 제안값. 수동 확인으로 맞춘다 (camera 결정 1)
 - model_id 키는 두지 않는다 (모델은 환경변수 MODEL_ID만, 1차 결정 5)
 """
 
@@ -26,7 +28,7 @@ from .versions import SCORING_VERSION
 logger = logging.getLogger("interview")
 
 CONFIG_DIR = Path(__file__).resolve().parent / "config"
-SCORING_CONFIG_PATH = CONFIG_DIR / "scoring_v1.json"
+SCORING_CONFIG_PATH = CONFIG_DIR / "scoring_v2.json"
 STAGE = "load_scoring_config"
 
 
@@ -84,7 +86,7 @@ class DeliveryConfig(BaseModel):
 
 
 class AttitudeConfig(BaseModel):
-    """태도 기준 (노션 6-③). 3차는 검사만 하고 쓰지 않는다 (4차에서 사용)."""
+    """태도 기준 (노션 6-③). measure_attitude·compute_baseline이 쓴다 (4차)."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -102,6 +104,18 @@ class AttitudeConfig(BaseModel):
         if self.frontal_zero_max >= self.frontal_full_min:
             raise ValueError("frontal_zero_max must be below frontal_full_min")
         return self
+
+
+class FaceCheckConfig(BaseModel):
+    """analyze_face의 분석 제외 기준 (camera design §3). Rekognition 값은 모두 0~100이다."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    min_face_confidence: float = Field(gt=0, le=100)           # 얼굴 신뢰도. 미달 얼굴은 "여러 명"으로도 세지 않는다
+    min_eye_direction_confidence: float = Field(gt=0, le=100)  # 시선 신뢰도
+    occluded_min_confidence: float = Field(gt=0, le=100)       # 가림이라고 할 때 필요한 확신도
+    min_brightness: float = Field(gt=0, le=100)                # Quality.Brightness 미만이면 어두움
+    min_sharpness: float = Field(gt=0, le=100)                 # Quality.Sharpness 미만이면 흐림
 
 
 AREAS = ("content", "delivery", "attitude")
@@ -152,6 +166,7 @@ class ScoringConfig(BaseModel):
     recording_limit_sec: int = Field(gt=0)
     delivery: DeliveryConfig
     attitude: AttitudeConfig
+    face_check: FaceCheckConfig
     total_weights: TotalWeights
     grades: list[Grade] = Field(min_length=1)
 
@@ -194,5 +209,5 @@ def read_scoring_config(path: Path) -> ScoringConfig:
 
 @lru_cache(maxsize=1)
 def load_scoring_config() -> ScoringConfig:
-    """배포 묶음의 config/scoring_v1.json. 프로세스에서 한 번만 읽는다."""
+    """배포 묶음의 config/scoring_v2.json. 프로세스에서 한 번만 읽는다."""
     return read_scoring_config(SCORING_CONFIG_PATH)
