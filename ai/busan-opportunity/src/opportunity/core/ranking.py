@@ -498,9 +498,9 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
     vector = profile_vector(deps, ctx.profile, query_terms)
     top_k = cfg.ranking.candidate_top_k
     sidos = _region_sidos(cfg, region)
-    queries = [(top_k.busan, active_filter(ctx.as_of, isBusan=True)), (top_k.all, active_filter(ctx.as_of))]
+    queries = [(top_k.feed, active_filter(ctx.as_of, isBusan=True)), (top_k.feed, active_filter(ctx.as_of))]
     if sidos:
-        queries.append((top_k.all, active_filter(ctx.as_of, sido={"$in": sidos})))
+        queries.append((top_k.feed, active_filter(ctx.as_of, sido={"$in": sidos})))
     similarity: dict[str, float] = {}
     for hits in (deps.vectors.query(vector, top_k=k, filter=f) for k, f in queries):
         for hit in hits:

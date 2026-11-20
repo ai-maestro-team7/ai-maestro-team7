@@ -33,7 +33,8 @@
     "inversionGuard": 0.15,
     "candidateTopK": {
       "busan": 30,
-      "all": 30
+      "all": 30,
+      "feed": 100
     }
   },
   "alternatives": {
