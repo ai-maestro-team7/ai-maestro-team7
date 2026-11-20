@@ -100,7 +100,7 @@
 - `ivId` = 면접 명세의 `sessionId` (UUID, 백엔드 생성). 중복 제출은 조건부 쓰기 → 409. 제출 뒤 캡처는 `accepted=false`
 - `compute_baseline`은 리포트 직전 `CALIBRATION` 캡처로 → `session.baseline`. 유효 3장 미만이면 `None`(태도 미측정)이고 백엔드는 대체값을 넣지 않는다
 - Transcribe 결과는 백엔드가 정한 `uploads/interview/{ivId}/transcripts/{answerId}.json`에 저장(`start_transcription`의 `output_bucket`·`output_key`). 답변 원문이 들어 있어 녹음과 함께 바로 삭제
-- `start_interview` 입력: `resumeText` 또는 `documentId` → `DOC_LATEST#`의 `extractedTextKey`. `profile` = `PROFILE#LATEST` 최신 버전의 `projects`, `skills`, `needsConfirmation`
+- `start_interview` 입력: `resumeText` 또는 `documentId` → `DOC_LATEST#`의 `extractedTextKey`. 저장된 역량 프로필은 `PROFILE#LATEST`가 가리키는 버전을 A의 `to_career_profile_summary()`로 변환해 넘긴다. 변환 결과가 없거나 계약 검사를 통과하지 못하면 `profile=None`이다.
 - 녹음은 변환 끝나면 바로 삭제, `uploads/` 7일 자동 삭제는 안전장치
 - 구현 `backend/interview_api.py` · 테스트 `backend/test_interview.py`
 
@@ -121,7 +121,7 @@
 
 1. `ACCOUNT.status = DELETING` → 모든 쓰기(작업 Lambda, B 배치 포함)는 이 값을 확인하고 저장
 2. Query `PK = USER#{u}` 페이지네이션 → `BatchWriteItem` 25개씩, `UnprocessedItems`는 지수 백오프 재시도. **`OPP#` 아이템도 같은 PK라 함께 지워진다**
-3. S3: `career-docs/users/{hashedUserId}/`, `uploads/interview/{ivId}/`
+3. S3: `career-docs/users/{hashedUserId}/`, `uploads/interview/{ivId}/`. 개인 문서 저장과 회원 탈퇴 삭제는 모두 `backend/common.py`의 `hash_user_id()`를 사용한다. 인증된 Cognito `sub`의 UTF-8 바이트를 SHA-256으로 해시한 소문자 64자리 16진수이며, 접두사를 안정적으로 다시 계산할 수 있도록 키나 솔트를 사용하지 않는다. 해시는 인증이나 접근 제어를 대신하지 않는다.
 4. B의 EventBridge 일정(`scheduleNames[]`, `OPP#ALERT#.scheduleName`)은 아이템을 지우기 전에 읽어서 삭제 (B 함수 호출)
 5. 마지막에 `ACCOUNT` 삭제. 단계별 건수만 로그로
 

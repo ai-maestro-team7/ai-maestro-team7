@@ -2,7 +2,7 @@
 
 경로 앞부분으로 파트별 처리로 나눈다 (docs/api.md):
   /api/v1/interview/*      모의면접 (C)          → interview_api.py
-  /api/v1/mentoring/*      멘토링 (A)            → 연결 예정
+  /api/v1/mentoring/*      멘토링 (A)            → mentoring_api.py
   /api/v1/opportunities/*  부산 기회 추천 (B)    → opportunities_api.py
   /api/v1/auth/login·refresh 로그인 (토큰 없이)  → auth_api.py
   /api/v1/me               내 정보 (토큰 필요)    → auth_api.py
@@ -45,6 +45,8 @@ def health():
 
 def lambda_handler(event, context):
     # 뒤에서 처리하는 작업 (Lambda 비동기 자기 호출)
+    if "mentoringTask" in event:
+        return part("mentoring_api").run_task(event)
     if "task" in event:
         return part("interview_api").run_task(event)
     # B 알림 일정 (EventBridge Scheduler)
@@ -68,9 +70,10 @@ def lambda_handler(event, context):
         return dispatch("auth_api", event, method, path)
     if path.startswith("/api/v1/interview/"):
         return dispatch("interview_api", event, method, path)
+    if path.startswith("/api/v1/mentoring/") or path == "/api/v1/mentoring":
+        return dispatch("mentoring_api", event, method, path)
     if path.startswith("/api/v1/opportunities/"):
         return dispatch("opportunities_api", event, method, path)
-    for prefix in ("/api/v1/mentoring/", "/api/v1/opportunities"):
-        if path.startswith(prefix) or path == prefix.rstrip("/"):
-            return not_implemented()
+    if path.startswith("/api/v1/opportunities"):
+        return not_implemented()
     return error_response(TeamError(404, "NOT_FOUND", "없는 주소예요."), new_request_id())

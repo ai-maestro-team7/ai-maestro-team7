@@ -10,7 +10,7 @@ A(멘토링), B(부산 기회 추천), C(AI 모의면접) 명세의 공통 부�
 | 경로 | 파트 | 상태 |
 |---|---|---|
 | `/api/v1/interview/*` | C 모의면접 | ✅ 배포 (면접 함수는 대역, `interview/` 패키지가 들어오면 교체) |
-| `/api/v1/mentoring/*` | A 멘토링 (`/profiles/me`는 **역량 프로필**) | 연결 예정 (501) |
+| `/api/v1/mentoring/*` | A 멘토링 (`/profiles/me`는 **역량 프로필**) | 백엔드 연결 (`backend/mentoring_api.py`). A 패키지, AWS 의존성 팩터리 또는 필수 AWS 설정이 없으면 501 |
 | `/api/v1/opportunities/*` | B 부산 기회 추천 | 연결됨 (`backend/opportunities_api.py`). 배포는 백엔드 담당 확인 후 |
 | `/api/v1/me/profile` (GET, PUT) | 공통 **기본 프로필** (`PROFILE#BASIC`). PUT은 보낸 필드만 수정, `null`이면 삭제 | ✅ |
 | `/api/v1/me/workspaces` (GET `?status=`, POST) · `/api/v1/me/workspaces/{wsId}` (GET, PATCH) | 워크스페이스 목록·생성(중복이면 기존 것)·상세(연결된 분석·첨삭·학습·면접)·상태와 문서 버전 변경 | ✅ |
@@ -19,6 +19,10 @@ A(멘토링), B(부산 기회 추천), C(AI 모의면접) 명세의 공통 부�
 
 API 주소(`API_BASE`)는 팀 채널 공지 참고. 저장소가 공개라 적지 않는다.
 API Gateway는 **HTTP API** (payload v2.0). Powertools를 쓰면 `APIGatewayHttpResolver`를 쓴다 (`APIGatewayRestResolver` 아님).
+
+A의 REST 요청은 백엔드에서 확인한 사용자 ID를 `mentoring.api.rest_handler.handle`에 넘긴다.
+`mentoringTask` 키가 있는 Lambda 내부 이벤트는 `mentoring.api.task_handler.handle`에 넘긴다.
+두 입구는 `mentoring.store.factory.build_aws_deps()`가 만든 `Deps`를 재사용하고, `Deps.hash_user_id`는 백엔드 공통 함수를 사용한다.
 
 ## 2. 형식 (카멜 표기 D-02 · 시각 `+09:00` D-29 · 금액 D-30 CONFIRMED)
 

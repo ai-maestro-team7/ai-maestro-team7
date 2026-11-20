@@ -84,11 +84,28 @@ def main():
     t = boto3.resource("dynamodb").Table("test-cm")
     t.put_item(Item={"PK": "USER#u-1", "SK": "DOC_LATEST#doc-1", "latestVersion": 2, "extractedTextKey": "users/h/documents/doc-1/v2/extracted.txt"})
     t.put_item(Item={"PK": "USER#u-1", "SK": "PROFILE#LATEST", "latestProfileId": "p-1", "latestVersion": 2})
-    t.put_item(Item={"PK": "USER#u-1", "SK": "PROFILE#p-1#V#0002", "projects": ["예약 API"], "skills": ["Python"], "needsConfirmation": ["트래픽"], "evidence": ["x"]})
+    career_profile = {
+        "PK": "USER#u-1", "SK": "PROFILE#p-1#V#0002", "ownerUserId": "u-1",
+        "profileId": "p-1", "profileVersion": 2, "createdBy": "USER_CONFIRMATION",
+        "createdAt": "2026-11-20T10:00:00+09:00",
+        "projects": [{"itemId": "proj-1", "name": "예약 API", "factStatus": "VERIFIED"}],
+        "skills": [
+            {"skillId": "sk-1", "name": "Python", "factStatus": "VERIFIED", "evidenceLevel": "EVIDENCED"},
+            {"skillId": "sk-2", "name": "트래픽", "factStatus": "NEEDS_CONFIRMATION", "evidenceLevel": "PARTIAL"},
+        ],
+        "evidence": [{"evidenceId": "ev-1", "sourceDocumentId": "doc-1", "page": 1, "startChar": 0,
+                      "endChar": 6, "quotedText": "면접에 넘기지 않는 원문"}],
+    }
+    t.put_item(Item=career_profile)
     s2, b2 = call("POST", "/api/v1/interview/start", body={"job": "백엔드", "interviewType": "JOB", "cameraConsent": False, "documentId": "doc-1"})
     sess2 = api.get_interview("u-1", b2["sessionId"])["session"]
     check("documentId → DOC_LATEST#의 extractedTextKey에서 자소서 읽음", s2 == 202 and sess2["resumeText"] == RESUME)
-    check("profile = 최신 버전의 projects, skills, needsConfirmation만", sess2["profile"] == {"projects": ["예약 API"], "skills": ["Python"], "needsConfirmation": ["트래픽"]})
+    check("A 역량 프로필을 면접 계약으로 변환하며 원문은 제외", sess2["profile"] == {
+        "projects": ["예약 API"], "skills": ["Python"], "needsConfirmation": ["트래픽"],
+        "profileId": "p-1", "profileVersion": 2,
+    })
+    t.put_item(Item={**career_profile, "skills": ["이전 형식의 원본"]})
+    check("변환할 수 없는 역량 프로필은 전달하지 않음", api.load_latest_profile("u-1") is None)
 
     s, b = call("GET", f"/api/v1/interview/{sid}/status")
     check("status → NEXT_QUESTION_READY + answerId", b["stage"] == "NEXT_QUESTION_READY" and b["nextQuestion"]["answerId"] == "a-q1-1")
