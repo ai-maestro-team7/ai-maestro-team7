@@ -18,7 +18,8 @@ def build_message(task: Task) -> dict:
 
 def run_task(deps, message: TaskMessage) -> dict:
     """작업 하나를 실행하고 요약을 돌려준다. 예외를 밖으로 던지지 않는다 (비동기 호출이라 받을 쪽이 없다)."""
-    from .extraction import run_profile_extraction  # 순환 import 방지
+    from ..fit.analysis import run_job_fit  # 순환 import 방지
+    from .extraction import run_profile_extraction
     from .upload import run_document_extraction
 
     started = time.perf_counter()
@@ -41,6 +42,8 @@ def run_task(deps, message: TaskMessage) -> dict:
             outcome = run_profile_extraction(deps, claimed)
         elif claimed.task_type == TaskType.DOCUMENT_EXTRACT:
             outcome = run_document_extraction(deps, claimed)
+        elif claimed.task_type == TaskType.JOB_FIT:
+            outcome = run_job_fit(deps, claimed)
         else:
             raise MentoringError(500, "INTERNAL_ERROR", "알 수 없는 작업이에요.", False)
         final = claimed.model_copy(update={
@@ -62,10 +65,15 @@ def run_task(deps, message: TaskMessage) -> dict:
 
 
 def _failed(deps, task: Task, code: str, retryable: bool) -> Task:
-    from .documents import set_document_status
+    if task.task_type == TaskType.JOB_FIT:
+        from ..fit.analysis import mark_failed
 
-    set_document_status(deps, task.owner_user_id, task.resource_id, task.resource_version, ExtractionStatus.FAILED,
-                        error_code=code)
+        mark_failed(deps, task, code)
+    else:
+        from .documents import set_document_status
+
+        set_document_status(deps, task.owner_user_id, task.resource_id, task.resource_version,
+                            ExtractionStatus.FAILED, error_code=code)
     now = deps.now_iso()
     return task.model_copy(update={"status": TaskStatus.FAILED, "error_code": code, "retryable": retryable,
                                    "updated_at": now, "completed_at": now})

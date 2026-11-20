@@ -58,6 +58,7 @@ class TaskType(str, Enum):
     """db-schema §2.5 `taskType` 값."""
     DOCUMENT_EXTRACT = "DOCUMENT_EXTRACT"  # 업로드한 PDF → 정규화 텍스트
     PROFILE_EXTRACT = "PROFILE_EXTRACT"    # 정규화 텍스트 → 역량 프로필
+    JOB_FIT = "JOB_FIT"                    # 역량 프로필 + 공고(또는 NCS 직무) → 적합도 분석
 
 
 class ConfirmAction(str, Enum):
