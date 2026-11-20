@@ -114,6 +114,11 @@ presigned URL은 응답에만 넣고 DB·멱등 결과·로그에 남기지 않�
 - 근거 인용이 원문에 없으면 근거로 저장하지 않는다. 근거가 하나도 남지 않은 역량은 프로필에 넣지 않고 `needsConfirmation`으로 돌린다
 - 재요청 뒤에도 원문에 없는 내용이 남은 항목은 빼고, 작업과 문서를 `REQUIRES_USER_REVIEW`(사유 `EVIDENCE_MISMATCH`)로 둔다
 - 모델이 고른 확인 상태는 쓰지 않는다. 확인 전 역량은 모두 `NEEDS_CONFIRMATION`이고 `VERIFIED`는 사용자 확인(`POST /profiles/{id}/confirm`)으로만 생긴다
+- 역량 표준 분류 (#104, `core/taxonomy.py`): `name`은 이력서 표현 그대로 자유롭게 두고, 표준 코드는 프롬프트에 넘긴 목록에서만 고른다
+  - `ncsUnitCode`: 희망 직무(`PROFILE#BASIC.desiredJobs[].ncsCode`, 최대 3개)의 NCS 능력단위
+  - `basicSkillId`: NCS 직업기초능력 34개 (예: `003` 의사소통능력 > 경청능력)
+  - 목록에 없는 코드는 지운다. 희망 직무가 없으면 직업기초능력만 고른다. `Deps.ncs`가 없거나 기준 데이터를 못 읽으면 코드 없이 추출한다
+  - NCS 기준 적합도는 요건(능력단위)과 코드가 같은 역량을 모델 없이 연결하고, 나머지만 모델에 묻는다
 - 새 문서를 분석하면 같은 프로필의 다음 버전이 된다. 버전은 고치지 않고 쌓는다
 
 ## 아직 정하지 않은 것
