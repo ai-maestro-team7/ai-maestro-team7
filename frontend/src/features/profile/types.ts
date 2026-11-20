@@ -12,6 +12,9 @@ export type BasicProfile = {
   desiredJobs?: DesiredJob[];
   desiredRegion?: string;
   priorities?: string[];
+  /** 채팅 조건 저장 (D-40): 희망 최소 연봉(만 원/년), 신입·경력 구분 */
+  desiredSalaryMin?: number;
+  desiredCareerType?: "NEW" | "EXPERIENCED" | "ANY";
 };
 
 /** 저장할 때 보내는 값. null은 그 항목을 지운다. */
