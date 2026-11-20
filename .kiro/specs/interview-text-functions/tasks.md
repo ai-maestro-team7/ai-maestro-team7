@@ -38,16 +38,16 @@
     - 임시 구현의 반환 값, 가짜 S3 클라이언트에 기록된 `put_object` 인자, `compute_baseline` 유효 2개 → `None`·3개 → 기준값
     - _Requirements: 1.3, 1.4, 1.5, 11.2, 11.3, 11.4, 11.5, 14.1, 14.4_
 
-- [ ] 4. LLM 계층
-  - [ ] 4.1 `llm.py`에 `LLMClient` 인터페이스, `extract_json`, `call_json`(1회 재시도)을 만든다 (design §6.1, §6.3)
+- [x] 4. LLM 계층
+  - [x] 4.1 `llm.py`에 `LLMClient` 인터페이스, `extract_json`, `call_json`(1회 재시도)을 만든다 (design §6.1, §6.3)
     - 모델 호출 예외는 `AWS_SERVICE_ERROR`(retryable true), 2회 검사 실패는 `AI_OUTPUT_INVALID`(retryable true)
     - 로그는 stage·attempt·errorCode·durationMs만
     - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 12.1_
-  - [ ] 4.2 `StrandsLLMClient`를 만든다 (design §6.2)
+  - [x] 4.2 `StrandsLLMClient`를 만든다 (design §6.2)
     - `strands`는 지연 import, `BedrockModel`은 프로세스에서 한 번, `Agent`는 호출마다 새로 만들고 `tools=[]`, `callback_handler=None`
     - 설치된 `strands-agents` 버전에서 `callback_handler=None`과 `str(result)` 동작을 확인한다. 다르면 design §6.2를 고친다
     - _Requirements: 4.1, 4.3, 4.4, 4.5, 4.6_
-  - [ ] 4.3 `tests/fakes.py`에 Fake_LLM과 가짜 S3 클라이언트, `tests/test_llm.py`를 쓴다
+  - [x] 4.3 `tests/fakes.py`에 Fake_LLM과 가짜 S3 클라이언트, `tests/test_llm.py`를 쓴다
     - 코드 블록 JSON 추출, 첫 실패 후 성공, 2회 실패, 호출 예외, `MODEL_ID` 없음, `StrandsLLMClient`가 `strands` 없이 import되는지
     - _Requirements: 4.2, 5.2, 5.3, 5.4, 5.5, 14.1_
 

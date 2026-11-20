@@ -21,13 +21,13 @@ QUESTION_MIN, QUESTION_MAX = 5, 300
 # 면접 고정 규칙 (C §4.2)
 BASE_QUESTION_COUNT = 3
 
-_CONFIG_ERROR_MESSAGE = "면접 설정에 문제가 있어요. 관리자에게 알려 주세요."
+CONFIG_ERROR_MESSAGE = "면접 설정에 문제가 있어요. 관리자에게 알려 주세요."
 
 
 def model_id() -> str:
     value = os.environ.get("MODEL_ID", "").strip()
     if not value:
-        raise InterviewError(AWS_SERVICE_ERROR, _CONFIG_ERROR_MESSAGE, retryable=False)
+        raise InterviewError(AWS_SERVICE_ERROR, CONFIG_ERROR_MESSAGE, retryable=False)
     return value
 
 
@@ -44,5 +44,5 @@ def max_tokens() -> int:
     except ValueError:
         value = 0
     if value <= 0:
-        raise InterviewError(AWS_SERVICE_ERROR, _CONFIG_ERROR_MESSAGE, retryable=False)
+        raise InterviewError(AWS_SERVICE_ERROR, CONFIG_ERROR_MESSAGE, retryable=False)
     return value
