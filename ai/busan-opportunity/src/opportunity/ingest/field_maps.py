@@ -1,7 +1,9 @@
 """출처별 "원본 필드 → 우리 필드" 매핑표와 호출 설정.
 
-주의: 이 파일의 값은 전부 임시다. 공공 API의 실제 응답 필드 이름은 아직 아무도 확인하지 못했다
-(개발계획서2 §3.2). 첫 수집이 `raw/{출처}/{날짜}/`에 남긴 원본 응답을 보고 이 표를 고친다.
+확인 상태 (2026-11-20, 개발계획서2 §3.2)
+- 온통청년 청년정책, 고용24 청년일자리강소기업, 고용24 공통코드(지역·직종): 실제 응답을 받아 이 표를 맞췄다.
+  원본은 `raw/{출처}/2026-11-20/`에 있다.
+- 고용24 채용정보(WORK24), 잡알리오(ALIO): 응답 미확인. 값은 응답을 보기 전에 넣은 임시 값이다.
 정규화 함수(`normalize.py`)는 이 표만 본다. 필드 이름을 코드 안에 박지 않는다.
 
 값 규칙
@@ -24,6 +26,8 @@ SECRET_DATA_GO_KR = "DATA_GO_KR_SERVICE_KEY"
 SECRET_WORK24 = "WORK24_AUTH_KEY"
 SECRET_YOUTHCENTER = "YOUTHCENTER_API_KEY"
 
+# 응답 미확인 (개인회원 불가): 고용24 채용정보 목록 210L01·상세 210D01은 개인회원 키로 부르면
+# "개인회원은 사용할 수 없는 OPEN-API입니다" 오류가 온다 (2026-11-20). 아래 필드 이름은 임시 값이다.
 WORK24 = {
     "source": "work24",
     "secret": SECRET_WORK24,
@@ -60,6 +64,8 @@ WORK24 = {
     },
 }
 
+# 응답 미확인 (키 미등록): 잡알리오는 403 SERVICE_KEY_IS_NOT_REGISTERED_ERROR가 온다 (2026-11-20).
+# 아래 필드 이름은 임시 값이다.
 ALIO = {
     "source": "alio",
     "secret": SECRET_DATA_GO_KR,  # 공공데이터포털 키는 URL 인코딩된 값이다. `http.encode_key`가 두 번 인코딩하지 않는다
@@ -97,40 +103,107 @@ ALIO = {
     },
 }
 
+# 온통청년 청년정책 (2026-11-20 응답 확인). pageType=1이 없으면 e003 오류가 온다.
+# 응답: result.pagging.totCount, result.youthPolicyList[]. 3,996건이라 100건씩 40페이지다.
 YOUTHCENTER = {
     "source": "youthcenter",
     "secret": SECRET_YOUTHCENTER,
     "key_param": "apiKeyNm",
     "list": {
         "url": "https://www.youthcenter.go.kr/go/ythip/getPlcy",
-        "params": {"rtnType": "json"},
-        "page_param": "pageNum", "size_param": "pageSize", "page_size": 100, "first_page": 1, "max_pages": 50,
+        "params": {"pageType": 1, "rtnType": "json"},
+        "page_param": "pageNum", "size_param": "pageSize", "page_size": 100, "first_page": 1, "max_pages": 60,
         "items_path": "result.youthPolicyList", "total_path": "result.pagging.totCount",
     },
     "fields": {
         "external_id": "plcyNo",
         "title": "plcyNm",
-        "summary": "plcyExplnCn",
+        "summary": ("plcySprtCn", "plcyExplnCn"),  # 지원 내용 원문이 먼저, 없으면 정책 설명
         "benefit_text": "plcySprtCn",
-        "category": "lclsfNm",
+        "category": "lclsfNm",                     # 대분류. "일자리,교육"처럼 여럿이 쉼표로 올 수 있다
+        "subcategory": "mclsfNm",                  # 중분류
+        "age_limited": "sprtTrgtAgeLmtYn",         # Y일 때만 나이를 쓴다
         "age_min": "sprtTrgtMinAge",
         "age_max": "sprtTrgtMaxAge",
-        "apply_period_text": "aplyYmd",
+        "apply_period_code": "aplyPrdSeCd",
+        "apply_period_text": "aplyYmd",            # "20261119 ~ 20261204". 여러 기간은 글자 \N으로 이어 온다
+        "biz_start": "bizPrdBgngYmd",
+        "biz_end": "bizPrdEndYmd",
         "url": ("aplyUrlAddr", "refUrlAddr1"),
-        "region_codes": "zipCd",          # 쉼표로 이어진 법정동 코드. 비어 있으면 전국
+        "region_codes": "zipCd",                   # 법정 시군구 코드 5자리를 쉼표로 이은 값
+        "income_code": "earnCndSeCd",
+        "income_min": "earnMinAmt",
+        "income_max": "earnMaxAmt",
         "income_text": "earnEtcCn",
-        "income_kind": "earnCndSeNm",
-        "residence_text": None,
-        "extra_conditions": ("addAplyQlfcCndCn", "ptcpPrpTrgtCn"),
-        "apply_method": "plcyAplyMthdCn",
+        "extra_conditions": "addAplyQlfcCndCn",    # 추가 자격 조건
+        "excluded_targets": "ptcpPrpTrgtCn",       # 참여 제한 대상
+        "first_come": "sprtArvlSeqYn",             # Y면 선착순
+        "documents": "sbmsnDcmntCn",
+        "job_codes": "jobCd",
     },
 }
 
-SOURCES = {"work24": WORK24, "alio": ALIO, "youthcenter": YOUTHCENTER}
+# 온통청년 코드 값. 공식 코드표를 아직 못 봐서 2026-11-20 응답 3,996건의 분포로 추정했다.
+# 신청기간구분 (aplyPrdSeCd)
+APPLY_PERIOD_FIXED = "0057001"    # 추정: 특정 기간. 이 값만 aplyYmd가 채워져 온다 (1,938건 모두)
+APPLY_PERIOD_ALWAYS = "0057002"   # 추정: 상시. aplyYmd가 늘 비어 있고 사업 기간 대부분이 아직 진행 중이다
+APPLY_PERIOD_CLOSED = "0057003"   # 추정: 마감. aplyYmd가 비어 있고 사업 기간 80%가 이미 끝났다
+# 소득조건구분 (earnCndSeCd)
+INCOME_ANY = "0043001"            # 추정: 무관. 금액이 모두 0이고 기타 내용이 없다
+INCOME_AMOUNT = "0043002"         # 추정: 연소득 금액 조건. earnMinAmt·earnMaxAmt가 채워져 온다
+INCOME_OTHER = "0043003"          # 추정: 기타. earnEtcCn에 "중위소득 150% 이하" 같은 글이 온다
+# 나이 제한 여부 (sprtTrgtAgeLmtYn). 응답 분포가 "Y면 제한 있음"과 맞지 않는다.
+#   Y 1,800건 중 1,050건이 나이 0/0이고(예: 출산가정 산후조리비용 지원),
+#   N 2,196건 중 2,121건이 나이를 담고 있으며 그중 757건은 글에도 같은 상한 나이가 나온다(예: 청년참여기구 19~39세).
+# 그래서 여부 값과 상관없이 0이 아닌 나이를 쓴다 (0은 제한 없음). True로 바꾸면 Y일 때만 나이를 쓴다.
+AGE_ONLY_WHEN_LIMIT_FLAG_Y = False
+# earnMinAmt·earnMaxAmt의 단위. 추정: 만 원 (조건 글 "연소득 5천만원"인 정책의 최대값이 5000).
+# 확실하지 않아 숫자 판정에는 쓰지 않고 안내 글에만 쓴다.
+INCOME_AMOUNT_UNIT_LABEL = "만 원"
+# jobCd(취업 상태) 코드는 뜻을 확인하지 못했다. employment 조건은 만들지 않는다 (None = 제한 없음).
 
-# 온통청년 대분류 이름 → Policy.category, 단계. 모르는 이름은 원문 그대로 category에 두고 단계는 기본값(PREPARE)을 쓴다.
-CATEGORY_MAP = {"일자리": "JOB", "주거": "HOUSING", "교육": "EDUCATION", "복지문화": "WELFARE", "금융": "ASSET"}
-STAGE_BY_CATEGORY = {"JOB": PolicyStage.PREPARE, "EDUCATION": PolicyStage.PREPARE, "HOUSING": PolicyStage.SETTLE}
+# 자유 서술 칸에서 "조건 없음"으로 보는 값. 이 값이면 조건으로 옮기지 않는다
+BLANK_CONDITION_TEXTS = {"-", "--", "해당 없음", "해당없음", "없음", "제한 없음", "제한없음", "무관", "x", "X"}
+
+# 정책 지역 규칙 (zipCd)
+NATIONAL_MIN_SIDO = 15  # 시·도가 이만큼 이상이면 전국 정책으로 본다 (2026년 시·도는 16곳)
+# 2026년 전남·광주 통합으로 생긴 시·도 코드. 고용24 지역 코드(CMCD_1)와 온통청년 zipCd에 나온다.
+# 공용 `core/regions.SIDO_NAMES`에 아직 없어서 수집 쪽에서만 더해 쓴다 (공용 파일 변경 요청).
+EXTRA_SIDO_NAMES = {"12": "전남광주"}
+
+# 고용24 청년일자리강소기업 (2026-11-20 응답 확인). 지역마다 따로 부른다 (region=26000 등).
+# 응답: smallGiantsList > total, smallGiant[]
+WORK24_GANGSO = {
+    "source": "work24_gangso",
+    "secret": SECRET_WORK24,
+    "key_param": "authKey",
+    "list": {
+        "url": "https://www.work24.go.kr/cm/openApi/call/wk/callOpenApiSvcInfo216L01.do",
+        "params": {"returnType": "XML"},
+        "page_param": "startPage", "size_param": "display", "page_size": 100, "first_page": 1, "max_pages": 60,
+        "items_path": "smallGiantsList.smallGiant", "total_path": "smallGiantsList.total",
+    },
+    "region_param": "region",  # 시·도 코드 + "000" (부산 26000)
+    "fields": {
+        "biz_no": "busiNo",
+        "name": "coNm",
+        "brand": "sgBrandNm",
+        "year": "selYear",
+        "region_code": "regionCd",
+        "industry": ("indTpNm", "superIndTpNm"),
+        "workers": "alwaysWorkerCnt",
+    },
+}
+GANGSO_BADGE_SOURCE = "고용노동부 청년일자리강소기업"
+COMPANY_ID_PREFIX = "biz"
+
+SOURCES = {"work24": WORK24, "alio": ALIO, "youthcenter": YOUTHCENTER, "work24_gangso": WORK24_GANGSO}
+
+# 온통청년 대분류 이름 → Policy.category. 여기 없는 이름은 원문 그대로 category에 둔다.
+CATEGORY_MAP = {"일자리": "JOB", "주거": "HOUSING"}
+STAGE_BY_CATEGORY = {"JOB": PolicyStage.PREPARE, "HOUSING": PolicyStage.SETTLE}
+# 중분류가 이 이름이면 대분류보다 먼저 단계를 정한다. 중분류 "재직자"는 취업한 청년 대상이다
+STAGE_BY_SUBCATEGORY = {"재직자": PolicyStage.EMPLOYED}
 
 # 근무지 글에서 시·도를 알아볼 이름 (첫 낱말). 시·도 번호는 법정동 코드 앞 2자리다.
 SIDO_ALIASES = {

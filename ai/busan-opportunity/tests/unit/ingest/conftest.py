@@ -50,6 +50,10 @@ class FakeApi:
             return fixture_bytes(f"alio_detail_{param(url, 'sn')}.json")
         if "getPlcy" in url:
             return fixture_bytes("youthcenter_list_p1.json")
+        if "callOpenApiSvcInfo216L01" in url:  # 강소기업은 부산 샘플만 있다. 다른 지역은 빈 목록
+            if param(url, "region") == "26000":
+                return fixture_bytes("work24_gangso_region26000_p1.xml")
+            return b"<smallGiantsList><total>0</total><startPage>1</startPage><display>100</display></smallGiantsList>"
         raise AssertionError("가짜 API에 없는 주소")
 
     def count(self, needle: str) -> int:

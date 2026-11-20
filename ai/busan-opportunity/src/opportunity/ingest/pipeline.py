@@ -10,7 +10,7 @@ from ..config import OpportunityConfig
 from ..core import clock
 from ..models.enums import ExtractStatus, PolicySource
 from ..models.policy import ALWAYS_APPLY_END, Policy
-from ..models.posting import PostingSnapshot, latest_from_snapshot
+from ..models.posting import CompanyRecord, PostingSnapshot, latest_from_snapshot
 from ..ports import CatalogRepo
 
 # 마감 처리 때 지난 며칠까지 거슬러 읽을지, 시·도마다 몇 건까지 읽을지. 설정 파일에 자리가 생기면 옮긴다.
@@ -158,4 +158,36 @@ def upsert_policies(catalog: CatalogRepo, policies: list[Policy]) -> dict:
             if existing != policy:
                 catalog.put_policy(policy)
             result["unchanged"] += 1
+    return result
+
+
+# ---------------------------------------------------------------- 기업
+def upsert_companies(catalog: CatalogRepo, companies: list[CompanyRecord]) -> dict:
+    """강소기업 같은 기업 시드를 넣는다. 돌려주는 값: {"created", "updated", "unchanged"}.
+
+    같은 기업이 이미 있으면 배지를 합친다. 다른 출처(청끌기업 시드 등)에서 붙은 배지를 지우지 않는다.
+    내용이 같고 기준일만 다르면 기준일만 갱신하고 unchanged로 센다.
+    """
+    result = {"created": 0, "updated": 0, "unchanged": 0}
+    for company in companies:
+        existing = catalog.get_company(company.company_id)
+        if existing is None:
+            catalog.put_company(company)
+            result["created"] += 1
+            continue
+        incoming = {(b.type, b.label, b.source) for b in company.highlights}
+        kept = [b for b in existing.highlights if (b.type, b.label, b.source) not in incoming]
+        merged = existing.model_copy(update={
+            "name": company.name, "biz_no": company.biz_no or existing.biz_no, "sido": company.sido or existing.sido,
+            "industry": company.industry or existing.industry, "size": company.size or existing.size,
+            "highlights": kept + list(company.highlights),
+            # 기업 항목의 출처는 처음 넣은 쪽을 따른다. 같은 출처가 다시 오면 기준일만 새로 쓴다
+            "as_of": company.as_of if existing.source == company.source else existing.as_of,
+        })
+        if merged.model_dump(exclude={"as_of"}) == existing.model_dump(exclude={"as_of"}):
+            result["unchanged"] += 1
+        else:
+            result["updated"] += 1
+        if merged != existing:
+            catalog.put_company(merged)
     return result

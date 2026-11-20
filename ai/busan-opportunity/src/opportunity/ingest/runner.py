@@ -15,29 +15,34 @@ from ..ports import CatalogRepo, RawStore, Secrets
 from . import alio, work24, youthcenter
 from .field_maps import DETAIL_MAX_PER_RUN
 from .http import FetchError, HttpGet, KeyCache, default_http_get
-from .normalize import SkipRecord, normalize_alio, normalize_work24, normalize_youthcenter
-from .pipeline import expire_postings, upsert_policies, upsert_postings
+from .normalize import SkipRecord, normalize_alio, normalize_gangso, normalize_work24, normalize_youthcenter
+from .pipeline import expire_postings, upsert_companies, upsert_policies, upsert_postings
 
 log = logging.getLogger(__name__)
 
 JOB_CODES_KEY = "seed/codes/work24_job_codes.json"  # {"직종코드": {"name", "middle", "major"}} (공통코드 시드)
+REGION_CODES_KEY = "seed/codes/work24_region_codes.json"  # {"지역코드 5자리": "부산 해운대구"} (`codes.region_names`)
 POSTING_SOURCES = {
     "work24": (work24, normalize_work24),
     "alio": (alio, normalize_alio),
 }
-ALL_SOURCES = ("work24", "alio", "youthcenter")
+ALL_SOURCES = ("work24", "alio", "youthcenter", "work24_gangso")
 
 
-def _load_job_codes(raw_store: RawStore) -> dict:
-    body = raw_store.get(JOB_CODES_KEY)
+def _load_seed_json(raw_store: RawStore, key: str) -> dict:
+    body = raw_store.get(key)
     if body is None:
         return {}
     try:
         data = json.loads(body.decode("utf-8"))
     except (ValueError, UnicodeDecodeError):
-        log.warning("직종 코드 시드를 읽지 못함 key=%s", JOB_CODES_KEY)
+        log.warning("코드 시드를 읽지 못함 key=%s", key)
         return {}
     return data if isinstance(data, dict) else {}
+
+
+def _load_job_codes(raw_store: RawStore) -> dict:
+    return _load_seed_json(raw_store, JOB_CODES_KEY)
 
 
 def _wants_detail(config: OpportunityConfig, snap: PostingSnapshot) -> bool:
@@ -106,13 +111,15 @@ def _run_postings(name: str, config, catalog, raw_store, keys, *, when, day, htt
     }
 
 
-def _run_policies(catalog, raw_store, keys, *, when, day, http_get, sleep) -> dict:
+def _run_policies(config, catalog, raw_store, keys, *, when, day, http_get, sleep) -> dict:
     pages = youthcenter.client(keys, raw_store, day=day, http_get=http_get, sleep=sleep).fetch_list()
+    region_names = _load_seed_json(raw_store, REGION_CODES_KEY)
     skipped: dict[str, int] = {}
     policies = {}
     for record in pages.records:
         try:
-            policy = normalize_youthcenter(record, as_of=when)
+            policy = normalize_youthcenter(record, as_of=when, region_names=region_names or None,
+                                           first_sido=config.data.busan_sido)
         except SkipRecord as e:
             skipped[e.reason] = skipped.get(e.reason, 0) + 1
             continue
@@ -121,6 +128,27 @@ def _run_policies(catalog, raw_store, keys, *, when, day, http_get, sleep) -> di
     return {
         "status": _status(len(pages.records), len(policies), pages.failed_pages),
         "listed": len(pages.records), "normalized": len(policies), "skipped": skipped,
+        "pages": pages.pages, "failedPages": pages.failed_pages, "warnings": pages.warnings, **stats,
+    }
+
+
+def _run_companies(config, catalog, raw_store, keys, *, when, day, http_get, sleep) -> dict:
+    """강소기업. 부산과 수도권 시·도(설정값)만 부른다. 배지 보강(B-02)이 이 기업 목록을 읽는다."""
+    client = work24.gangso_client(keys, raw_store, day=day, http_get=http_get, sleep=sleep)
+    pages = work24.fetch_gangso(client, [config.data.busan_sido, *config.data.capital_area_sido])
+    skipped: dict[str, int] = {}
+    companies = {}
+    for record in pages.records:
+        try:
+            company = normalize_gangso(record, as_of=when)
+        except SkipRecord as e:
+            skipped[e.reason] = skipped.get(e.reason, 0) + 1
+            continue
+        companies[company.company_id] = company
+    stats = upsert_companies(catalog, list(companies.values()))
+    return {
+        "status": _status(len(pages.records), len(companies), pages.failed_pages),
+        "listed": len(pages.records), "normalized": len(companies), "skipped": skipped,
         "pages": pages.pages, "failedPages": pages.failed_pages, "warnings": pages.warnings, **stats,
     }
 
@@ -146,7 +174,11 @@ def run_ingest(config: OpportunityConfig, catalog: CatalogRepo, raw_store: RawSt
                 result = _run_postings(name, config, catalog, raw_store, keys, when=when, day=day,
                                        http_get=fetch, sleep=sleep)
             elif name == "youthcenter":
-                result = _run_policies(catalog, raw_store, keys, when=when, day=day, http_get=fetch, sleep=sleep)
+                result = _run_policies(config, catalog, raw_store, keys, when=when, day=day, http_get=fetch,
+                                       sleep=sleep)
+            elif name == "work24_gangso":
+                result = _run_companies(config, catalog, raw_store, keys, when=when, day=day, http_get=fetch,
+                                        sleep=sleep)
             else:
                 result = {"status": "FAILED", "error": f"알 수 없는 출처: {name}"}
         except Exception as e:  # 한 출처의 실패가 다른 출처를 막지 않게 한다

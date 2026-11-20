@@ -21,12 +21,13 @@ def test_full_run_loads_postings_and_policies(config, catalog, raw_store, secret
     assert (w["status"], w["listed"], w["normalized"], w["created"]) == ("OK", 3, 3, 3)
     assert w["pages"] == 2 and w["detailFetched"] == 2  # 부산·서울 공고만. 근무지 미상은 부르지 않는다
     assert (a["listed"], a["normalized"], a["created"], a["skipped"]) == (3, 2, 2, {"bad_id": 1})
-    assert (y["listed"], y["normalized"], y["created"], y["skipped"]) == (4, 3, 3, {"bad_id": 1})
+    assert (y["listed"], y["normalized"], y["created"], y["skipped"]) == (8, 8, 8, {})
     assert report["ok"] is True
     assert catalog.get_latest("wk24-K000000001").is_busan and catalog.get_latest("alio-2026001").is_busan
     assert catalog.get_snapshot("wk24-K000000001", catalog.get_latest("wk24-K000000001").snapshot_id
                                 ).job_description.startswith("데이터 분석과 SQL")
-    assert len(catalog.policies) == 3
+    assert len(catalog.policies) == 8
+    assert catalog.get_policy("ythc-20260923005400113568").region_key() == "26"  # 여러 시·도 정책은 부산이 먼저
     assert catalog.data_as_of() == "2026-11-21T04:30:00+09:00"
 
 
@@ -50,7 +51,7 @@ def test_t17_running_twice_on_same_day_keeps_counts(config, catalog, raw_store, 
     w, a, y = (report["sources"][n] for n in ALL)
     assert (w["created"], w["updated"], w["unchanged"]) == (0, 0, 3)
     assert (a["created"], a["updated"], a["unchanged"]) == (0, 0, 2)
-    assert (y["created"], y["updated"], y["unchanged"]) == (0, 0, 3)
+    assert (y["created"], y["updated"], y["unchanged"]) == (0, 0, 8)
     assert w["needsEnrich"] == [] and a["needsEnrich"] == []
     assert (catalog.snapshots, catalog.latest, catalog.policies) == (snapshots, latest, policies)
 
@@ -71,7 +72,7 @@ def test_one_failing_source_does_not_stop_the_others(config, catalog, raw_store,
     api.failing = {"callOpenApiSvcInfo210L01"}
     report = run(config, catalog, raw_store, secrets, api)
     assert report["sources"]["work24"]["status"] == "FAILED"
-    assert report["sources"]["alio"]["created"] == 2 and report["sources"]["youthcenter"]["created"] == 3
+    assert report["sources"]["alio"]["created"] == 2 and report["sources"]["youthcenter"]["created"] == 8
     assert report["ok"] is False
     assert catalog.data_as_of() == "2026-11-21T04:30:00+09:00"  # 하나라도 성공하면 기준 시각을 올린다
 
@@ -135,6 +136,37 @@ def test_detail_only_for_busan_and_capital(config, catalog, raw_store, secrets, 
     detail_calls = [url for url in api.calls if "210D01" in url]
     assert len(detail_calls) == 2
     assert not any("K000000003" in url for url in detail_calls)
+
+
+def test_youthcenter_request_has_page_type(config, catalog, raw_store, secrets, api):
+    run(config, catalog, raw_store, secrets, api, sources=("youthcenter",))
+    url = next(u for u in api.calls if "getPlcy" in u)
+    assert "pageType=1" in url and "rtnType=json" in url and "pageNum=1" in url  # pageType이 없으면 e003 오류
+
+
+def test_region_codes_seed_groups_city_districts(config, catalog, raw_store, secrets, api):
+    from opportunity.ingest import codes
+    names = codes.region_names((__import__("pathlib").Path(__file__).parent / "fixtures"
+                                / "work24_codes_CMCD_1.xml").read_bytes())
+    raw_store.put("seed/codes/work24_region_codes.json", json.dumps(names, ensure_ascii=False).encode())
+    run(config, catalog, raw_store, secrets, api, sources=("youthcenter",))
+    regions = catalog.get_policy("ythc-20261106005400214758").regions  # 청주시 구 4곳
+    assert [(r.scope, r.sigungu) for r in regions] == [("SIGUNGU", "43110")]
+
+
+def test_gangso_companies_are_loaded_per_region(config, catalog, raw_store, secrets, api):
+    report = run(config, catalog, raw_store, secrets, api, sources=("work24_gangso",))
+    g = report["sources"]["work24_gangso"]
+    assert (g["status"], g["listed"], g["normalized"], g["created"], g["skipped"]) == ("OK", 3, 3, 3, {})
+    regions = sorted(__import__("re").search(r"region=(\d+)", u).group(1) for u in api.calls if "216L01" in u)
+    assert regions == sorted(f"{s}000" for s in [config.data.busan_sido, *config.data.capital_area_sido])
+    assert f"raw/work24_gangso/{DAY}/region26000-0001.xml" in raw_store.list("raw/work24_gangso/")
+    company = catalog.get_company("biz-6088195805")
+    assert company.sido == "26" and company.highlights[0].label == "인재육성형중소기업"
+    assert [c.company_id for c in catalog.list_companies("26")] == [
+        "biz-1058163269", "biz-6088195805", "biz-6068111231"]  # 이름순
+    again = run(config, catalog, raw_store, secrets, api, sources=("work24_gangso",))
+    assert again["sources"]["work24_gangso"]["unchanged"] == 3
 
 
 def test_job_codes_seed_limits_detail_to_demo_families(config, catalog, raw_store, secrets, api, small_pages):

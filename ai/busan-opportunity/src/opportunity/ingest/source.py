@@ -56,21 +56,23 @@ class SourceClient:
         self._raw.put(f"raw/{self.name}/{self._day}/{name}.{extension}", body, content_type)
 
     # ------------------------------------------------------------ 목록
-    def fetch_list(self) -> ListPages:
+    def fetch_list(self, extra: dict | None = None, *, name: str = "list") -> ListPages:
         """페이지마다 부른다. 실패한 페이지는 다시 부르고, 그래도 안 되면 건너뛴다.
 
         전체 건수를 알면 다음 페이지로 계속 가고, 모르면 실패한 자리에서 멈춘다.
+        extra는 페이지마다 붙일 인자(강소기업의 지역 코드 등), name은 원본 파일 이름 앞부분이다.
         """
         cfg = self.spec["list"]
+        stem = _UNSAFE.sub("_", name)[:40]
         size = cfg["page_size"]
         first = cfg["first_page"]
         out = ListPages()
         total_pages: int | None = None
         for offset in range(cfg["max_pages"]):
             page = first + offset
-            url = self._url(cfg, {cfg["page_param"]: page, cfg["size_param"]: size})
+            url = self._url(cfg, {**(extra or {}), cfg["page_param"]: page, cfg["size_param"]: size})
             try:
-                body, parsed = fetch_parsed(self._http_get, url, label=f"{self.name}:list:p{page}",
+                body, parsed = fetch_parsed(self._http_get, url, label=f"{self.name}:{stem}:p{page}",
                                             sleep=self._sleep, timeout=HTTP_TIMEOUT_SECONDS)
             except FetchError as e:
                 out.failed_pages += 1
@@ -78,7 +80,7 @@ class SourceClient:
                 if total_pages is None or offset + 1 >= total_pages:
                     break
                 continue
-            self._save(f"list-{page:04d}", body)
+            self._save(f"{stem}-{page:04d}", body)
             out.pages += 1
             items = [item for item in as_list(walk(parsed, cfg["items_path"])) if isinstance(item, dict)]
             out.records.extend(items)

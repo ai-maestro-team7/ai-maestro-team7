@@ -3,8 +3,8 @@
 from pathlib import Path
 
 from opportunity.ingest.http import as_list, parse_body, walk
-from opportunity.ingest.normalize import normalize_work24, normalize_youthcenter
-from opportunity.ingest.pipeline import expire_postings, upsert_policies, upsert_postings
+from opportunity.ingest.normalize import normalize_gangso, normalize_work24, normalize_youthcenter
+from opportunity.ingest.pipeline import expire_postings, upsert_companies, upsert_policies, upsert_postings
 from opportunity.models import (
     Badge,
     BadgeType,
@@ -133,38 +133,45 @@ def test_expire_marks_closed_postings_and_keeps_snapshots(config, catalog):
 
 
 # ---------------------------------------------------------------- 정책
+BUSAN_HOUSING = "20260513005400213198"  # 부산 청년 중개보수 및 이사비 지원 (부산 전체)
+NATIONAL = "ythc-20261021005400214232"
+
+
 def youth(as_of=DAY1):
     parsed = parse_body((FIXTURES / "youthcenter_list_p1.json").read_bytes())
-    return [normalize_youthcenter(r, as_of=as_of) for r in walk(parsed, "result.youthPolicyList")[:3]]
+    return [normalize_youthcenter(r, as_of=as_of, first_sido="26") for r in walk(parsed, "result.youthPolicyList")]
 
 
 def test_policies_are_created_once(catalog):
     first = upsert_policies(catalog, youth())
-    assert first == {"created": 3, "enriched": 0, "updated": 0, "unchanged": 0}
+    assert first == {"created": 8, "enriched": 0, "updated": 0, "unchanged": 0}
     again = upsert_policies(catalog, youth())
-    assert again == {"created": 0, "enriched": 0, "updated": 0, "unchanged": 3}
-    assert len(catalog.policies) == 3
-    assert {p.policy_id for p in catalog.query_policies("00")} == {"ythc-20260100000001"}
-    assert {p.policy_id for p in catalog.query_policies("26")} == {"ythc-20260100000002"}
+    assert again == {"created": 0, "enriched": 0, "updated": 0, "unchanged": 8}
+    assert len(catalog.policies) == 8
+    assert {p.policy_id for p in catalog.query_policies("00")} == {NATIONAL}
+    assert {p.policy_id for p in catalog.query_policies("26")} == {
+        "ythc-20261030005400214630", f"ythc-{BUSAN_HOUSING}", "ythc-20260923005400113568",
+        "ythc-20260914005400213409", "ythc-20260513005400213204"}
+    assert {p.policy_id for p in catalog.query_policies("11")} == {"ythc-20261023005400214282"}
 
 
 def test_policy_same_content_next_day_refreshes_as_of_only(catalog):
     upsert_policies(catalog, youth(DAY1))
     result = upsert_policies(catalog, youth(DAY2))
-    assert result["unchanged"] == 3 and result["updated"] == 0
-    assert catalog.get_policy("ythc-20260100000001").as_of == "2026-11-22"
+    assert result["unchanged"] == 8 and result["updated"] == 0
+    assert catalog.get_policy(NATIONAL).as_of == "2026-11-22"
 
 
 def test_policy_content_change_updates(catalog):
     upsert_policies(catalog, youth())
-    changed = [p.model_copy(update={"title": "[가상] 이름이 바뀐 정책"}) for p in youth()[:1]]
+    changed = [p.model_copy(update={"title": "이름이 바뀐 정책"}) for p in youth()[:1]]
     assert upsert_policies(catalog, changed)["updated"] == 1
 
 
 def seed_policy(**override):
     base = dict(policy_id="seed-busan-housing", title="부산 주거 시드", source=PolicySource.BUSAN_SEED,
                 as_of="2026-11-20", regions=[PolicyRegion(scope=RegionScope.SIDO, sido="26")],
-                stage=PolicyStage.SETTLE, verified=False, youthcenter_id="20260100000002",
+                stage=PolicyStage.SETTLE, verified=False, youthcenter_id=BUSAN_HOUSING,
                 benefit=PolicyBenefit(text="시드에 적은 혜택"))
     return Policy(**{**base, **override})
 
@@ -173,19 +180,45 @@ def test_policy_seed_is_enriched_not_duplicated(catalog):
     seed = seed_policy()
     catalog.put_policy(seed)
     result = upsert_policies(catalog, youth())
-    assert result["enriched"] == 1 and result["created"] == 2
-    assert "ythc-20260100000002" not in catalog.policies  # 새로 만들지 않는다
+    assert result["enriched"] == 1 and result["created"] == 7
+    assert f"ythc-{BUSAN_HOUSING}" not in catalog.policies  # 새로 만들지 않는다
     merged = catalog.get_policy("seed-busan-housing")
     assert merged.title == "부산 주거 시드" and merged.benefit.text == "시드에 적은 혜택"  # 시드 값은 그대로
-    assert merged.summary == "주거비를 돕는 가상 정책" and merged.url == "https://example.invalid/policy/2"
-    assert merged.income_rule == "연소득 중위소득 150% 이하"
+    assert merged.summary.startswith("○ 지원내용") and merged.url == "https://young.busan.go.kr/index.nm?menuCd=271"
+    assert merged.income_rule == "기준중위소득 120%이하(월 3,078천원 이하)"
     assert merged.verified is False and merged.source == PolicySource.BUSAN_SEED  # 확인 상태는 건드리지 않는다
-    assert merged.eligibility.manual_checks == ["부산 거주 6개월 이상"]
+    assert (merged.age_min, merged.age_max) == (18, 39)
+    assert merged.eligibility.manual_checks[-1] == "참여 제한 대상: ※ 유사사업 수혜이력이 있는 자 등"
 
     again = upsert_policies(catalog, youth())
-    assert again["enriched"] == 0 and again["unchanged"] == 3
+    assert again["enriched"] == 0 and again["unchanged"] == 8  # 보강이 끝난 시드도 unchanged로 센다
 
 
 def test_policy_seed_matches_prefixed_youthcenter_id(catalog):
-    catalog.put_policy(seed_policy(youthcenter_id="ythc-20260100000002"))
+    catalog.put_policy(seed_policy(youthcenter_id=f"ythc-{BUSAN_HOUSING}"))
     assert upsert_policies(catalog, youth())["enriched"] == 1
+
+
+# ---------------------------------------------------------------- 기업
+def gangso(as_of=DAY1):
+    xml = (FIXTURES / "work24_gangso_region26000_p1.xml").read_bytes()
+    return [normalize_gangso(r, as_of=as_of) for r in as_list(walk(parse_body(xml), "smallGiantsList.smallGiant"))]
+
+
+def test_companies_created_once_and_next_day_unchanged(catalog):
+    assert upsert_companies(catalog, gangso()) == {"created": 3, "updated": 0, "unchanged": 0}
+    assert upsert_companies(catalog, gangso(DAY2)) == {"created": 0, "updated": 0, "unchanged": 3}
+    assert catalog.get_company("biz-6088195805").as_of == "2026-11-22"  # 기준일만 새로 쓴다
+
+
+def test_company_badges_from_other_sources_are_kept(catalog):
+    cheonggeul = Badge(type=BadgeType.CHEONGKKEUL, label="청끌기업", source="고용노동부 청끌기업", as_of="2026-06-30")
+    seeded = gangso()[0].model_copy(update={"highlights": [cheonggeul], "source": "청끌기업 시드",
+                                            "as_of": "2026-06-30"})
+    catalog.put_company(seeded)
+    result = upsert_companies(catalog, gangso())
+    assert result["updated"] == 1 and result["created"] == 2
+    merged = catalog.get_company("biz-6088195805")
+    assert [b.type for b in merged.highlights] == [BadgeType.CHEONGKKEUL, BadgeType.GANGSO]
+    assert merged.source == "청끌기업 시드" and merged.as_of == "2026-06-30"  # 먼저 넣은 출처를 따른다
+    assert upsert_companies(catalog, gangso())["unchanged"] == 3
