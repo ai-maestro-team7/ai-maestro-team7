@@ -51,13 +51,13 @@
     - 코드 블록 JSON 추출, 첫 실패 후 성공, 2회 실패, 호출 예외, `MODEL_ID` 없음, `StrandsLLMClient`가 `strands` 없이 import되는지
     - _Requirements: 4.2, 5.2, 5.3, 5.4, 5.5, 14.1_
 
-- [ ] 5. 프롬프트
-  - [ ] 5.1 `prompts/system_v1.md`, `a_questions_v1.md`, `b_follow_up_v1.md`를 쓴다 (design §7)
+- [x] 5. 프롬프트
+  - [x] 5.1 `prompts/system_v1.md`, `a_questions_v1.md`, `b_follow_up_v1.md`를 쓴다 (design §7)
     - 데이터 태그 규칙, 06 제약(가짜 기출 금지, 직무 무관 요소 금지), 지어내지 않기, `needsConfirmation`은 확인 질문 소재로만, JSON만 출력, 출력 예시
     - _Requirements: 6.3, 6.4, 6.5, 6.6, 8.7, 10.2_
-  - [ ] 5.2 `prompting.py`에 `wrap`(태그 무력화), `profile` JSON 삽입, 프롬프트 파일 읽기·자리표시 채우기를 만든다. `Path(__file__).parent / "prompts"`로 읽는다
+  - [x] 5.2 `prompting.py`에 `wrap`(태그 무력화), `profile` JSON 삽입, 프롬프트 파일 읽기·자리표시 채우기를 만든다. `Path(__file__).parent / "prompts"`로 읽는다
     - _Requirements: 6.1, 6.2, 6.8_
-  - [ ] 5.3 `tests/test_prompting.py`를 쓴다
+  - [x] 5.3 `tests/test_prompting.py`를 쓴다
     - 데이터 안 `</resume>` 무력화, 완성된 프롬프트에 06 제약·데이터 규칙 문장이 들어 있는지, `profile` JSON이 `<profile>` 안에 들어가는지, `PROMPT_VERSION` 값
     - _Requirements: 6.2, 6.3, 6.4, 6.5, 6.7_
 
