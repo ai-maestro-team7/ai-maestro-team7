@@ -100,6 +100,16 @@ def main():
     s2, b2 = call("POST", "/api/v1/interview/start", body={"job": "백엔드", "interviewType": "JOB", "cameraConsent": False, "documentId": "doc-1"})
     sess2 = api.get_interview("u-1", b2["sessionId"])["session"]
     check("documentId → DOC_LATEST#의 extractedTextKey에서 자소서 읽음", s2 == 202 and sess2["resumeText"] == RESUME)
+    # A가 실제로 쓰는 모양: DOC_LATEST#에는 키가 없고 문서 버전 DOC#{id}#V#{n}의 textKey에 있다 (db-schema v1.4)
+    boto3.client("s3").put_object(Bucket="test-docs", Key="users/h/documents/doc-a/v1/extracted.txt", Body=RESUME.encode())
+    t.put_item(Item={"PK": "USER#u-1", "SK": "DOC_LATEST#doc-a", "documentId": "doc-a", "latestVersion": 1,
+                     "documentType": "COVER_LETTER", "extractionStatus": "COMPLETED"})
+    t.put_item(Item={"PK": "USER#u-1", "SK": "DOC#doc-a#V#0001", "documentId": "doc-a", "version": 1,
+                     "textKey": "users/h/documents/doc-a/v1/extracted.txt"})
+    s3_, b3 = call("POST", "/api/v1/interview/start", body={"job": "데이터 분석", "interviewType": "JOB", "cameraConsent": False, "documentId": "doc-a"})
+    check("documentId → A 문서 버전의 textKey에서 자소서 읽음", s3_ == 202 and api.get_interview("u-1", b3["sessionId"])["session"]["resumeText"] == RESUME)
+    t.put_item(Item={"PK": "USER#u-1", "SK": "DOC_LATEST#doc-b", "documentId": "doc-b", "latestVersion": 1})
+    check("문서 버전에 textKey가 없으면 404", call("POST", "/api/v1/interview/start", body={"job": "데이터 분석", "interviewType": "JOB", "cameraConsent": False, "documentId": "doc-b"})[0] == 404)
     check("A 역량 프로필을 면접 계약으로 변환하며 원문은 제외", sess2["profile"] == {
         "projects": ["예약 API"], "skills": ["Python"], "needsConfirmation": ["트래픽"],
         "profileId": "p-1", "profileVersion": 2,

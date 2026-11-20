@@ -26,6 +26,11 @@ if compgen -G "$ROOT/ai/mentoring/src/mentoring/*.py" >/dev/null; then
   rsync -a --exclude '__pycache__' "$ROOT/ai/mentoring/src/mentoring/" "$BUILD/mentoring/"
 fi
 
+# 채팅 Agent (D-38, ai/supervisor/src/supervisor/) → `supervisor` 패키지
+if compgen -G "$ROOT/ai/supervisor/src/supervisor/*.py" >/dev/null; then
+  rsync -a --exclude '__pycache__' "$ROOT/ai/supervisor/src/supervisor/" "$BUILD/supervisor/"
+fi
+
 # 파트 간 계약 패키지 (contracts/src/team07_contracts/, D-18) → `team07_contracts`
 if [[ -d $ROOT/contracts/src/team07_contracts ]]; then
   rsync -a --exclude '__pycache__' --exclude 'testing' "$ROOT/contracts/src/team07_contracts/" "$BUILD/team07_contracts/"
@@ -33,6 +38,7 @@ fi
 
 for req in "$ROOT/backend/requirements.txt" "$ROOT/ai/interview/requirements.txt" \
            "$ROOT/ai/busan-opportunity/requirements.txt" "$ROOT/ai/mentoring/requirements.txt" \
+           "$ROOT/ai/supervisor/requirements.txt" \
            "$ROOT/contracts/requirements.txt"; do
   if [[ -s $req ]]; then
     uv pip install --quiet -r "$req" --target "$BUILD" \
