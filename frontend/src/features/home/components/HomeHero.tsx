@@ -1,99 +1,72 @@
 "use client";
 
-import { type CSSProperties, useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import { ChatPanel } from "@/features/chat/components/ChatPanel";
+import { playSeagullIntro } from "../intro";
+import { BridgeScene } from "./BridgeScene";
+import { Seagull } from "./Seagull";
 
 const HEADLINE = "어떤 일을 찾고 있나요?";
 
 /**
- * 제목 글자마다 기차놀이 등장 값을 정한다 (globals.css .wave-char·.wave-hop).
- * 모두 제목 왼쪽 3em 밖에서 출발해 제자리까지 걷는다. 걷는 거리는 제자리의 대략적 가로 위치(한글 0.96em, 띄어쓰기 0.28em)로 잡고,
- * 맨 앞 글자(?)가 먼저 출발한다. 줄 간격이 제자리 간격보다 넓어서 앞 글자부터 차례로 선다.
- */
-type TitleChar = { char: string; dist?: number; order?: number };
-
-const TITLE_CHARS: TitleChar[] = (() => {
-  const visible = [...HEADLINE].filter((char) => char !== " ").length;
-  let index = 0;
-  let spaces = 0;
-  return [...HEADLINE].map((char): TitleChar => {
-    if (char === " ") {
-      spaces += 1;
-      return { char };
-    }
-    const dist = Number((index * 0.96 + spaces * 0.28 + 3).toFixed(2));
-    const item = { char, dist, order: visible - 1 - index };
-    index += 1;
-    return item;
-  });
-})();
-
-/**
  * 홈 첫 화면: 큰 문구와 채팅창 하나만 둔다. 공고·정책 목록은 "채용·정책" 메뉴에서 본다.
- * 배경은 커서를 따라 옅은 파란 빛과 점 무늬가 움직이고, 제목 글자는 커서가 지나가면 물결처럼 떠오른다 (globals.css).
- * 커서 위치는 렌더링 없이 CSS 변수로만 넣는다. 터치 화면에서는 가만히 있는 빛만 보인다.
+ * 배경은 광안대교 3D 장면이고, 제목은 갈매기가 물고 와서 떨어뜨린다 (intro.ts). 등장이 끝난 뒤에는 커서가 지나가는
+ * 글자가 물결처럼 떠오른다 (globals.css). 움직임 줄이기 설정이면 등장 없이 바로 보인다.
  */
 export function HomeHero() {
-  const backdrop = useRef<HTMLDivElement>(null);
+  const title = useRef<HTMLHeadingElement>(null);
+  const bird = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const el = backdrop.current;
-    if (!el) return;
-    let frame = 0;
-    function onMove(event: PointerEvent) {
-      if (event.pointerType === "touch") return;
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        if (!el) return;
-        const box = el.getBoundingClientRect();
-        const inside =
-          event.clientX >= box.left && event.clientX <= box.right && event.clientY >= box.top && event.clientY <= box.bottom;
-        el.style.setProperty("--hero-x", `${event.clientX - box.left}px`);
-        el.style.setProperty("--hero-y", `${event.clientY - box.top}px`);
-        el.dataset.active = String(inside);
-      });
+    const titleEl = title.current;
+    const birdEl = bird.current;
+    if (!titleEl || !birdEl) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      titleEl.dataset.intro = "done";
+      return;
     }
-    window.addEventListener("pointermove", onMove, { passive: true });
+    let stop = () => {};
+    let cancelled = false;
+    // 글자 폭이 정해진 뒤(글꼴을 받은 뒤)에 제자리를 잰다. 글꼴이 늦어도 0.8초 뒤에는 시작한다
+    const begin = () => {
+      if (cancelled || titleEl.dataset.intro !== "pending") return;
+      stop = playSeagullIntro(birdEl, titleEl);
+    };
+    const timer = window.setTimeout(begin, 800);
+    void document.fonts.ready.then(begin);
     return () => {
-      cancelAnimationFrame(frame);
-      window.removeEventListener("pointermove", onMove);
+      cancelled = true;
+      window.clearTimeout(timer);
+      stop();
     };
   }, []);
 
   return (
     <>
-      {/* 배경 (꾸밈): 위쪽 가운데에 늘 있는 옅은 빛 + 커서를 따라오는 빛과 점 무늬 */}
-      <div ref={backdrop} aria-hidden data-active="false" className="group/backdrop pointer-events-none absolute inset-0 -z-10">
-        <div className="absolute inset-x-0 -top-24 mx-auto h-110 max-w-220 rounded-full bg-radial from-blue-50 to-transparent to-70% blur-2xl" />
-        <div className="hero-glow absolute inset-0 opacity-0 transition-opacity duration-500 group-data-[active=true]/backdrop:opacity-100" />
-        <div className="hero-dots absolute inset-0 opacity-0 transition-opacity duration-500 group-data-[active=true]/backdrop:opacity-70" />
-      </div>
+      <BridgeScene />
+      <Seagull ref={bird} />
 
       <section className="relative mx-auto flex w-full max-w-main flex-col items-center gap-8 text-center">
         <div className="flex flex-col items-center gap-3">
           <span className="rounded-full bg-white px-3 py-1 text-small font-bold text-blue-500 shadow-sm ring-1 ring-blue-500/15">
             AI 취업 멘토
           </span>
-          <h1 className="text-title font-bold text-grey-900 xl:text-hero">
+          <h1 ref={title} data-intro="pending" className="hero-title text-title font-bold text-grey-900 xl:text-hero">
             <span className="sr-only">{HEADLINE}</span>
-            {/* 글자마다 나눠 커서 물결을 준다. 화면 읽기 프로그램은 위의 한 줄만 읽는다 */}
+            {/* 글자마다 나눠 등장과 커서 물결을 준다. 화면 읽기 프로그램은 위의 한 줄만 읽는다 */}
             <span aria-hidden className="cursor-default">
-              {TITLE_CHARS.map((item, index) =>
-                item.dist === undefined || item.order === undefined ? (
+              {[...HEADLINE].map((char, index) =>
+                char === " " ? (
                   " "
                 ) : (
-                  <span
-                    key={index}
-                    className="wave-char"
-                    style={{ "--dist": item.dist, "--order": item.order } as CSSProperties}
-                  >
-                    <span className="wave-hop">{item.char}</span>
+                  <span key={index} className="wave-char">
+                    <span className="wave-hop">{char}</span>
                   </span>
                 ),
               )}
             </span>
           </h1>
-          <p className="text-body text-grey-600">조건을 말하거나 이력서를 올리면 공고와 청년 정책을 함께 찾아 드려요.</p>
+          <p className="text-halo text-body text-grey-700">조건을 말하거나 이력서를 올리면 공고와 청년 정책을 함께 찾아 드려요.</p>
         </div>
         <ChatPanel />
       </section>
