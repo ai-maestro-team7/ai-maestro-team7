@@ -32,7 +32,7 @@ class EventBridgeScheduler:
             "ActionAfterCompletion": "DELETE",
             "FlexibleTimeWindow": {"Mode": "OFF"},
             "Target": {"Arn": self.target_arn, "RoleArn": self.role_arn,
-                       "Input": json.dumps(payload, ensure_ascii=False, separators=(",", ":"))},
+                       "Input": json.dumps({"oppSchedule": payload}, ensure_ascii=False, separators=(",", ":"))},
         }
         if self.group_name:
             params["GroupName"] = self.group_name

@@ -13,6 +13,16 @@ CAREER_DOCS_BUCKET=${PREFIX}-career-docs-${ACCOUNT_ID}   # 명세 §7.2 개인 �
 KB_SOURCE_BUCKET=${PREFIX}-kb-source-${ACCOUNT_ID}       # 명세 §7.2 KB 원천 (docs/ 13쌍만)
 OPP_DATA_BUCKET=${PREFIX}-opp-data-${ACCOUNT_ID}         # B: raw/, normalized/, seed/, snapshots/, runs/
 OPP_VECTOR_BUCKET=${PREFIX}-opp-vectors                  # B: S3 Vectors, 인덱스 postings-v1
+OPP_VECTOR_INDEX=postings-v1
+CATALOG_TABLE=${PREFIX}-catalog
+
+# Bedrock 모델 (docs/team-guide.md). 코드에는 환경변수로만 넣는다
+MODEL_ID=${MODEL_ID:-global.anthropic.claude-haiku-5-5}
+EMBEDDING_MODEL_ID=${EMBEDDING_MODEL_ID:-cohere.embed-v4:0}
+
+# B 알림 일정: EventBridge Scheduler가 이 역할로 Lambda를 부른다 (infra/setup-role.sh 가 만든다)
+SCHEDULER_ROLE_NAME=${PREFIX}-scheduler-role
+SCHEDULER_ROLE_ARN=arn:aws:iam::${ACCOUNT_ID}:role/${SCHEDULER_ROLE_NAME}
 
 # Lambda 실행 역할 (infra/setup-role.sh 가 만든다)
 
