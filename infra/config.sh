@@ -18,6 +18,10 @@ OPP_VECTOR_BUCKET=${PREFIX}-opp-vectors                  # B: S3 Vectors, 인덱
 
 ROLE_ARN=${ROLE_ARN:-arn:aws:iam::${ACCOUNT_ID}:role/${PREFIX}-lambda-role}
 
+# Bedrock 모델 (코드에 넣지 않고 Lambda 환경 변수로, AGENTS.md "코딩 규칙"). 서울 리전은 global. 프로필로만 호출
+MODEL_ID=${MODEL_ID:-global.anthropic.claude-haiku-5-5}
+EMBEDDING_MODEL_ID=${EMBEDDING_MODEL_ID:-cohere.embed-v4:0}
+
 # 프론트 주소가 정해지면 바꾼다. 개발 중에는 * (모두 허용)
 ALLOWED_ORIGIN=${ALLOWED_ORIGIN:-*}
 
