@@ -64,7 +64,7 @@
   /* 체크박스 20px 상자 */
   --radius-check: 5px;
 
-  /* GNB·본문·Footer 공통 폭 */
+  /* GNB·본문 공통 폭 */
   --container-content: 1080px;
   /* 2단 배치: 본문 700 + 오른쪽 332 */
   --container-main: 700px;
