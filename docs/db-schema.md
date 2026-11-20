@@ -209,6 +209,7 @@ B가 스냅샷에 조건을 저장하고, **A·B 모두 `backend/eligibility.py`
 | 엔티티 | PK | SK | GSI1PK / GSI1SK |
 |---|---|---|---|
 | NCS 직무 프로필 (11) | `NCS#{ncsCode}` | `PROFILE` | `JOBNAME#{직무명}` / `NCS#{ncsCode}` |
+| 주간 공식 능력단위·요소 스냅샷 | `NCS#{ncsCode}` | `OFFICIAL#UNITS` | — |
 | 능력단위 (135) | `NCS#{ncsCode}` | `UNIT#{unitCode}` | — |
 | 자격 연계 (37) | `UNIT#{unitCode}` | `QUAL#{qualCode}#{unitType}` | `QUAL#{qualCode}` / `UNIT#{unitCode}` |
 | 자격 정보 | `QUAL#{qualCode}` | `META` | — |
@@ -221,6 +222,15 @@ B가 스냅샷에 조건을 저장하고, **A·B 모두 `backend/eligibility.py`
 ## 5. `team07-cache`
 
 `cache_key` + TTL `expires_at`. A가 훈련과정·시험일정·직업정보 응답에 쓴다. API 키가 들어간 URL은 키로 쓰지 않는다.
+
+자격시험 일정은 등록된 `QUAL#… / META`의 종목코드별로 `EXAM#{qualificationCode}#{year}`에 저장한다. `items`는 해당 종목·연도에 공식 발표된 일정이며 빈 목록은 조회 시점 기준 미발표를 뜻한다. 사용 시 `expires_at`을 확인한다.
+
+## 멘토링 수집 운영
+
+- 매일 06:00 KST에 한국산업인력공단 `getQualExamSchdList`에서 올해와 내년 시험 일정을 수집한다. 캐시 유효기간은 24시간이다.
+- 매주 화요일 07:00 KST에 [NCS 공식 자료실](https://www.ncs.go.kr/th06/bbs_lib_list.do?libDstinCd=01&searchKeyword=DB)의 최신 대분류별 정보망 DB를 확인한다. 각 직무 스냅샷에 버전 포함 능력단위코드, 명칭, 요소명, 자료 기준월, 출처, SHA-256을 저장한다. 수집 실패 시 이전 자료를 유지한다.
+- 개발계획서1 §9의 권장 주기를 따른다. 실행 시각은 오전 정책 배치와 분리한 운영 설정이다. 기존 팀 키로 NCS 기준정보 API가 403을 반환해 공단 공식 배포 파일을 사용한다.
+- Lambda 코드 배포 후 서울 리전에서 `python3 infra/setup_mentoring_collection.py`를 실행한다. 두 일정은 기존 Scheduler 역할로 `team07-api`를 호출한다.
 
 ## 6. 공통 ID 규칙
 
