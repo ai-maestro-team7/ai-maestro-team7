@@ -66,7 +66,7 @@ def test_persona_alio_posting_gets_ncs_job_match(deps, as_of, user, job, descrip
     breakdown = ranking.match_score(deps.config, profile, no_ncs)
     assert breakdown.job_match == 0  # NCS 경로가 없으면 이름만 비교해 0이다
     with_ncs = ranking.match_score(deps.config, profile, deps.catalog.get_latest("alio-T-PERSONA"))
-    assert with_ncs.job_match == deps.config.match.job_match_levels.same_major
+    assert with_ncs.job_match == deps.config.match.job_match_levels.same_major_category_only
 
 
 def test_persona3_without_ncs_code_is_unchanged(deps, as_of):

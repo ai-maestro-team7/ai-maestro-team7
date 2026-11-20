@@ -14,7 +14,8 @@
     "jobMatchLevels": {
       "exact": 1.0,
       "sameMiddle": 0.6,
-      "sameMajor": 0.3
+      "sameMajor": 0.3,
+      "sameMajorCategoryOnly": 0.6
     },
     "contentSimRange": {
       "low": 0.2,

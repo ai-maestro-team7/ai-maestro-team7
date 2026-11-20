@@ -58,18 +58,38 @@ def test_ncs_exact_middle_major(config):
     assert value(config, Job(name="", ncs_codes=["02030201"]), ncs_only(NCS_DATA)) == 0
 
 
-def test_alio_code_is_at_most_same_major(config):
+def test_alio_code_is_at_most_category_only_major(config):
+    """대분류 분류만 있는 공고는 대분류가 같으면 sameMajorCategoryOnly다. 그 위(중분류·세분류)로는 못 간다 (B-D07)."""
     levels = config.match.job_match_levels
-    assert value(config, ALIO_IT, ncs_only(NCS_DATA)) == levels.same_major       # R600020 = 20 정보통신
-    assert value(config, ALIO_OFFICE, ncs_only("02030201")) == levels.same_major  # R600002 = 02 경영·회계·사무
+    assert value(config, ALIO_IT, ncs_only(NCS_DATA)) == levels.same_major_category_only       # R600020 = 20 정보통신
+    assert value(config, ALIO_OFFICE, ncs_only("02030201")) == levels.same_major_category_only  # R600002 = 02 경영·회계·사무
     assert value(config, ALIO_OFFICE, ncs_only(NCS_DATA)) == 0
+    assert levels.same_major <= levels.same_major_category_only < levels.exact
+
+
+def test_posting_with_finer_code_keeps_plain_same_major(config):
+    """8자리 NCS가 있는 공고는 더 잘게 비교할 수 있으므로 대분류만 같으면 그대로 sameMajor다."""
+    levels = config.match.job_match_levels
+    assert value(config, Job(name="", ncs_codes=["20020101"]), ncs_only(NCS_DATA)) == levels.same_major
+    mixed = Job(name="", ncs_codes=["R600020", "20020101"])  # 잡알리오 코드와 8자리가 섞이면 대분류만 아는 공고가 아니다
+    assert value(config, mixed, ncs_only(NCS_DATA)) == levels.same_major
+    profile = BasicProfile(desired_jobs=[ncs_only(NCS_DATA)])
+    assert ranking.job_match_detail(config, profile, ALIO_IT) == (levels.same_major_category_only, ranking.BASIS_NCS_MAJOR)
+
+
+def test_category_only_match_is_still_described_as_major(config):
+    """점수는 올라가도 화면 문구는 "NCS 대분류"다. 중분류가 같다고 말하지 않는다."""
+    levels = config.match.job_match_levels
+    for basis in (ranking.BASIS_NCS_MAJOR, ranking.BASIS_NCS_MAJOR_NAME):
+        assert facts.job_fact(config, levels.same_major_category_only, basis=basis) == facts.FACT_JOB_NCS_MAJOR
 
 
 def test_any_of_many_categories_is_enough(config):
     levels = config.match.job_match_levels
     many = Job(name="", ncs_codes=["R600006", "R600002", "20010105"])
     assert value(config, many, ncs_only(NCS_DATA)) == levels.exact
-    assert value(config, Job(name="", ncs_codes=["R600006", "R600020"]), ncs_only(NCS_DATA)) == levels.same_major
+    assert value(config, Job(name="", ncs_codes=["R600006", "R600020"]), ncs_only(NCS_DATA)) \
+        == levels.same_major_category_only
     assert value(config, Job(name="", ncs_codes=["R600006", "R600011"]), ncs_only(NCS_DATA)) == 0
 
 
@@ -85,7 +105,7 @@ def test_none_only_when_nothing_to_compare(config):
 def test_alio_major_name_is_not_a_work24_code(config):
     """잡알리오 공고의 job.major는 NCS 대분류 이름이다. 예전에는 고용24 코드로 비교해 늘 0이었다."""
     persona1 = DesiredJob(work24_code="D0101", ncs_code=NCS_DATA, name="데이터 분석")
-    assert value(config, ALIO_IT, persona1) == config.match.job_match_levels.same_major
+    assert value(config, ALIO_IT, persona1) == config.match.job_match_levels.same_major_category_only
 
 
 def test_highest_of_work24_and_ncs(config):
@@ -100,11 +120,12 @@ def test_highest_of_work24_and_ncs(config):
         == (levels.exact, ranking.BASIS_NCS)
 
 
-def test_name_hit_on_category_name_is_only_same_major(config):
+def test_name_hit_on_category_name_is_only_major_level(config):
     """공고 이름이 NCS 대분류 이름뿐이면 이름이 겹쳐도 "같은 직종"이 아니라 같은 분야다."""
     levels = config.match.job_match_levels
     profile = BasicProfile(desired_jobs=[DesiredJob(name="회계")])
-    assert ranking.job_match_detail(config, profile, ALIO_OFFICE) == (levels.same_major, ranking.BASIS_NCS_MAJOR_NAME)
+    assert ranking.job_match_detail(config, profile, ALIO_OFFICE) \
+        == (levels.same_major_category_only, ranking.BASIS_NCS_MAJOR_NAME)
     specific = Job(name="회계 사무원", ncs_codes=["02030201"])  # 8자리 NCS가 있으면 이름 그대로
     assert ranking.job_match_value(config, profile, specific) == levels.exact
 
@@ -130,7 +151,7 @@ def test_feed_card_says_same_field_not_same_job(deps, as_of):
     assert facts.FACT_JOB_EXACT not in card.facts
 
 
-@pytest.mark.parametrize("job,expected", [(ALIO_IT, "same_major"), (ALIO_OFFICE, None)])
+@pytest.mark.parametrize("job,expected", [(ALIO_IT, "same_major_category_only"), (ALIO_OFFICE, None)])
 def test_match_score_uses_ncs(deps, job, expected):
     cfg = deps.config
     latest = add_posting(deps, "alio-T-SCORE", job=job)
@@ -138,6 +159,6 @@ def test_match_score_uses_ncs(deps, job, expected):
     breakdown = ranking.match_score(cfg, profile, latest, content_similarity=0.7)
     if expected:
         assert breakdown.job_match == getattr(cfg.match.job_match_levels, expected)
-        assert breakdown.job_basis == ranking.BASIS_NCS
+        assert breakdown.job_basis == ranking.BASIS_NCS_MAJOR
     else:
         assert breakdown.job_match == 0  # 비교는 했고 맞는 분류가 없다

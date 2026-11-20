@@ -29,6 +29,7 @@ REGION_ALL, REGION_BUSAN, REGION_CAPITAL, REGION_OVERSEAS = "ALL", "BUSAN", "CAP
 # 직무 일치의 근거. 사실 문구를 고를 때 쓴다 (facts.job_fact)
 BASIS_WORK24, BASIS_NAME, BASIS_NCS = facts.BASIS_WORK24, facts.BASIS_NAME, facts.BASIS_NCS
 BASIS_NCS_MAJOR_NAME = facts.BASIS_NCS_MAJOR_NAME
+BASIS_NCS_MAJOR = facts.BASIS_NCS_MAJOR
 
 # NCS 코드: 대분류 2 + 중분류 2 + 소분류 2 + 세분류 2 = 8자리
 NCS_FULL = 8
@@ -89,7 +90,8 @@ def _ncs_prefixes(job: Job) -> list[str]:
 def ncs_match_value(config: OpportunityConfig, desired_ncs: str | None, job: Job) -> float | None:
     """NCS 코드 비교. 8자리가 같으면 exact, 앞 4자리 sameMiddle, 앞 2자리 sameMajor.
 
-    공고 분류가 여러 개면 가장 높은 값을 쓴다. 잡알리오 코드는 대분류만 알아서 최대 sameMajor다.
+    공고 분류가 여러 개면 가장 높은 값을 쓴다. 공고에 대분류 분류만 있으면(잡알리오) 대분류 일치를
+    sameMajorCategoryOnly로 본다. 더 잘게 비교할 정보가 공고에 없어서다 (B-D07).
     희망 직무 NCS 코드나 공고 NCS 코드가 없으면 None.
     """
     levels = config.match.job_match_levels
@@ -97,6 +99,7 @@ def ncs_match_value(config: OpportunityConfig, desired_ncs: str | None, job: Job
     prefixes = _ncs_prefixes(job)
     if len(mine) != NCS_FULL or not mine.isdigit() or not prefixes:
         return None
+    major = levels.same_major_category_only if _category_only(job) else levels.same_major
     best = 0.0
     for prefix in prefixes:
         if len(prefix) == NCS_FULL and prefix == mine:
@@ -104,7 +107,7 @@ def ncs_match_value(config: OpportunityConfig, desired_ncs: str | None, job: Job
         if len(prefix) >= NCS_MIDDLE and prefix[:NCS_MIDDLE] == mine[:NCS_MIDDLE]:
             best = max(best, levels.same_middle)
         elif prefix[:NCS_MAJOR] == mine[:NCS_MAJOR]:
-            best = max(best, levels.same_major)
+            best = max(best, major)
     return best
 
 
@@ -115,14 +118,14 @@ def _category_only(job: Job) -> bool:
 
 
 def _name_match(config: OpportunityConfig, desired: DesiredJob, job: Job) -> tuple[float | None, str]:
-    """이름 포함 관계. 공고 이름이 NCS 대분류 이름뿐이면 겹쳐도 같은 분야(sameMajor)까지만 본다."""
+    """이름 포함 관계. 공고 이름이 NCS 대분류 이름뿐이면 겹쳐도 같은 분야(sameMajorCategoryOnly)까지만 본다."""
     levels = config.match.job_match_levels
     mine, theirs = _norm(desired.name), _norm(job.name)
     if not mine or not theirs:
         return None, BASIS_NAME
     hit = mine in theirs or theirs in mine
     if _category_only(job):
-        return (levels.same_major if hit else 0.0), BASIS_NCS_MAJOR_NAME
+        return (levels.same_major_category_only if hit else 0.0), BASIS_NCS_MAJOR_NAME
     return (levels.exact if hit else 0.0), BASIS_NAME
 
 
@@ -133,7 +136,7 @@ def _job_match_one(config: OpportunityConfig, desired: DesiredJob, job: Job) -> 
         value, basis = _name_match(config, desired, job)
     ncs = ncs_match_value(config, desired.ncs_code, job)
     if ncs is not None and (value is None or ncs > value):
-        return ncs, BASIS_NCS
+        return ncs, (BASIS_NCS_MAJOR if _category_only(job) else BASIS_NCS)
     return value, (basis if value is not None else None)
 
 

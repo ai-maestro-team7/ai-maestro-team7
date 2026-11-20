@@ -45,6 +45,8 @@ class JobMatchLevels(OppModel):
     exact: float
     same_middle: float
     same_major: float
+    # 공고에 대분류 분류만 있을 때(잡알리오)의 대분류 일치 값. 더 잘게 비교할 수 없는 공고라 sameMajor보다 높게 둔다 (B-D07)
+    same_major_category_only: float
 
 
 class Range(OppModel):
@@ -71,11 +73,15 @@ class MatchConfig(OppModel):
         for name, value in (("jobMatchLevels.exact", self.job_match_levels.exact),
                             ("jobMatchLevels.sameMiddle", self.job_match_levels.same_middle),
                             ("jobMatchLevels.sameMajor", self.job_match_levels.same_major),
+                            ("jobMatchLevels.sameMajorCategoryOnly", self.job_match_levels.same_major_category_only),
                             ("contentSimRange.low", self.content_sim_range.low),
                             ("contentSimRange.high", self.content_sim_range.high),
                             ("unknownConditionValue", self.unknown_condition_value),
                             ("levels.good", self.levels.good), ("levels.fair", self.levels.fair)):
             _unit(value, f"match.{name}")
+        jl = self.job_match_levels
+        if not jl.same_major <= jl.same_major_category_only < jl.exact:
+            raise ValueError("match.jobMatchLevels는 sameMajor <= sameMajorCategoryOnly < exact여야 한다")
         if not self.content_sim_range.low < self.content_sim_range.high:
             raise ValueError("match.contentSimRange는 low < high여야 한다")
         if not self.levels.fair < self.levels.good:
