@@ -18,7 +18,7 @@ from .versions import (PROMPT_A_VERSION, PROMPT_B_VERSION, PROMPT_C1_VERSION, PR
 PROMPT_DIR = Path(__file__).resolve().parent / "prompts"
 
 DATA_TAGS = ("job", "interview_type", "resume", "profile", "question", "answer",
-             "question_type", "follow_up_question", "follow_up_answer")
+             "question_type", "follow_up_question", "follow_up_answer", "job_posting")
 
 _TAG_RE = re.compile(r"<(/?)(" + "|".join(DATA_TAGS) + r")\b", re.IGNORECASE)
 _PLACEHOLDER_RE = re.compile(r"\{\{([A-Z_]+)\}\}")
@@ -65,17 +65,32 @@ def _profile_text(profile: BaseModel | None) -> str:
     return json.dumps(profile.model_dump(by_alias=True, exclude_none=True), ensure_ascii=False)
 
 
+def _job_posting_text(job_posting) -> str:
+    """<job_posting> 태그 내용 (#158 design §5). 제목·회사는 값이 있을 때만 줄을 넣는다. 공고가 없으면 빈 문자열."""
+    if job_posting is None:
+        return ""
+    lines = []
+    if job_posting.title:
+        lines.append(f"제목: {job_posting.title}")
+    if job_posting.company:
+        lines.append(f"회사: {job_posting.company}")
+    lines += ["본문:", job_posting.text]
+    return "\n".join(lines)
+
+
 def system_prompt() -> str:
     return load(SYSTEM_FILE)
 
 
-def questions_prompt(job: str, interview_type: str, resume_text: str, profile: BaseModel | None) -> str:
-    """Prompt_A 사용자 메시지."""
+def questions_prompt(job: str, interview_type: str, resume_text: str, profile: BaseModel | None,
+                     job_posting=None) -> str:
+    """Prompt_A 사용자 메시지. job_posting은 models.JobPostingInput 또는 None (A-v3, #158)."""
     return fill(load(QUESTIONS_FILE), {
         "JOB": wrap("job", job),
         "INTERVIEW_TYPE": wrap("interview_type", interview_type),
         "RESUME": wrap("resume", resume_text),
         "PROFILE": wrap("profile", _profile_text(profile)),
+        "JOB_POSTING": wrap("job_posting", _job_posting_text(job_posting)),
     })
 
 

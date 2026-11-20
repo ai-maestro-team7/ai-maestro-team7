@@ -43,7 +43,7 @@ def test_start_initial_session():
     assert session["answers"] == [] and session["baseline"] is None
     assert session["scoringVersion"] == "v2.0"
     assert session["modelId"] == "test-model"
-    assert session["promptVersion"] == "A-v2/B-v2"
+    assert session["promptVersion"] == "A-v3/B-v2"
     assert [q["questionId"] for q in session["questions"]] == ["q1", "q2", "q3"]
     assert result["nextQuestion"] == {"questionId": "q1", "answerId": "a-q1-1",
                                       "text": session["questions"][0]["question"], "isFollowUp": False}
@@ -108,6 +108,88 @@ def test_start_without_model_id_fails_before_llm(monkeypatch):
         start(fake=fake)
     assert exc.value.code == AWS_SERVICE_ERROR and exc.value.retryable is False
     assert fake.calls == []
+
+
+# ---------------------------------------------------------------- start_interview 채용공고 (#158)
+
+JOB_POSTING = sample_json("job_posting_data_analysis.json")
+
+
+def start_with_posting(job_posting, fake=None):
+    """백엔드가 연결한 뒤의 호출: 위치 인자 7개 (profile 다음 jobPosting)."""
+    fake = fake or FakeLLM([QUESTIONS_OK])
+    return interview.start_interview(SESSION_ID, "데이터 분석", RESUME, "MIXED", True, PROFILE, job_posting,
+                                     llm=fake), fake
+
+
+def test_start_with_job_posting_reaches_prompt():
+    result, fake = start_with_posting(JOB_POSTING)
+    user = fake.calls[0]["user"]
+    assert (f"<job_posting>\n제목: {JOB_POSTING['title']}\n회사: {JOB_POSTING['company']}\n본문:\n"
+            f"{JOB_POSTING['text']}\n</job_posting>") in user
+    assert "<resume>\n" + RESUME + "\n</resume>" in user  # 자소서는 그대로 들어간다
+    assert result["session"]["promptVersion"] == "A-v3/B-v2"
+
+
+def test_start_with_job_posting_keeps_session_shape():
+    with_posting, _ = start_with_posting(JOB_POSTING)
+    without = start(profile=PROFILE)
+    assert set(with_posting["session"]) == set(without["session"])  # Session에 공고를 남기지 않는다
+    assert with_posting == without  # 같은 LLM 응답이면 결과가 같다
+    assert "가상 부산관광데이터랩" not in json.dumps(with_posting, ensure_ascii=False)
+    Session.model_validate(with_posting["session"])
+
+
+def test_start_six_args_has_empty_job_posting_tag():
+    fake = FakeLLM([QUESTIONS_OK])
+    start(fake=fake)  # 지금 백엔드와 같은 6개 인자
+    assert "<job_posting>\n\n</job_posting>" in fake.calls[0]["user"]
+
+
+def test_start_job_posting_none_positional():
+    result, fake = start_with_posting(None)
+    assert "<job_posting>\n\n</job_posting>" in fake.calls[0]["user"]
+    assert result["session"]["promptVersion"] == "A-v3/B-v2"
+
+
+def test_start_accepts_normalized_and_converted_posting():
+    # 백엔드가 normalize_job_posting·job_posting_from_posting 결과를 그대로 넘긴다
+    _, fake = start_with_posting(interview.normalize_job_posting(JOB_POSTING))
+    assert JOB_POSTING["text"] in fake.calls[0]["user"]
+    converted = interview.job_posting_from_posting({
+        "title": "데이터 분석 신입", "organization": "가상 데이터랩",
+        "requirements": [{"requirementId": "r1", "name": "SQL", "kind": "REQUIRED_SKILL",
+                          "sourceQuote": "SQL을 활용한 데이터 추출 및 가공 경험"}],
+        "jobDescription": "사내 서비스 이용 데이터를 분석해 지표 보고서를 작성합니다."})
+    _, fake = start_with_posting(converted)
+    assert "- SQL을 활용한 데이터 추출 및 가공 경험" in fake.calls[0]["user"]
+
+
+@pytest.mark.parametrize("job_posting", [
+    {"text": "짧은 공고"},
+    {"text": "가" * 4001},
+    {"text": "가" * 30, "requirements": ["SQL"]},
+    {"title": "가" * 201, "text": "가" * 30},
+    "공고 본문만 문자열로 넘김" * 3,
+])
+def test_start_invalid_job_posting_no_llm_call(job_posting):
+    fake = FakeLLM([QUESTIONS_OK])
+    with pytest.raises(InterviewError) as exc:
+        start_with_posting(job_posting, fake)
+    assert exc.value.code == INVALID_INPUT and exc.value.retryable is False
+    assert fake.calls == []
+
+
+def test_start_logs_job_posting_presence_only(caplog):
+    import logging
+
+    with caplog.at_level(logging.INFO, logger="interview"):
+        start_with_posting(JOB_POSTING)
+        start()
+    assert "stage=start_interview jobPosting=True" in caplog.text
+    assert "stage=start_interview jobPosting=False" in caplog.text
+    for raw in ("관광 통계 데이터 정제", "가상 부산관광데이터랩", "데이터 분석 신입 (가상 공고)"):
+        assert raw not in caplog.text
 
 
 # ---------------------------------------------------------------- process_answer

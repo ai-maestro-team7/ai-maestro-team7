@@ -42,11 +42,16 @@ def follow_up_question(question: Question, text: str) -> NextQuestion:
                         text=text, is_follow_up=True)
 
 
-def start_interview(session_id, job, resume_text, interview_type, camera_consent, profile=None, *, llm=None):
+def start_interview(session_id, job, resume_text, interview_type, camera_consent, profile=None, job_posting=None, *,
+                    llm=None):
+    """job_posting(#158)은 7번째 위치 인자다. 백엔드 call_ai가 위치 인자만 넘기기 때문이다.
+
+    공고는 기본 질문 생성에만 쓰고 Session에는 남기지 않는다 (#158 결정 5).
+    """
     started = time.monotonic()
     request = parse_input(StartInterviewInput, {
         "session_id": session_id, "job": job, "resume_text": resume_text, "interview_type": interview_type,
-        "camera_consent": camera_consent, "profile": profile,
+        "camera_consent": camera_consent, "profile": profile, "job_posting": job_posting,
     }, stage=STAGE_START)
     model_id = settings.model_id()  # 모델을 부르기 전에 설정부터 확인한다
     questions = generate_from_request(request, llm)
@@ -58,7 +63,7 @@ def start_interview(session_id, job, resume_text, interview_type, camera_consent
         questions=questions, current_index=0, follow_up_used=False, current_question=first,
         answers=[], baseline=None,
     )
-    logger.info("stage=%s durationMs=%d", STAGE_START, _ms(started))
+    logger.info("stage=%s jobPosting=%s durationMs=%d", STAGE_START, request.job_posting is not None, _ms(started))
     return {"session": dump(session), "nextQuestion": dump(first)}
 
 

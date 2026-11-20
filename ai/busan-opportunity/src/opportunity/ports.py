@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Any, Protocol
 
 from .models.policy import Policy
-from .models.posting import AltCandidates, CompanyRecord, PostingLatest, PostingSnapshot
+from .models.posting import AltCandidates, CompanyRecord, PostingLatest, PostingName, PostingSnapshot
 from .models.profile import BasicProfile, OppPrefs
 from .models.user_state import ExplanationCache, Notification, PolicyAlert, SavedItem
 
@@ -26,6 +26,10 @@ class CatalogRepo(Protocol):
 
     def query_postings_by_sido(self, sido: str, *, closes_from: str, limit: int = 100) -> list[PostingLatest]:
         """GSI1 `POSTING#{sido}`, closesAt >= closes_from. 마감 임박순."""
+        ...
+
+    def posting_names(self) -> list[PostingName]:
+        """진행 중 공고의 이름 색인 (`POSTNAMES`, B-D08). 검색어·회사 이름으로 벡터 후보 밖의 공고를 찾을 때 쓴다."""
         ...
 
     def query_policies(self, region_key: str) -> list[Policy]:
@@ -130,6 +134,10 @@ class VectorIndex(Protocol):
     def put(self, key: str, vector: Sequence[float], metadata: dict) -> None: ...
     def get(self, key: str) -> list[float] | None: ...
     def delete(self, key: str) -> None: ...
+
+    def similarities(self, vector: Sequence[float], keys: Sequence[str]) -> dict[str, float]:
+        """질의 벡터와 키마다의 유사도. query가 같은 공고에 주는 값과 같다. 벡터가 없는 키는 빠진다."""
+        ...
 
 
 class Embedder(Protocol):

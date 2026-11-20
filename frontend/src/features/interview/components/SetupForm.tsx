@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useState, useSyncExternalStore } from "react";
 import { TwoColumn } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -11,7 +11,10 @@ import { RadioList } from "@/components/ui/RadioList";
 import { TextArea } from "@/components/ui/TextArea";
 import { TextField } from "@/components/ui/TextField";
 import { loginHref } from "@/features/auth/lib";
+import { useSessionOwner } from "@/features/auth/useSessionOwner";
+import { parseHandoff, readHandoffRaw, subscribeHandoff } from "@/features/chat/lib";
 import { ApiError, AUTH_REQUIRED } from "@/lib/api";
+import { sessionOwner } from "@/lib/session";
 import { startInterview } from "../api";
 import { interviewDefaults, MODE_OPTIONS, RULES, TYPE_OPTIONS } from "../data";
 import { interviewQuery, modeLabel, parseMode, readJob, typeLabel } from "../lib";
@@ -21,10 +24,22 @@ type Errors = { job?: string; coverLetter?: string; consent?: string };
 
 /** 모의면접 1단계: 설정. 입력을 검사하고 세션을 만든 뒤(`POST /interview/start`) 장비 점검으로 넘어간다. */
 export function SetupForm() {
+  const owner = useSessionOwner();
+  // 계정이 바뀌면 인계 문서와 사용자가 고친 자소서를 포함한 폼 상태를 새로 만든다.
+  return <InterviewSetup key={owner ?? "anonymous"} owner={owner} />;
+}
+
+function InterviewSetup({ owner }: { owner: string | null }) {
   const router = useRouter();
   const params = useSearchParams();
   const [job, setJob] = useState(() => readJob(params.get("job")));
-  const [coverLetter, setCoverLetter] = useState<string>(interviewDefaults.coverLetter);
+  // 채팅에서 넘어왔으면 넘겨받은 자소서를 채운다 (개발계획서4 §10). 서버 렌더에는 값이 없다
+  const handoffRaw = useSyncExternalStore(subscribeHandoff, readHandoffRaw, () => null);
+  const handoff = parseHandoff(handoffRaw);
+  const [editedCoverLetter, setCoverLetter] = useState<string | null>(null);
+  const coverLetter = editedCoverLetter ?? handoff?.coverLetter ?? (handoff?.documentId ? "" : interviewDefaults.coverLetter);
+  // 저장된 자소서(A 문서)를 골랐고 칸을 비워 두면 /start에 documentId를 넘긴다
+  const savedDocument = handoff?.documentId && !coverLetter.trim() ? (handoff.documentTitle ?? "저장된 자기소개서") : null;
   const [interviewType, setInterviewType] = useState<InterviewType>(interviewDefaults.interviewType);
   const [mode, setMode] = useState<InterviewMode>(() => parseMode(params.get("mode")));
   const [consent, setConsent] = useState(true);
@@ -37,7 +52,9 @@ export function SetupForm() {
     const trimmedJob = job.trim();
     if (!trimmedJob) next.job = "희망 직무를 입력해 주세요.";
     else if (trimmedJob.length > RULES.jobMax) next.job = `희망 직무는 ${RULES.jobMax}자까지 쓸 수 있어요.`;
-    if (coverLetter.length < RULES.resumeMin) next.coverLetter = `자기소개서를 ${RULES.resumeMin}자 이상 입력해 주세요.`;
+    if (savedDocument) {
+      // 저장된 자소서로 진행. 길이는 서버가 문서에서 읽어 확인한다
+    } else if (coverLetter.length < RULES.resumeMin) next.coverLetter = `자기소개서를 ${RULES.resumeMin}자 이상 입력해 주세요.`;
     else if (coverLetter.length > RULES.resumeMax)
       next.coverLetter = `자기소개서는 ${RULES.resumeMax.toLocaleString()}자까지 쓸 수 있어요.`;
     if (nextMode === "camera" && !consent) next.consent = "음성 + 카메라로 진행하려면 카메라 분석에 동의해 주세요.";
@@ -45,6 +62,8 @@ export function SetupForm() {
   }
 
   async function start(nextMode: InterviewMode) {
+    // 다른 탭에서 로그인 계정이 바뀐 직후, 이전 렌더의 클릭 핸들러가 실행될 수 있다.
+    if (owner !== sessionOwner()) return;
     const next = validate(nextMode);
     setErrors(next);
     if (Object.keys(next).length > 0) return;
@@ -54,11 +73,12 @@ export function SetupForm() {
     try {
       const { sessionId } = await startInterview({
         job: job.trim(),
-        resumeText: coverLetter,
+        ...(savedDocument && handoff?.documentId ? { documentId: handoff.documentId } : { resumeText: coverLetter }),
         interviewType,
         // 카메라 방식이고 동의했을 때만 시선을 본다. 그 밖에는 태도가 측정되지 않는다
         cameraConsent: nextMode === "camera" && consent,
       });
+      if (owner !== sessionOwner()) return;
       router.push(`/interview/check?${interviewQuery({ session: sessionId, job: job.trim(), mode: nextMode })}`);
     } catch (e) {
       const needsLogin = e instanceof ApiError && e.code === AUTH_REQUIRED;
@@ -105,6 +125,11 @@ export function SetupForm() {
             onChange={(event) => setJob(event.target.value)}
             error={errors.job}
           />
+          {savedDocument && (
+            <p className="text-small text-grey-600">
+              채팅에서 고른 ‘{savedDocument}’로 질문을 만들어요. 다른 자기소개서를 쓰려면 아래에 붙여 넣으세요.
+            </p>
+          )}
           <TextArea
             id="interview-cover-letter"
             label="자기소개서"
