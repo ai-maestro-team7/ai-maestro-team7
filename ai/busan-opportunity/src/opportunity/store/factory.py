@@ -10,9 +10,11 @@
 | `SCHEDULER_TARGET_ARN`, `SCHEDULER_ROLE_ARN` | EventBridge Scheduler 일정이 부를 Lambda와 그 역할 |
 | `SCHEDULER_GROUP` (선택) | 일정 그룹. 없으면 default 그룹 |
 | `SES_FROM_ADDRESS`, `COGNITO_USER_POOL_ID` (선택, 둘 다 있어야) | 메일 알림. 없으면 알림함만 쓴다 |
-| `OPP_DATA_BUCKET` | `build_raw_store()`. 수집 배치만 쓴다 |
+| `OPP_DATA_BUCKET` | `build_raw_store()`(수집 배치), 생활 정보 시드, KB ID 시드(`seed/kb.json`) |
+| `OPP_KB_ID` (선택) | 정책 검색 Knowledge Base ID. 없으면 `seed/kb.json`에서 읽고, 둘 다 없으면 질문 기능만 끈다 |
 """
 
+import json
 import os
 from functools import lru_cache
 
@@ -24,6 +26,7 @@ from ..models.region import LocalLifeData, RegionStats
 from ..ports import EligibilityFn, WorkspacePort
 from .dynamo import DynamoCatalog, DynamoUsers
 from .events import EmfEvents
+from .kb import BedrockKbRetriever
 from .mailer import SesMailer, cognito_email_resolver
 from .s3 import S3RawStore
 from .scheduler import EventBridgeScheduler
@@ -43,6 +46,7 @@ def _dynamodb(region: str):
 
 
 LOCAL_LIFE_SEED_KEY = "seed/local_life.json"
+KB_SEED_KEY = "seed/kb.json"  # {"knowledgeBaseId": "…"}
 
 
 def build_aws_deps(*, eligibility: EligibilityFn, workspaces: WorkspacePort,
@@ -78,6 +82,7 @@ def build_aws_deps(*, eligibility: EligibilityFn, workspaces: WorkspacePort,
         events=EmfEvents(),
         llm=BedrockLlm(client=bedrock, config=config, model_id=require_env("MODEL_ID")),
         mailer=mailer,
+        retriever=_build_retriever(region),
         local_life=_load_local_life(region),
         region_stats=RegionStats(),  # 주거비·통근 통계는 비워 둔다. 값이 없으면 비교 패널이 해당 행을 숨긴다
     )
@@ -94,6 +99,26 @@ def _load_local_life(region: str) -> LocalLifeData:
         return load_local_life(S3RawStore(_client("s3", region), bucket).get(LOCAL_LIFE_SEED_KEY) or b"{}")
     except Exception:  # noqa: BLE001 — 시드 문제로 추천 API 전체가 멈추면 안 된다
         return LocalLifeData()
+
+
+def _build_retriever(region: str) -> BedrockKbRetriever | None:
+    """정책 검색. KB ID는 `OPP_KB_ID` → S3 `seed/kb.json` 순서로 찾는다. 없으면 None (질문 기능만 꺼진다)."""
+    kb_id = os.environ.get("OPP_KB_ID") or _load_kb_id(region)
+    if not kb_id:
+        return None
+    return BedrockKbRetriever(_client("bedrock-agent-runtime", region), knowledge_base_id=kb_id)
+
+
+def _load_kb_id(region: str) -> str | None:
+    bucket = os.environ.get("OPP_DATA_BUCKET")
+    if not bucket:
+        return None
+    try:
+        raw = S3RawStore(_client("s3", region), bucket).get(KB_SEED_KEY)
+        value = json.loads(raw).get("knowledgeBaseId") if raw else None
+        return value.strip() if isinstance(value, str) and value.strip() else None
+    except Exception:  # noqa: BLE001 — KB 설정 문제로 추천 API 전체가 멈추면 안 된다
+        return None
 
 
 def build_raw_store(config: OpportunityConfig | None = None) -> S3RawStore:

@@ -23,8 +23,9 @@ from ..core.preferences import get_preferences, set_preferences
 from ..core.ranking import search_postings
 from ..core.saved import add_target_posting, list_saved
 from ..deps import Deps
+from ..enrich.ask import ask_policies, ask_policy, ask_posting
 from ..enrich.explain import explain_posting
-from ..models.api import DemoClockRequest, PreferencesUpdate, SaveRequest, TrackRequest
+from ..models.api import AskRequest, DemoClockRequest, PreferencesUpdate, SaveRequest, TrackRequest
 from ..models.base import OppModel
 from ..models.enums import LeaveReason, PolicyStage, Sort, TrackEvent
 from ..models.errors import OppError, invalid_input
@@ -150,6 +151,12 @@ def rest_explain_posting(job_posting_id: str):
     return explain_posting(_deps(), _user_id(), _id(job_posting_id, "jobPostingId")).to_api()
 
 
+@app.post(f"{PREFIX}/postings/<job_posting_id>/ask")
+def rest_ask_posting(job_posting_id: str):
+    request = _body(AskRequest)
+    return ask_posting(_deps(), _user_id(), _id(job_posting_id, "jobPostingId"), request.question).to_api()
+
+
 @app.get(f"{PREFIX}/postings/<job_posting_id>/alternatives")
 def rest_alternatives(job_posting_id: str):
     q = _query(AlternativesQuery)
@@ -170,6 +177,17 @@ def rest_compare():
 def rest_match_policies():
     q = _query(PoliciesQuery)
     return match_policies(_deps(), _user_id(), stage=q.stage).to_api()
+
+
+@app.post(f"{PREFIX}/policies/ask")
+def rest_ask_policies():
+    return ask_policies(_deps(), _user_id(), _body(AskRequest).question).to_api()
+
+
+@app.post(f"{PREFIX}/policies/<policy_id>/ask")
+def rest_ask_policy(policy_id: str):
+    request = _body(AskRequest)
+    return ask_policy(_deps(), _user_id(), _id(policy_id, "policyId"), request.question).to_api()
 
 
 @app.get(f"{PREFIX}/policies/<policy_id>")

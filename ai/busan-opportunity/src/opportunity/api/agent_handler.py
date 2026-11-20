@@ -27,8 +27,10 @@ from ..core.policies import match_policies
 from ..core.posting_detail import get_regional_talent
 from ..core.ranking import search_postings
 from ..deps import Deps
+from ..enrich.ask import ask_policies
 from ..models.api import (
     AlternativeItem,
+    AskResponse,
     CompareRow,
     CostAdjusted,
     PolicyCard,
@@ -251,6 +253,15 @@ def agent_policies(
     wallet = match_policies(_deps(), _user_id(), stage=stage)
     items = [_policy(card) for bucket in wallet.buckets.values() for card in bucket]
     return AgentPolicies(items=items, totals=wallet.totals, data_as_of=wallet.data_as_of)
+
+
+@agent.get("/agent/policies/search",
+           description="청년정책의 내용·자격·신청 방법을 묻는 질문에 쓴다. 원문 근거와 함께 답한다. "
+                       "answered=false면 answer 없이 notice와 relatedPolicies만 준다. 자격은 relatedPolicies의 status를 따른다.")
+def agent_search_policies(
+    question: Annotated[str, Query(description="정책에 관한 사용자 질문 (예: 부산 청년 월세 지원 신청 방법)")],
+) -> AskResponse:
+    return ask_policies(_deps(), _user_id(), question)
 
 
 @agent.get("/agent/postings/<jobPostingId>/regional-talent",
