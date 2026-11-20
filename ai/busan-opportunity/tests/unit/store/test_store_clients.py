@@ -338,3 +338,26 @@ def test_vector_filter_wraps_multiple_conditions_in_and():
     from datetime import datetime, timedelta, timezone
     built = to_s3_filter(active_filter(datetime(2026, 11, 21, 10, tzinfo=timezone(timedelta(hours=9))), isBusan=True))
     assert set(built) == {"$and"} and len(built["$and"]) == 3  # core 필터가 실제로 S3 형식이 된다
+
+
+def test_json_secret_returns_named_field_and_hides_missing_name():
+    class Client:
+        calls = 0
+
+        def get_secret_value(self, SecretId):
+            Client.calls += 1
+            assert SecretId == "team07/opp-api-keys"
+            return {"SecretString": '{"YOUTHCENTER_API_KEY": "v1", "WORK24_GANGSO_KEY": "v2"}'}
+
+    from opportunity.models.errors import OppError
+    from opportunity.store.secrets import SecretsManagerSecrets
+
+    secrets = SecretsManagerSecrets(Client(), json_secret_id="team07/opp-api-keys")
+    assert secrets.get("YOUTHCENTER_API_KEY") == "v1" and secrets.get("WORK24_GANGSO_KEY") == "v2"
+    assert Client.calls == 1  # 시크릿은 한 번만 읽고 5분 캐시한다
+    try:
+        secrets.get("NOPE")
+    except OppError as e:
+        assert e.code == "AWS_SERVICE_ERROR" and "NOPE" not in e.message
+    else:
+        raise AssertionError("없는 이름은 오류여야 한다")

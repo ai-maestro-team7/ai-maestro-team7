@@ -86,4 +86,5 @@ def build_raw_store(config: OpportunityConfig | None = None) -> S3RawStore:
 
 def build_secrets(config: OpportunityConfig | None = None) -> SecretsManagerSecrets:
     """수집 배치용 Secrets Manager."""
-    return SecretsManagerSecrets(_client("secretsmanager", (config or get_config()).region))
+    return SecretsManagerSecrets(_client("secretsmanager", (config or get_config()).region),
+                                 json_secret_id=os.environ.get("OPP_SECRET_ID") or None)

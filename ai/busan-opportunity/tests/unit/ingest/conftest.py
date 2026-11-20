@@ -13,6 +13,7 @@ FIXTURES = Path(__file__).parent / "fixtures"
 AS_OF = "2026-11-21T10:00:00+09:00"
 SECRET_VALUES = {
     "WORK24_AUTH_KEY": "W24-SECRET-AAAA1111",
+    "WORK24_GANGSO_KEY": "W24-SECRET-AAAA1111",
     "DATA_GO_KR_SERVICE_KEY": "GOKR%2BSECRET%2FBBBB2222%3D%3D",  # 공공데이터포털은 URL 인코딩된 키를 준다
     "YOUTHCENTER_API_KEY": "YTH-SECRET-CCCC3333",
 }
@@ -46,10 +47,17 @@ class FakeApi:
             return fixture_bytes(f"work24_detail_{param(url, 'wantedAuthNo')}.xml")
         if "recruitment/list" in url:
             return fixture_bytes("alio_list_p1.json")
-        if "recruitment/detail" in url:
-            return fixture_bytes(f"alio_detail_{param(url, 'sn')}.json")
+        if "recruitment/detail" in url:  # 샘플이 없는 공고는 빈 결과를 준다
+            name = f"alio_detail_{param(url, 'sn')}.json"
+            if (FIXTURES / name).exists():
+                return fixture_bytes(name)
+            return b'{"resultCode": 200, "resultMsg": "ok", "result": null}'
         if "getPlcy" in url:
             return fixture_bytes("youthcenter_list_p1.json")
+        if "callOpenApiSvcInfo216L01" in url:  # 강소기업은 부산 샘플만 있다. 다른 지역은 빈 목록
+            if param(url, "region") == "26000":
+                return fixture_bytes("work24_gangso_region26000_p1.xml")
+            return b"<smallGiantsList><total>0</total><startPage>1</startPage><display>100</display></smallGiantsList>"
         raise AssertionError("가짜 API에 없는 주소")
 
     def count(self, needle: str) -> int:

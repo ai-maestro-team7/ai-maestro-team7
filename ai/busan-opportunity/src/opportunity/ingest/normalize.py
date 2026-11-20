@@ -14,6 +14,7 @@ from typing import Any
 from ..core import clock
 from ..core.regions import SIDO_NAMES
 from ..models.enums import (
+    BadgeType,
     CareerType,
     EducationLevel,
     EmploymentType,
@@ -27,6 +28,8 @@ from ..models.enums import (
     PolicyStage,
     PostingSource,
     RegionScope,
+    RuleType,
+    Selection,
     SourceType,
 )
 from ..models.policy import (
@@ -38,8 +41,46 @@ from ..models.policy import (
     PolicyEligibility,
     PolicyRegion,
 )
-from ..models.posting import ROLLING_CLOSES_AT, Company, Job, PostingSnapshot, Salary, WorkRegion
-from .field_maps import ALIO, CATEGORY_MAP, SIDO_ALIASES, STAGE_BY_CATEGORY, WORK24, YOUTHCENTER
+from ..models.posting import (
+    ROLLING_CLOSES_AT,
+    Badge,
+    Company,
+    CompanyRecord,
+    EligibilityRule,
+    Job,
+    PostingSnapshot,
+    Salary,
+    WorkRegion,
+)
+from . import codes
+from .field_maps import (
+    AGE_ONLY_WHEN_LIMIT_FLAG_Y,
+    ALIO,
+    ALIO_CAREER,
+    ALIO_EDUCATION,
+    ALIO_EMPLOYMENT,
+    ALIO_JOB_NAME_SHOWN,
+    ALIO_NATIONAL_NAMES,
+    ALIO_ROLLING_MIN_DAYS,
+    ALIO_ROLLING_TITLE_WORDS,
+    ALIO_URL_BLANKS,
+    APPLY_PERIOD_ALWAYS,
+    BLANK_CONDITION_TEXTS,
+    CATEGORY_MAP,
+    COMPANY_ID_PREFIX,
+    EXTRA_SIDO_NAMES,
+    GANGSO_BADGE_SOURCE,
+    INCOME_AMOUNT,
+    INCOME_AMOUNT_UNIT_LABEL,
+    INCOME_OTHER,
+    NATIONAL_MIN_SIDO,
+    SIDO_ALIASES,
+    STAGE_BY_CATEGORY,
+    STAGE_BY_SUBCATEGORY,
+    WORK24,
+    WORK24_GANGSO,
+    YOUTHCENTER,
+)
 from .http import walk
 
 POSTING_ID_PREFIX = {"work24": "wk24", "alio": "alio"}
@@ -171,10 +212,14 @@ def _sido_of_text(part: str) -> str | None:
     return SIDO_ALIASES.get(tokens[0]) if tokens else None
 
 
+def _sido_label(sido: str) -> str:
+    return SIDO_NAMES.get(sido) or EXTRA_SIDO_NAMES.get(sido) or sido
+
+
 def _region_label(sido: str, address: str) -> str:
     """"부산 해운대구"처럼 시·도 이름에 이어지는 시·군·구 이름을 붙인다. 주소에 없으면 시·도만 쓴다."""
     tokens = _ZIP_PREFIX.sub("", address.strip()).split()
-    names = [SIDO_NAMES[sido]]
+    names = [_sido_label(sido)]
     if tokens and SIDO_ALIASES.get(tokens[0]) == sido:
         for token in tokens[1:3]:
             if token.endswith(("시", "군", "구")):
@@ -184,13 +229,17 @@ def _region_label(sido: str, address: str) -> str:
     return " ".join(names)
 
 
-def parse_region(code: str, address: str) -> WorkRegion:
-    """API 코드 → 주소 글 → 없으면 unknown. 근무지를 모르면 부산으로 세지 않는다 (개발계획서2 §3.2)."""
+def parse_region(code: str, address: str, *, region_names: Mapping[str, str] | None = None) -> WorkRegion:
+    """API 코드 → 주소 글 → 없으면 unknown. 근무지를 모르면 부산으로 세지 않는다 (개발계획서2 §3.2).
+
+    region_names(고용24 지역 표)가 있으면 코드로 찾은 이름("부산 해운대구")을 label로 쓴다.
+    """
     digits = re.sub(r"\D", "", code)
-    if len(digits) >= 2 and digits[:2] in SIDO_NAMES:
+    if len(digits) >= 2 and digits[:2] in _sido_codes(region_names):
         sido = digits[:2]
         sigungu = digits[:5] if len(digits) >= 5 and digits[2:5] != "000" else None
-        return WorkRegion(sido=sido, sigungu=sigungu, label=_region_label(sido, address))
+        named = (region_names or {}).get(sigungu or f"{sido}000")
+        return WorkRegion(sido=sido, sigungu=sigungu, label=named or _region_label(sido, address))
     sidos = {s for s in (_sido_of_text(part) for part in re.split(r"[,;/·]", address)) if s}
     if len(sidos) == 1:
         sido = next(iter(sidos))
@@ -333,38 +382,356 @@ def normalize_work24(record: Mapping, *, as_of, detail: Mapping | None = None,
                               org_type=OrgType.PRIVATE, source=PostingSource.WORK24)
 
 
-def normalize_alio(record: Mapping, *, as_of, detail: Mapping | None = None,
-                   job_codes: Mapping | None = None) -> PostingSnapshot:
-    """잡알리오 채용공시 → 스냅샷. ID는 `alio-{공시번호}`."""
-    return _normalize_posting(ALIO, record, detail, as_of=as_of, job_codes=job_codes,
-                              org_type=OrgType.PUBLIC_INSTITUTION, source=PostingSource.ALIO)
+# ---------------------------------------------------------------- 공고 (잡알리오)
+ALIO_MULTI_REGION_LABEL = "{first} 외 {rest}개 지역"
+ALIO_NATIONAL_LABEL = "전국 · 근무지 공고문 확인"
+ALIO_OTHER_REGION_LABEL = "{names} · 근무지 공고문 확인"
+ALIO_DESCRIPTION_HEADINGS = ("지원 자격", "우대", "전형 절차")
+_FILE_NUMBER = re.compile(r"^\s*\d+\s*[.)]\s*")
+_FILE_EXTENSION = re.compile(r"\.[A-Za-z0-9]{2,5}$")
 
 
-# ---------------------------------------------------------------- 정책
-def _int_or_none(raw: str) -> int | None:
+def _names(raw: str) -> list[str]:
+    """쉼표로 이은 이름 목록. 빈 칸은 버리고 처음 나온 순서대로 중복을 뺀다."""
+    return list(dict.fromkeys(part.strip() for part in (raw or "").split(",") if part.strip()))
+
+
+def _sido_by_name() -> dict[str, str]:
+    """시·도 이름 → 코드. 공용 이름표(`core/regions.SIDO_NAMES`)에 2026년 통합 시·도(전남광주)를 더한다."""
+    return {name: code for code, name in {**SIDO_NAMES, **EXTRA_SIDO_NAMES}.items()}
+
+
+def parse_alio_region(raw: str, *, first_sido: str | None = None) -> WorkRegion:
+    """잡알리오 근무지 이름 목록 → 근무지 하나. 시·군·구 코드가 없어서 sigungu는 늘 None이다.
+
+    - 한 곳이면 그 시·도. 여러 곳이면 first_sido(부산)가 들어 있을 때 그 시·도, 없으면 첫 지역을 sido로 두고
+      label에 "부산 외 3개 지역"처럼 여러 곳임을 적는다. "외 N"에는 시·도가 아닌 이름(해외)도 센다.
+    - "전국"이 있으면 근무지를 하나로 정할 수 없어 unknown이다. 시·도 이름이 하나도 없으면(해외) unknown.
+    """
+    names = _names(raw)
+    if not names:
+        return WorkRegion(unknown=True)
+    if any(name in ALIO_NATIONAL_NAMES for name in names):
+        return WorkRegion(unknown=True, label=ALIO_NATIONAL_LABEL)
+    by_name = _sido_by_name()
+    known = [(name, by_name[name]) for name in names if name in by_name]
+    if not known:
+        return WorkRegion(unknown=True, label=ALIO_OTHER_REGION_LABEL.format(names=" · ".join(names)))
+    first_name, sido = next(((n, c) for n, c in known if c == first_sido), known[0])
+    if len(names) == 1:
+        return WorkRegion(sido=sido, label=first_name)
+    return WorkRegion(sido=sido, label=ALIO_MULTI_REGION_LABEL.format(first=first_name, rest=len(names) - 1))
+
+
+def parse_alio_employment(raw: str) -> EmploymentType:
+    """고용 형태 이름 목록. 모두 같은 종류일 때만 값을 둔다 (무기계약직+비정규직 → CONTRACT, 정규직+비정규직 → UNKNOWN)."""
+    found = {ALIO_EMPLOYMENT.get(name.replace(" ", "")) or parse_employment(name) for name in _names(raw)}
+    return next(iter(found)) if len(found) == 1 else EmploymentType.UNKNOWN
+
+
+def parse_alio_career(raw: str) -> CareerType:
+    name = (raw or "").replace(" ", "")
+    return ALIO_CAREER.get(name) or parse_career(name)
+
+
+def parse_alio_education(raw: str) -> EducationLevel | None:
+    """학력 조건 이름 목록에서 가장 낮은 학력. 표에 없는 이름은 글로 읽는다 (`parse_education`)."""
+    levels = [ALIO_EDUCATION.get(name.replace(" ", "")) or parse_education(name) for name in _names(raw)]
+    levels = [level for level in levels if level is not None]
+    return min(levels, key=_EDUCATION_ORDER.index) if levels else None
+
+
+def parse_alio_job(ncs_names: str, ncs_codes: str, title: str) -> Job:
+    """NCS 분류 이름으로 직무 이름을 만든다. 고용24 직종 코드가 없어서 code·middle은 None이다."""
+    names, codes_ = _names(ncs_names), _names(ncs_codes)
+    shown = " · ".join(names[:ALIO_JOB_NAME_SHOWN])
+    if len(names) > ALIO_JOB_NAME_SHOWN:
+        shown += f" 외 {len(names) - ALIO_JOB_NAME_SHOWN}"
+    return Job(code=None, middle=None, major=names[0] if names else None, name=shown or title, ncs_codes=codes_)
+
+
+def alio_url(raw: str) -> str | None:
+    """기관 누리집 주소. "없음"·"." 같은 값은 버리고, 앞뒤 공백을 지우고, `www.`로 시작하면 https://를 붙인다."""
+    value = (raw or "").strip()
+    if not value or value in ALIO_URL_BLANKS or any(ch.isspace() for ch in value):
+        return None
+    if value.lower().startswith("www."):
+        value = "https://" + value
+    return http_url(value)
+
+
+def _paragraph(raw: str) -> str:
+    lines = [line.rstrip() for line in (raw or "").replace("\r\n", "\n").replace("\r", "\n").split("\n")]
+    return meaningful("\n".join(lines).strip())
+
+
+def alio_description(qualification: str, preference: str, targets: str, selection: str) -> str | None:
+    """지원 자격, 우대, 전형 글을 "[제목]" 아래에 이어 한 글로 만든다. 요건 추출(enrich)이 이 글을 읽는다.
+
+    우대 대상 목록(prefCondCn)이 우대 내용(prefCn)에 그대로 들어 있으면 한 번만 쓴다.
+    """
+    pref = _paragraph(preference)
+    target = _paragraph(targets)
+    if target and target not in pref:
+        pref = "\n".join(p for p in (f"우대 대상: {target}", pref) if p)
+    sections = zip(ALIO_DESCRIPTION_HEADINGS, (_paragraph(qualification), pref, _paragraph(selection)))
+    parts = [f"[{heading}]\n{body}" for heading, body in sections if body]
+    return "\n\n".join(parts) or None
+
+
+def alio_documents(files: Any, name_key: str) -> list[str]:
+    """첨부 파일 이름 → 서류 이름. 앞 번호("1. ")와 확장자를 뗀다. 상세에만 파일 목록이 온다."""
+    rows = [f for f in (files if isinstance(files, list) else []) if isinstance(f, Mapping)]
+    rows.sort(key=lambda f: (f.get("sortNo") is None, f.get("sortNo") or 0))
+    out: list[str] = []
+    for row in rows:
+        name = _FILE_EXTENSION.sub("", _FILE_NUMBER.sub("", text_of(row.get(name_key)))).strip()
+        if name and name not in out:
+            out.append(name)
+    return out
+
+
+def _alio_closes(raw: str) -> str | None:
+    return _ymd(raw) or next(iter(find_dates(raw or "")), None)
+
+
+def _alio_rules(education: EducationLevel | None, education_text: str, career: CareerType,
+                career_text: str) -> list[EligibilityRule]:
+    """API 값으로 만든 지원 자격 조건 (db-schema §3.2). 경력 연수는 API에 없어서 넣지 않는다."""
+    rules = []
+    if education is not None:
+        rules.append(EligibilityRule(rule_id="rule-edu", type=RuleType.EDUCATION, value=education.value,
+                                     source_quote=education_text))
+    if career != CareerType.UNKNOWN:
+        rules.append(EligibilityRule(rule_id="rule-career", type=RuleType.CAREER, value={"type": career.value},
+                                     source_quote=career_text))
+    return rules
+
+
+def normalize_alio(record: Mapping, *, as_of, detail: Mapping | None = None, job_codes: Mapping | None = None,
+                   first_sido: str | None = None) -> PostingSnapshot:
+    """잡알리오 채용공시 → 스냅샷. ID는 `alio-{recrutPblntSn}`.
+
+    - 근무지는 `parse_alio_region`. first_sido(설정의 부산 시·도 코드)가 여러 근무지 가운데 있으면 그 시·도로 둔다.
+    - 급여는 응답에 없어서 disclosed=false. 요건은 비워 두고 extractStatus=PENDING (보강이 뽑는다).
+    - rolling은 마감일이 `ALIO_ROLLING_MIN_DAYS`일 넘게 남았거나 제목에 "상시"가 있을 때. closesAt은 원문 날짜 그대로다.
+    - job_codes는 쓰지 않는다 (고용24 직종 코드가 없다). 수집 실행기가 출처마다 같은 모양으로 부르려고 받는다.
+    """
+    fields = ALIO["fields"]
+    merged = {**record, **(detail or {})}
+
+    def get(name: str) -> str:
+        return pick(merged, fields.get(name))
+
+    raw_id = get("external_id")
+    external_id = clean_id(raw_id) if raw_id else None
+    if external_id is None:
+        raise SkipRecord("missing_id" if not raw_id else "bad_id")
+    title, organization = get("title"), get("organization")
+    if not title:
+        raise SkipRecord("missing_title")
+    if not organization:
+        raise SkipRecord("missing_organization")
+    closes_at = _alio_closes(get("closes_ymd"))
+    if closes_at is None:
+        raise SkipRecord("no_deadline")
+    when = clock.parse_as_of(as_of)
+    days_left = (date.fromisoformat(closes_at) - when.date()).days
+    rolling = days_left > ALIO_ROLLING_MIN_DAYS or any(w in title for w in ALIO_ROLLING_TITLE_WORDS)
+
+    region = parse_alio_region(get("region_names"), first_sido=first_sido)
+    job = parse_alio_job(get("ncs_names"), get("ncs_codes"), title)
+    employment = parse_alio_employment(get("employment_names"))
+    career_text, education_text = get("career_name"), get("education_names")
+    career = parse_alio_career(career_text)
+    education = parse_alio_education(education_text)
+    description = alio_description(get("qualification"), get("preference"), get("preference_targets"),
+                                   get("selection"))
+    documents = alio_documents(merged.get(fields["files"]), fields["file_name"])
+    url = alio_url(get("url"))
+
+    api: dict[str, ExtractedBy] = {"title": ExtractedBy.API, "organization": ExtractedBy.API,
+                                   "closesAt": ExtractedBy.API}
+    for name, present in (("workRegion", not region.unknown), ("job", job.major is not None),
+                          ("employmentType", employment != EmploymentType.UNKNOWN),
+                          ("careerType", career != CareerType.UNKNOWN), ("educationMin", education is not None),
+                          ("jobDescription", description is not None), ("documents", bool(documents)),
+                          ("officialUrl", url is not None)):
+        if present:
+            api[name] = ExtractedBy.API
+
+    snapshot = PostingSnapshot(
+        job_posting_id=f"{POSTING_ID_PREFIX['alio']}-{external_id}", snapshot_id="pending", title=title,
+        organization=organization, job_description=description, closes_at=closes_at, official_url=url,
+        source_type=SourceType.OFFICIAL, checked_at=clock.iso(when), source=PostingSource.ALIO,
+        company=Company(name=organization), org_type=OrgType.PUBLIC_INSTITUTION, work_region=region, job=job,
+        employment_type=employment, career_type=career, education_min=education, salary=Salary(disclosed=False),
+        rolling=rolling, selection_steps=[], documents=documents,
+        eligibility_rules=_alio_rules(education, education_text, career, career_text),
+        extract_status=ExtractStatus.PENDING, extracted_by=api, content_hash="pending",
+    )
+    digest = compute_content_hash(snapshot)
+    return snapshot.model_copy(update={"content_hash": digest, "snapshot_id": snapshot_id_for(as_of, digest)})
+
+
+# ---------------------------------------------------------------- 정책 (온통청년)
+_YMD = re.compile(r"(\d{4})(\d{2})(\d{2})")
+_YMD_RANGE = re.compile(r"(\d{8})\s*~\s*(\d{8})")
+
+
+def meaningful(raw: str) -> str:
+    """자유 서술 값. 비었거나 "-"·"해당 없음" 같은 값이면 빈 글을 돌려준다."""
+    text = (raw or "").strip()
+    return "" if text in BLANK_CONDITION_TEXTS else text
+
+
+def _age(raw: str) -> int | None:
     digits = re.sub(r"\D", "", raw)
     value = int(digits) if digits else 0
     return value or None  # 0은 제한 없음
 
 
-def parse_policy_regions(raw: str) -> list[PolicyRegion]:
-    """법정동 코드 목록 → 전국/시·도/시·군·구. 코드가 없으면 전국이다."""
-    codes = [re.sub(r"\D", "", c) for c in re.split(r"[,\s]+", raw) if c.strip()]
-    codes = [c for c in codes if len(c) >= 2 and c[:2] in SIDO_NAMES]
-    if not codes:
+def _ymd(raw: str) -> str | None:
+    found = _YMD.fullmatch((raw or "").strip())
+    return _to_date(*found.groups()) if found else None
+
+
+def parse_apply_period(text: str, code: str, biz_start: str, biz_end: str,
+                       today: str) -> tuple[str | None, str, PeriodType]:
+    """신청 기간 → (applyStart, applyEnd, 기간 종류). 날짜는 YYYY-MM-DD.
+
+    1. aplyYmd에 기간이 있으면 FIXED. 기간이 여럿이면 끝나지 않은 첫 기간, 다 끝났으면 마지막 기간을 쓴다.
+    2. 비어 있고 신청기간구분이 상시(추정 0057002)면 ALWAYS, 끝은 9999-12-31.
+       사업 기간이 이미 끝났으면 상시라도 지금은 신청할 수 없어 TBD로 둔다.
+    3. 그 밖(마감으로 추정되는 0057003, 모르는 코드, 날짜를 못 읽은 경우)은 TBD. 날짜를 만들지 않는다.
+    """
+    ranges = [(a, b) for a, b in ((_ymd(x), _ymd(y)) for x, y in _YMD_RANGE.findall(text or "")) if a and b]
+    if ranges:
+        start, end = next(((a, b) for a, b in ranges if b >= today), ranges[-1])
+        return start, end, PeriodType.FIXED
+    if code == APPLY_PERIOD_ALWAYS:
+        ends = _ymd(biz_end)
+        if ends is not None and ends < today:
+            return None, ALWAYS_APPLY_END, PeriodType.TBD
+        return _ymd(biz_start), ALWAYS_APPLY_END, PeriodType.ALWAYS
+    return None, ALWAYS_APPLY_END, PeriodType.TBD
+
+
+def _sido_codes(region_names: Mapping[str, str] | None) -> set[str]:
+    known = set(SIDO_NAMES) | set(EXTRA_SIDO_NAMES)
+    if region_names:
+        known |= set(codes.sido_names(region_names))
+    return known
+
+
+def _unit_of(code: str, present: set[str], region_names: Mapping[str, str] | None) -> str:
+    """구가 있는 시의 구 코드(41111 수원시 장안구)는 시 코드(41110)로 묶는다. 시 코드가 목록이나 지역 표에 있을 때만."""
+    if code[4] == "0":
+        return code
+    parent = code[:4] + "0"
+    return parent if parent in present or (region_names and parent in region_names) else code
+
+
+def _only_unit_of_sido(code: str, region_names: Mapping[str, str] | None) -> bool:
+    """세종(36110)처럼 시·군·구가 하나뿐인 시·도. 지역 표가 있을 때만 알 수 있다."""
+    if not region_names:
+        return False
+    return [c for c in region_names if c[:2] == code[:2] and not c.endswith("000")] == [code]
+
+
+def parse_policy_regions(raw: str, *, region_names: Mapping[str, str] | None = None,
+                         first_sido: str | None = None) -> list[PolicyRegion]:
+    """zipCd(시군구 코드 5자리 목록) → 지역 목록. 알아볼 코드가 하나도 없으면 빈 목록이다.
+
+    - 시·도가 `NATIONAL_MIN_SIDO`곳 이상이면 전국 하나.
+    - 한 시·도 안의 시·군·구 하나면 SIGUNGU, 여럿(또는 시·도 전부)이면 SIDO.
+    - 여러 시·도에 걸치면 시·도마다 SIDO 하나씩. `first_sido`(부산)가 들어 있으면 맨 앞에 둔다.
+      `Policy.region_key()`가 첫 지역만 보기 때문이다.
+    """
+    known = _sido_codes(region_names)
+    found: list[str] = []
+    for part in re.split(r"[,\s]+", raw or ""):
+        code = re.sub(r"\D", "", part)
+        if len(code) == 5 and code[:2] in known and code not in found:
+            found.append(code)
+    if not found:
+        return []
+    sidos = sorted({c[:2] for c in found}, key=lambda s: (s != first_sido, s))
+    if len(sidos) >= NATIONAL_MIN_SIDO:
         return [PolicyRegion(scope=RegionScope.NATIONAL)]
-    regions: dict[tuple, PolicyRegion] = {}
-    for code in codes:
-        if len(code) >= 5 and code[2:5] != "000":
-            region = PolicyRegion(scope=RegionScope.SIGUNGU, sido=code[:2], sigungu=code[:5])
+    if len(sidos) == 1:
+        present = set(found)
+        units = {_unit_of(c, present, region_names) for c in found}
+        if len(units) == 1:
+            unit = next(iter(units))
+            if not unit.endswith("000") and not _only_unit_of_sido(unit, region_names):
+                return [PolicyRegion(scope=RegionScope.SIGUNGU, sido=unit[:2], sigungu=unit)]
+    return [PolicyRegion(scope=RegionScope.SIDO, sido=s) for s in sidos]
+
+
+def _category(raw: str) -> str | None:
+    """대분류 → category. "일자리,교육"처럼 여럿이면 표에 있는 첫 이름, 없으면 원문(중복 제거)."""
+    parts = list(dict.fromkeys(p.strip() for p in raw.split(",") if p.strip()))
+    mapped = [CATEGORY_MAP[p] for p in parts if p in CATEGORY_MAP]
+    if mapped:
+        return mapped[0]
+    return ",".join(parts) or None
+
+
+def _stage(category: str | None, subcategory: str) -> PolicyStage:
+    for part in (p.strip() for p in subcategory.split(",")):
+        if part in STAGE_BY_SUBCATEGORY:
+            return STAGE_BY_SUBCATEGORY[part]
+    return STAGE_BY_CATEGORY.get(category or "", PolicyStage.PREPARE)
+
+
+def _amount(raw: str) -> int | None:
+    digits = re.sub(r"\D", "", raw or "")
+    return int(digits) if digits else None
+
+
+def parse_income(code: str, low: str, high: str, etc: str) -> IncomeRule | None:
+    """소득 조건. 판정용 숫자(maxMonthlyIncome 등)는 채우지 않는다. 조건이 있으면 사용자에게 확인을 받는다.
+
+    - 무관(추정 0043001)·빈 코드: 기타 글이 있을 때만 그 글로 조건을 둔다. 없으면 None.
+    - 금액(추정 0043002): 금액 범위를 API 값 그대로 글로 적는다. 단위(만 원)는 추정이라 "공고문 확인"을 붙인다.
+    - 기타(추정 0043003): 기타 글 원문. 글이 "-"뿐이면 조건이 있다는 것만 적는다.
+    """
+    note = meaningful(etc)
+    if code == INCOME_AMOUNT:
+        lo, hi = _amount(low) or 0, _amount(high) or 0
+        unit = INCOME_AMOUNT_UNIT_LABEL
+        if lo and hi:
+            amount = f"소득 {lo:,}~{hi:,}{unit}"
+        elif hi:
+            amount = f"소득 {hi:,}{unit} 이하"
+        elif lo:
+            amount = f"소득 {lo:,}{unit} 이상"
         else:
-            region = PolicyRegion(scope=RegionScope.SIDO, sido=code[:2])
-        regions.setdefault((region.scope, region.sido, region.sigungu), region)
-    return list(regions.values())
+            amount = "소득 조건 있음"
+        return IncomeRule(text=f"{note} ({amount} · 공고문 확인)" if note else f"{amount} · 공고문 확인")
+    if code == INCOME_OTHER:
+        return IncomeRule(text=note or "소득 조건 있음 · 공고문 확인")
+    return IncomeRule(text=note) if note else None
 
 
-def normalize_youthcenter(record: Mapping, *, as_of) -> Policy:
-    """온통청년 정책 → `Policy`. ID는 `ythc-{정책번호}`, 공식 API 값이라 verified=true다."""
+def _first_url(record: Mapping, spec) -> str | None:
+    for key in _spec_keys(spec):
+        url = http_url(text_of(record.get(key)))
+        if url:
+            return url
+    return None
+
+
+def normalize_youthcenter(record: Mapping, *, as_of, region_names: Mapping[str, str] | None = None,
+                          first_sido: str | None = None) -> Policy:
+    """온통청년 정책 → `Policy`. ID는 `ythc-{정책번호}`, 공식 API 값이라 verified=true다.
+
+    - 금액(amountMax, publicShareMax)은 글에서 숫자를 뽑아 만들지 않는다. 지원 내용 원문을 summary·benefit에 둔다.
+    - 나이는 0이 아닌 값만 쓴다. 나이 제한 여부 값을 믿을 수 없어서다 (`field_maps.AGE_ONLY_WHEN_LIMIT_FLAG_Y`).
+    - 취업 상태 조건(jobCd)은 코드 뜻을 몰라 만들지 않는다 (None = 제한 없음).
+    - region_names(고용24 지역 표)가 있으면 구 단위 묶기와 시·도 확인에 쓴다. first_sido는 부산 시·도 코드다.
+    """
     fields = YOUTHCENTER["fields"]
 
     def get(name: str) -> str:
@@ -377,40 +744,37 @@ def normalize_youthcenter(record: Mapping, *, as_of) -> Policy:
     title = get("title")
     if not title:
         raise SkipRecord("missing_title")
+    regions = parse_policy_regions(get("region_codes"), region_names=region_names, first_sido=first_sido)
+    if not regions:
+        raise SkipRecord("missing_region")  # 지역을 모르는 정책을 전국 정책으로 만들지 않는다
     when = clock.parse_as_of(as_of)
+    today = clock.day(when)
 
-    period = get("apply_period_text")
-    dates = find_dates(period)
-    always = "상시" in period.replace(" ", "")
-    apply_start = dates[0] if dates else None
-    apply_end = dates[1] if len(dates) >= 2 else ALWAYS_APPLY_END
-    if len(dates) >= 2:
-        period_type = PeriodType.FIXED
-    elif always:
-        period_type = PeriodType.ALWAYS
-    else:
-        period_type = PeriodType.TBD
-
-    age_min, age_max = _int_or_none(get("age_min")), _int_or_none(get("age_max"))
-    category_raw = get("category")
-    category = CATEGORY_MAP.get(category_raw, category_raw) or None
-    income_kind, income_text = get("income_kind"), get("income_text")
-    income = None
-    if (income_text or income_kind) and "무관" not in income_kind:
-        income = IncomeRule(text=" ".join(t for t in (income_kind, income_text) if t))
-    extras = [t for t in (text_of(record.get(k)) for k in _spec_keys(fields.get("extra_conditions"))) if t]
-    benefit_text = get("benefit_text")
+    apply_start, apply_end, period_type = parse_apply_period(
+        get("apply_period_text"), get("apply_period_code"), get("biz_start"), get("biz_end"), today)
+    limited = get("age_limited").upper() == "Y" or not AGE_ONLY_WHEN_LIMIT_FLAG_Y
+    age_min = _age(get("age_min")) if limited else None
+    age_max = _age(get("age_max")) if limited else None
+    category = _category(get("category"))
+    income = parse_income(get("income_code"), get("income_min"), get("income_max"), get("income_text"))
+    checks = [meaningful(get("extra_conditions"))]
+    excluded = meaningful(get("excluded_targets"))
+    checks.append(f"참여 제한 대상: {excluded}" if excluded else "")
+    documents = meaningful(get("documents"))
+    benefit_text = meaningful(get("benefit_text"))
+    selection = Selection.FIRST_COME if get("first_come").upper() == "Y" else Selection.REVIEW
 
     return Policy(
         policy_id=f"{POLICY_ID_PREFIX}-{external_id}", kind=PolicyKind.POLICY, title=title,
-        summary=get("summary") or None, age_min=age_min, age_max=age_max,
+        summary=meaningful(get("summary")) or None, amount_max=None, age_min=age_min, age_max=age_max,
         income_rule=income.text if income else None, apply_start=apply_start, apply_end=apply_end,
-        url=http_url(get("url")), source=PolicySource.YOUTHCENTER, as_of=clock.day(when),
-        regions=parse_policy_regions(get("region_codes")), category=category,
-        stage=STAGE_BY_CATEGORY.get(category, PolicyStage.PREPARE),
-        eligibility=PolicyEligibility(age_min=age_min, age_max=age_max, income=income, manual_checks=extras),
+        url=_first_url(record, fields.get("url")), source=PolicySource.YOUTHCENTER, as_of=today,
+        regions=regions, category=category, stage=_stage(category, get("subcategory")),
+        eligibility=PolicyEligibility(age_min=age_min, age_max=age_max, employment=None, income=income,
+                                      manual_checks=[c for c in checks if c]),
         benefit=PolicyBenefit(text=benefit_text) if benefit_text else None,
-        application=PolicyApplication(period_type=period_type),
+        application=PolicyApplication(period_type=period_type, selection=selection),
+        checklist=[f"제출 서류: {documents}"] if documents else [],
         verified=True, verified_by=VERIFIED_BY_YOUTHCENTER, verified_at=clock.iso(when), youthcenter_id=external_id,
     )
 
@@ -419,3 +783,35 @@ def _spec_keys(spec) -> tuple[str, ...]:
     if spec is None:
         return ()
     return spec if isinstance(spec, tuple) else (spec,)
+
+
+# ---------------------------------------------------------------- 기업 (강소기업)
+def normalize_gangso(record: Mapping, *, as_of) -> CompanyRecord:
+    """고용24 청년일자리강소기업 → `CompanyRecord`. ID는 `biz-{사업자번호}`.
+
+    배지 이름은 원문 브랜드 이름(sgBrandNm), 기준일은 선정 연도(selYear)다. 연도가 없으면 배지를 만들지 않는다.
+    """
+    fields = WORK24_GANGSO["fields"]
+
+    def get(name: str) -> str:
+        return pick(record, fields.get(name))
+
+    biz_no = re.sub(r"\D", "", get("biz_no"))
+    if not biz_no:
+        raise SkipRecord("missing_biz_no")
+    name = get("name")
+    if not name:
+        raise SkipRecord("missing_name")
+    region = re.sub(r"\D", "", get("region_code"))
+    sido = region[:2] if len(region) >= 2 and region[:2] in _sido_codes(None) else None
+    year, brand = get("year"), get("brand")
+    badges = []
+    # "…신청기업"은 선정이 아니라 신청 상태라 배지로 만들지 않는다 (사실과 다른 인증 표시 금지)
+    if re.fullmatch(r"\d{4}", year) and brand and "신청" not in brand:
+        badges.append(Badge(type=BadgeType.GANGSO, label=brand, source=GANGSO_BADGE_SOURCE, as_of=year))
+    workers = _amount(get("workers"))
+    return CompanyRecord(
+        company_id=f"{COMPANY_ID_PREFIX}-{biz_no}", name=name, biz_no=biz_no, sido=sido,
+        industry=get("industry") or None, size=f"상시근로자 {workers:,}명" if workers is not None else None,
+        highlights=badges, source=GANGSO_BADGE_SOURCE, as_of=clock.day(as_of),
+    )
