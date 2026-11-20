@@ -64,6 +64,7 @@
         "필수 조건 2개 중 2개 충족",
         "마감 D-14"
       ],
+      "commuteMinutes": 35,
       "isSample": true
     },
     {
@@ -122,6 +123,100 @@
         "마감 D-9"
       ],
       "busanAlternativesCount": 2,
+      "isSample": true
+    },
+    {
+      "jobPostingId": "klid-DEMO0001",
+      "title": "2026년 정규직 신입 채용 (데이터·통계)",
+      "organization": "가상시설공단",
+      "orgType": "LOCAL_PUBLIC",
+      "workRegion": {
+        "sido": "26",
+        "sigungu": "26500",
+        "label": "부산 수영구",
+        "unknown": false,
+        "overseas": false
+      },
+      "isBusan": true,
+      "isCapitalArea": false,
+      "job": {
+        "code": "D0101",
+        "middle": "D01",
+        "major": "D",
+        "name": "데이터 분석가",
+        "ncsCodes": []
+      },
+      "closesAt": "2026-12-08",
+      "rolling": false,
+      "salary": {
+        "disclosed": true,
+        "min": 3200,
+        "unit": "MANWON_YEAR"
+      },
+      "matchScore": 0.61,
+      "matchLevel": "FAIR",
+      "eligibility": {
+        "status": "ELIGIBLE",
+        "conditions": [
+          {
+            "ruleId": "rule-edu",
+            "type": "EDUCATION",
+            "result": "MET",
+            "reason": "학력 조건 충족"
+          },
+          {
+            "ruleId": "rule-career",
+            "type": "CAREER",
+            "result": "MET",
+            "reason": "신입 지원 가능"
+          }
+        ],
+        "unknown": [],
+        "ruleVersion": "elig-v1"
+      },
+      "badges": [],
+      "facts": [
+        "희망 직무와 같은 직종",
+        "급여는 하한만 공고에 적혀 있음",
+        "마감 D-17"
+      ],
+      "commuteMinutes": 28,
+      "isSample": true
+    },
+    {
+      "jobPostingId": "wj-DEMO0001",
+      "title": "해외 데이터 분석 인턴",
+      "organization": "가상글로벌(주)",
+      "orgType": "PRIVATE",
+      "workRegion": {
+        "label": "해외 근무 · 베트남",
+        "unknown": false,
+        "overseas": true,
+        "country": "베트남"
+      },
+      "isBusan": false,
+      "isCapitalArea": false,
+      "job": {
+        "code": "D0101",
+        "middle": "D01",
+        "major": "D",
+        "name": "데이터 분석가",
+        "ncsCodes": []
+      },
+      "closesAt": "2026-12-12",
+      "rolling": false,
+      "salary": {
+        "disclosed": false,
+        "unit": "MANWON_YEAR"
+      },
+      "matchScore": 0.52,
+      "matchLevel": "FAIR",
+      "badges": [],
+      "facts": [
+        "희망 직무와 같은 직종",
+        "해외 근무 · 베트남",
+        "마감 D-21"
+      ],
       "isSample": true
     }
   ],

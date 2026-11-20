@@ -1,0 +1,168 @@
+{
+  "posting": {
+    "jobPostingId": "wk24-DEMO0001",
+    "snapshotId": "20261121-e5f6a7b8",
+    "title": "데이터 분석 신입",
+    "organization": "(주)가상데이터",
+    "jobDescription": "고객 데이터를 SQL로 추출해 지표를 만들고 월간 리포트를 쓴다",
+    "requirements": [
+      {
+        "requirementId": "req-1",
+        "name": "SQL",
+        "kind": "REQUIRED_SKILL",
+        "weight": 1.0,
+        "sourceQuote": "필수: SQL"
+      },
+      {
+        "requirementId": "req-2",
+        "name": "엑셀",
+        "kind": "REQUIRED_SKILL",
+        "weight": 1.0,
+        "sourceQuote": "필수: 엑셀 활용"
+      }
+    ],
+    "eligibilityRules": [
+      {
+        "ruleId": "rule-edu",
+        "type": "EDUCATION",
+        "value": "COLLEGE",
+        "sourceQuote": "학력: 초대졸 이상"
+      }
+    ],
+    "closesAt": "2026-12-05",
+    "officialUrl": "https://example.invalid/postings/wk24-DEMO0001",
+    "sourceType": "DEMO",
+    "checkedAt": "2026-11-21T04:40:00+09:00",
+    "source": "WORK24",
+    "company": {
+      "name": "(주)가상데이터",
+      "hqSido": "26"
+    },
+    "orgType": "PRIVATE",
+    "workRegion": {
+      "sido": "26",
+      "sigungu": "26350",
+      "label": "부산 해운대구",
+      "unknown": false,
+      "overseas": false
+    },
+    "job": {
+      "code": "D0101",
+      "middle": "D01",
+      "major": "D",
+      "name": "데이터 분석가",
+      "ncsCodes": []
+    },
+    "employmentType": "FULL_TIME",
+    "careerType": "NEW",
+    "salary": {
+      "disclosed": true,
+      "min": 3400,
+      "max": 3800,
+      "unit": "MANWON_YEAR"
+    },
+    "rolling": false,
+    "remoteWork": "NONE",
+    "selectionSteps": [],
+    "documents": [],
+    "badges": [],
+    "extractStatus": "DONE",
+    "extractedBy": {},
+    "contentHash": "demo"
+  },
+  "isBusan": true,
+  "isCapitalArea": false,
+  "closed": false,
+  "isSample": true,
+  "matchLevel": "GOOD",
+  "eligibility": {
+    "status": "ELIGIBLE",
+    "conditions": [
+      {
+        "ruleId": "rule-edu",
+        "type": "EDUCATION",
+        "result": "MET",
+        "reason": "학력 조건 충족"
+      },
+      {
+        "ruleId": "rule-career",
+        "type": "CAREER",
+        "result": "MET",
+        "reason": "신입 지원 가능"
+      }
+    ],
+    "unknown": [],
+    "ruleVersion": "elig-v1"
+  },
+  "badges": [
+    {
+      "type": "CHEONGKKEUL",
+      "label": "청끌기업 · 급여",
+      "source": "부산광역시",
+      "asOf": "2026-06-30",
+      "cheonggeulType": "SALARY"
+    }
+  ],
+  "relatedPolicies": [
+    {
+      "policyId": "seed-busan-didimdol-plus",
+      "title": "디딤돌카드+",
+      "bucket": "NEXT_CYCLE",
+      "status": "ELIGIBLE",
+      "summary": "월 30만 원, 최대 6개월"
+    }
+  ],
+  "alternativesPreview": [],
+  "localLife": {
+    "commuteMinutes": 35,
+    "commuteLabel": "대중교통 약 35분 (사는 구청에서 근무지 구청까지)",
+    "commuteSource": "ODsay 대중교통 경로(구청 사이)",
+    "festivals": [
+      {
+        "festivalId": "fest-DEMO01",
+        "title": "가상 해운대 바다축제",
+        "gugun": "해운대구",
+        "place": "해운대해수욕장",
+        "period": "2027-05-01 ~ 2027-05-03",
+        "traffic": "도시철도 2호선 해운대역",
+        "url": "https://example.invalid/festival/1",
+        "source": "부산광역시 축제정보",
+        "asOf": "2026-11-20"
+      },
+      {
+        "festivalId": "fest-DEMO02",
+        "title": "가상 센텀 빛축제",
+        "gugun": "해운대구",
+        "place": "센텀시티",
+        "period": "2026-12-20 ~ 2027-01-05",
+        "source": "부산광역시 축제정보",
+        "asOf": "2026-11-20"
+      }
+    ],
+    "transit": [
+      {
+        "label": "도시철도",
+        "value": "2호선 해운대구 안 12개 역",
+        "source": "부산교통공사",
+        "asOf": "2026-06-30"
+      },
+      {
+        "label": "버스",
+        "value": "노선 48개 (해운대구 경유)",
+        "source": "부산시 버스정보",
+        "asOf": "2026-06-30"
+      },
+      {
+        "label": "동해선",
+        "value": "벡스코역 정차",
+        "source": "한국철도공사",
+        "asOf": "2026-06-30"
+      }
+    ]
+  },
+  "facts": [
+    "희망 직무와 같은 직종",
+    "마감 D-14"
+  ],
+  "dataAsOf": "2026-11-21T04:52:00+09:00"
+}

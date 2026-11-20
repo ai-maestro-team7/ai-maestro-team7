@@ -1,0 +1,18 @@
+{
+  "question": "필수 조건이 뭐예요?",
+  "answered": true,
+  "answer": "필수 조건은 SQL과 엑셀 활용이에요. 학력은 초대졸 이상이에요.",
+  "sources": [
+    {
+      "kind": "POSTING",
+      "id": "wk24-DEMO0001",
+      "title": "데이터 분석 신입",
+      "quote": "필수: SQL",
+      "url": "https://example.invalid/postings/wk24-DEMO0001",
+      "asOf": "2026-11-21"
+    }
+  ],
+  "relatedPolicies": [],
+  "manualChecks": [],
+  "dataAsOf": "2026-11-21T04:52:00+09:00"
+}

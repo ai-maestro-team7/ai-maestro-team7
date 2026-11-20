@@ -1,0 +1,9 @@
+{
+  "sort": "MATCH",
+  "leaveReason": "SALARY",
+  "notifications": {
+    "email": false,
+    "weekly": false
+  },
+  "receivingPolicies": []
+}
