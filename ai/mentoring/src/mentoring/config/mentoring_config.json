@@ -1,0 +1,22 @@
+{
+  "configVersion": "1.0",
+  "document": {
+    "textMinChars": 1000,
+    "textMaxChars": 30000,
+    "titleMaxChars": 100
+  },
+  "extraction": {
+    "promptVersion": "profile-extract-v1",
+    "maxTokens": 4096,
+    "schemaRetries": 1,
+    "factRetries": 1
+  },
+  "confirmation": {
+    "maxAdditions": 30,
+    "nameMaxChars": 50
+  },
+  "idempotency": {
+    "ttlHours": 24,
+    "keyMaxChars": 200
+  }
+}

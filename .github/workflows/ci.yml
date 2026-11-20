@@ -42,6 +42,9 @@ jobs:
         working-directory: ai/busan-opportunity
         run: uv run --no-project --with-requirements requirements.txt --with-requirements requirements-dev.txt python -m pytest -q -p no:cacheprovider
 
+      - name: 멘토링 (ai/mentoring/)
+        working-directory: ai/mentoring
+        run: uv run --no-project --with-requirements requirements-dev.txt --with-requirements ../../contracts/requirements.txt python -m pytest -q -p no:cacheprovider
       - name: 모의면접 (ai/interview/, 테스트가 있을 때만)
         working-directory: ai/interview
         run: |
