@@ -356,12 +356,8 @@ def _keyword_ok(posting: PostingLatest, keyword: str | None) -> bool:
 
 
 def _job_name_term(job_name: str | None) -> str:
-    """직무 이름에서 흔한 직책 접미어를 빼 제목·직무명 검색에 쓴다."""
-    name = _norm(job_name)
-    for suffix in ("개발자", "엔지니어", "담당자"):
-        if name.endswith(suffix) and len(name) > len(suffix):
-            return name[:-len(suffix)]
-    return name
+    """띄어쓰기만 무시한다. 엔지니어·분석가 같은 직무 구분어는 남긴다."""
+    return _norm(job_name)
 
 
 def _job_name_ok(posting: PostingLatest, job_name: str | None, profile: BasicProfile) -> bool:

@@ -309,6 +309,19 @@ def test_explicit_backend_job_ranks_matching_role_before_broader_roles(deps, as_
     assert feed(deps, as_of, job_name="존재하지 않는 직무").items
 
 
+def test_data_engineer_does_not_treat_data_analyst_as_direct_job_match(deps, as_of):
+    cards = feed(deps, as_of, job_name="데이터 엔지니어").items
+    assert cards[0].job_posting_id == w.GYEONGGI_DATA_ENG
+    assert w.BUSAN_DATA in ids_of(cards)  # 넓은 추천은 남기되 직접 일치로 올리지 않는다
+    analyst = deps.catalog.get_latest(w.BUSAN_DATA)
+    assert not ranking._job_name_ok(analyst, "데이터 엔지니어", BasicProfile())
+
+
+def test_data_engineer_name_index_excludes_analyst_when_vectors_miss(deps, as_of, monkeypatch):
+    monkeypatch.setattr(deps.vectors, "query", lambda *args, **kwargs: [])
+    assert ids(feed(deps, as_of, job_name="데이터 엔지니어")) == [w.GYEONGGI_DATA_ENG]
+
+
 def test_explicit_job_stays_first_with_deadline_sort(deps, as_of):
     result = feed(deps, as_of, job_name="백엔드 개발자", sort=Sort.DEADLINE)
     assert result.items[0].job_posting_id == w.BUSAN_BACKEND
