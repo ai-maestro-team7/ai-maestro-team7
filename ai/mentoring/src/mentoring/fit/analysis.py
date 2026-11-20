@@ -355,7 +355,10 @@ def _link(deps, task: Task, requirements: list[dict], profile: CareerProfile) ->
             if out.requirement_id in pending_ids:  # 코드로 연결한 요건은 모델이 바꾸지 못한다
                 outs.setdefault(out.requirement_id, out)
 
-    # 사용자가 "없다"고 확인한 역량은 이름이 같은 요건에서 확인된 격차로 쓴다
+    # 사용자가 "없다"고 확인한 역량은 NCS 능력단위 코드 또는 이름이 같은 요건에서 확인된 격차로 쓴다.
+    # 이력서에서 추출한 역량명은 NCS 표준명과 다를 수 있으므로 코드가 있으면 코드를 우선한다.
+    gap_codes = {s.ncs_unit_code for s in profile.skills
+                 if s.evidence_level == EvidenceLevel.USER_CONFIRMED_GAP and s.ncs_unit_code}
     gap_names = {_norm(s.name) for s in profile.skills if s.evidence_level == EvidenceLevel.USER_CONFIRMED_GAP}
     links: list[RequirementLink] = []
     dropped = 0
@@ -382,7 +385,9 @@ def _link(deps, task: Task, requirements: list[dict], profile: CareerProfile) ->
         if chosen and not evidence_ids:
             evidence_ids = list(dict.fromkeys(i for s in chosen for i in s.evidence_ids if i in evidence_by_id))[:3]
         level = _level(chosen)
-        if level == EvidenceLevel.NOT_FOUND and _norm(req["name"]) in gap_names:
+        confirmed_gap = ((req.get("ncs_unit_code") or "") in gap_codes
+                         or _norm(req["name"]) in gap_names)
+        if level == EvidenceLevel.NOT_FOUND and confirmed_gap:
             level = EvidenceLevel.USER_CONFIRMED_GAP
         if level in (EvidenceLevel.NOT_FOUND,):
             question = question or _default_question(req["name"])

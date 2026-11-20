@@ -290,3 +290,16 @@ def test_ncs_mode_links_same_unit_code_without_model():
     assert strength["ncsUnitCode"] == "2001010502_23v2" and strength["skills"] == ["Python pandas 데이터 전처리"]
     link_prompt = deps.llm.calls[0]["user"]
     assert "2001010501_23v2" in link_prompt and '"requirementId": "2001010502_23v2"' not in link_prompt
+
+
+def test_ncs_mode_matches_confirmed_gap_by_unit_code_when_names_differ():
+    gap = Skill(skill_id="skill-7", name="Python pandas 데이터 전처리", ncs_unit_code="2001010502_23v2",
+                evidence_level=EvidenceLevel.USER_CONFIRMED_GAP, fact_status=FactStatus.VERIFIED)
+    deps = fit_deps([{"links": []}, SUMMARY], career=profile(extra_skills=[gap]))
+
+    result = analyze(deps, {"profileId": "profile-1", "targetNcsCode": NCS_DATA})
+
+    [confirmed] = result["confirmedGaps"]
+    assert confirmed["name"] == "빅데이터 처리"
+    assert confirmed["ncsUnitCode"] == "2001010502_23v2"
+    assert result["potentialUpperBound"] == 50
