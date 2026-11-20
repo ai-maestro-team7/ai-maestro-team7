@@ -2,6 +2,7 @@
 # GitHub Actions 자동 배포용 (OIDC, 액세스 키 없음). 여러 번 실행해도 안전하다.
 #  - 신원 제공자 token.actions.githubusercontent.com (계정에 하나. 있으면 그대로 씀)
 #  - 역할 team07-github-deploy: 이 저장소 main 브랜치의 작업만 받을 수 있고, team07-api 코드 갱신만 할 수 있다
+#    (이 저장소는 GitHub "immutable subject"를 써서 sub에 소유자·저장소 숫자 ID가 붙는다. 두 형식 모두 허용)
 #  - IAM·환경 변수·API 설정 변경은 자동 배포에 넣지 않는다 (setup-role.sh, setup-api.sh는 사람이 실행)
 set -euo pipefail
 cd "$(dirname "$0")"
