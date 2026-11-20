@@ -23,6 +23,7 @@ export function PostingCard({ posting }: { posting: ChatPosting }) {
         </span>
       </div>
       <p className="text-small text-grey-800">급여 {posting.salary}</p>
+      {posting.orgPay && <p className="text-small text-grey-600">{posting.orgPay}</p>}
       {posting.facts.length > 0 && (
         <ul className="flex flex-col gap-0.5 text-small text-grey-600">
           {posting.facts.slice(0, 3).map((fact) => (

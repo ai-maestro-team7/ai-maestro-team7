@@ -26,9 +26,10 @@ import {
   jobDetailHref,
   MATCH_LABELS,
   ORG_TYPE_LABELS,
+  orgPayText,
   salaryText,
 } from "../lib";
-import type { PostingDetailResponse } from "../types";
+import type { OrgPay, PostingDetailResponse } from "../types";
 import { SaveToggle } from "./SaveToggle";
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -131,7 +132,10 @@ function PostingView({ detail }: { detail: PostingDetailResponse }) {
             </header>
 
             <DetailSection title="급여">
-              <p className="text-body text-grey-800">{salaryText(posting.salary)}</p>
+              <div className="flex flex-col gap-3">
+                <p className="text-body text-grey-800">{salaryText(posting.salary)}</p>
+                {detail.orgPay && <OrgPayBlock pay={detail.orgPay} />}
+              </div>
             </DetailSection>
 
             <DetailSection title="요구 역량">
@@ -253,6 +257,36 @@ function PostingView({ detail }: { detail: PostingDetailResponse }) {
           </Panel>
         }
       />
+    </div>
+  );
+}
+
+
+/** 기관 직원 평균보수 (알리오 경영공시). 공고 급여와 섞이지 않게 따로 두고, 신입 초봉이 아니라고 적는다. */
+function OrgPayBlock({ pay }: { pay: OrgPay }) {
+  const years = pay.years
+    .map((y) => `${y.year}${y.budget ? " 예산" : ""} ${y.average.toLocaleString("ko-KR")}`)
+    .join(" · ");
+  const tenure = pay.tenureMonths ? ` · 평균 근속 ${Math.floor(pay.tenureMonths / 12)}년 ${pay.tenureMonths % 12}개월` : "";
+  return (
+    <div className="flex flex-col gap-1 rounded-field bg-grey-50 px-4 py-3">
+      <p className="text-body font-medium text-grey-900">
+        {orgPayText(pay.latestAverage)} <span className="text-small font-normal text-grey-600">({pay.latestYear}년 결산)</span>
+      </p>
+      <p className="text-small text-grey-600">
+        직원 전체의 1인당 평균 보수라 신입 초봉과 달라요{tenure}
+      </p>
+      <p className="text-small text-grey-600">연도별 (만 원): {years}</p>
+      <a
+        href={pay.sourceUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex w-fit items-center gap-1 text-small font-medium text-blue-500"
+      >
+        {pay.source} · {pay.asOf} 기준
+        <ExternalLink aria-hidden className="size-3.5" strokeWidth={2} />
+        <span className="sr-only">(새 창)</span>
+      </a>
     </div>
   );
 }
