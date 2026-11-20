@@ -1,0 +1,10 @@
+[project]
+name = "supervisor"
+version = "0.1.0"
+description = "채팅 Agent (Strands, D-38): 채용공고·청년정책 함께 찾기와 모의면접 체험 연결"
+requires-python = ">=3.13"
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "tests"]
+testpaths = ["tests"]
+addopts = "-q --import-mode=importlib"

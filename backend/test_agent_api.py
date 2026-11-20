@@ -1,0 +1,153 @@
+"""채팅 Agent 백엔드 흐름 테스트 (moto DynamoDB, B는 데모 데이터 메모리 저장소, 모델은 대본 실행기).
+실행: cd backend && uv run --no-project --python 3.13 --with boto3 --with "moto[dynamodb]" \
+  --with-requirements ../ai/busan-opportunity/requirements.txt --with-requirements ../ai/supervisor/requirements.txt \
+  python test_agent_api.py
+"""
+import json
+import os
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path[:0] = [str(ROOT / "ai/supervisor/src"), str(ROOT / "ai/busan-opportunity/src")]
+os.environ.update(AWS_DEFAULT_REGION="ap-northeast-2", AWS_REGION="ap-northeast-2", AWS_ACCESS_KEY_ID="test",
+                  AWS_SECRET_ACCESS_KEY="test", TABLE_CAREER_MENTOR="test-cm", RUN_TASKS_INLINE="1",
+                  ALLOW_DEV_USER_HEADER="1", MODEL_ID="test-model")
+os.environ.pop("AWS_LAMBDA_FUNCTION_NAME", None)
+from moto import mock_aws  # noqa: E402
+
+results = []
+
+
+def check(name, cond):
+    cond = bool(cond)
+    results.append(cond)
+    print(f"{'PASS' if cond else 'FAIL'} {name}")
+
+
+def ev(method, path, user="demo1", body=None):
+    e = {"rawPath": path, "requestContext": {"http": {"method": method, "path": path}},
+         "headers": {"x-user-id": user} if user else {}}
+    if body is not None:
+        e["body"] = json.dumps(body, ensure_ascii=False)
+    return e
+
+
+class Runner:
+    """모델 대신 도구를 정해진 대로 부르고 답을 돌려준다."""
+
+    def __init__(self):
+        self.script = None
+        self.runs = []
+
+    def run(self, *, system_prompt, history, message, tools, max_turns):
+        from supervisor.models import ChatReply
+
+        by_name = {t.__name__: t for t in tools}
+        self.runs.append({"message": message, "history": history})
+        text = self.script(by_name)
+        return ChatReply(reply=text, follow_ups=["모의면접 체험해 볼래요"])
+
+
+@mock_aws
+def main():
+    import boto3
+
+    boto3.client("dynamodb").create_table(
+        TableName="test-cm", BillingMode="PAY_PER_REQUEST",
+        AttributeDefinitions=[{"AttributeName": n, "AttributeType": "S"} for n in ("PK", "SK")],
+        KeySchema=[{"AttributeName": "PK", "KeyType": "HASH"}, {"AttributeName": "SK", "KeyType": "RANGE"}])
+    table = boto3.resource("dynamodb").Table("test-cm")
+
+    import agent_api
+    import opportunities_api
+    from app import lambda_handler
+    from opportunity.config import load_config
+    from opportunity.seeds import demo_world
+
+    opportunities_api._deps = demo_world.build_deps(load_config())  # B는 데모 데이터 (AWS 안 부름)
+    runner = Runner()
+    agent_api.build_runner = lambda: runner
+
+    def call(method, path, body=None, user="demo1"):
+        r = lambda_handler(ev(method, path, user, body), None)
+        return r["statusCode"], json.loads(r["body"]) if r["body"] else None
+
+    check("health에 agentImpl", call("GET", "/api/v1/health")[1].get("agentImpl") == "supervisor")
+    table.put_item(Item={"PK": "USER#demo1", "SK": "PROFILE#BASIC", "desiredJobs": [{"name": "데이터 분석"}],
+                         "desiredRegion": "26"})
+
+    # 1. 조건 대화 → 공고·정책 카드, 저장 묻기, 면접 체험 제안 (S-01, BE-S1)
+    def search(tools):
+        out = tools["search_job_postings"](job_name="데이터 분석", region="부산", min_salary=3000, career_type="NEW")
+        tools["find_youth_policies"]()
+        return f"부산 데이터 분석 공고 {len(out.get('items', []))}개와 청년정책을 찾았어요."
+
+    runner.script = search
+    s, b = call("POST", "/api/v1/agent/chat", {"message": "부산 데이터 분석 신입 연봉 3천 이상", "userId": "demo2"})
+    check("POST /agent/chat → 202 PENDING", s == 202 and b["status"] == "PENDING" and b["sessionId"].startswith("chat-"))
+    sid, mid = b["sessionId"], b["messageId"]
+    s, m = call("GET", f"/api/v1/agent/chat/{sid}/messages/{mid}")
+    check("조회 → COMPLETED", s == 200 and m["status"] == "COMPLETED" and m["reply"].startswith("부산 데이터 분석"))
+    postings = [c["posting"] for c in m["cards"] if c["type"] == "POSTING"]
+    policies = [c for c in m["cards"] if c["type"] == "POLICY"]
+    check("B 실제 함수로 찾은 공고 카드 (최대 5개, 숫자 점수 없음)",
+          0 < len(postings) <= 5 and all("matchScore" not in p and p["career"] for p in postings))
+    check("정책 카드가 함께 온다", len(policies) > 0)
+    actions = {a["type"]: a for a in m["actions"]}
+    check("저장 묻기는 바뀐 조건만", actions.get("SAVE_CONDITIONS", {}).get("profilePatch") ==
+          {"desiredSalaryMin": 3000, "desiredCareerType": "NEW"})
+    check("면접 체험 제안", actions.get("SUGGEST_INTERVIEW", {}).get("job") == "데이터 분석")
+    check("본문 userId는 무시 (demo1로 저장)", table.get_item(Key={"PK": "USER#demo1", "SK": f"SESSION#{sid}"}).get("Item"))
+
+    # 2. 저장 버튼 → PUT /me/profile (D-40)
+    s, prof = call("PUT", "/api/v1/me/profile", actions["SAVE_CONDITIONS"]["profilePatch"])
+    check("PUT /me/profile에 새 필드 저장", s == 200 and prof["desiredSalaryMin"] == 3000 and prof["desiredCareerType"] == "NEW")
+    s, _ = call("PUT", "/api/v1/me/profile", {"desiredCareerType": "INTERN"})
+    check("잘못된 desiredCareerType은 400", s == 400)
+
+    # 3. 면접 체험: 자소서 없음 → 입력 요청, 있음 → 시작 카드 (S-03)
+    def interview(tools):
+        tools["prepare_mock_interview"](job="데이터 분석")
+        return "모의면접 체험을 준비했어요."
+
+    runner.script = interview
+    s, b = call("POST", "/api/v1/agent/chat", {"sessionId": sid, "message": "모의면접 체험해 볼래요"})
+    s, m = call("GET", f"/api/v1/agent/chat/{sid}/messages/{b['messageId']}")
+    check("자소서 없음 → REQUEST_COVER_LETTER", [a["type"] for a in m["actions"]] == ["REQUEST_COVER_LETTER"])
+    check("두 번째 턴은 지난 대화를 받는다", runner.runs[-1]["history"][0]["text"] == "부산 데이터 분석 신입 연봉 3천 이상")
+    table.put_item(Item={"PK": "USER#demo1", "SK": "DOC_LATEST#doc-cl1", "documentId": "doc-cl1",
+                         "documentType": "COVER_LETTER", "title": "데이터 분석 자소서", "latestVersion": 1,
+                         "extractionStatus": "COMPLETED", "ownerUserId": "demo1", "updatedAt": "2026-11-20T10:00:00+09:00"})
+    s, b = call("POST", "/api/v1/agent/chat", {"sessionId": sid, "message": "자소서 저장해 뒀어요",
+                                               "attachments": [{"documentId": "doc-cl1"}]})
+    s, m = call("GET", f"/api/v1/agent/chat/{sid}/messages/{b['messageId']}")
+    check("저장된 자소서 → START_INTERVIEW(documentId)", m["actions"] and m["actions"][0]["type"] == "START_INTERVIEW"
+          and m["actions"][0]["documentId"] == "doc-cl1")
+    s, _ = call("POST", "/api/v1/agent/chat", {"sessionId": sid, "message": "남의 문서",
+                                               "attachments": [{"documentId": "doc-none"}]})
+    check("남의·없는 문서 첨부는 404", s == 404)
+
+    # 4. 대화 목록, 소유 확인
+    s, session = call("GET", f"/api/v1/agent/chat/{sid}")
+    check("대화 목록 (USER·ASSISTANT 번갈아 6개)", s == 200 and [x["role"] for x in session["messages"]] ==
+          ["USER", "ASSISTANT"] * 3)
+    check("남의 대화는 404", call("GET", f"/api/v1/agent/chat/{sid}", user="demo2")[0] == 404)
+    check("남의 메시지는 404", call("GET", f"/api/v1/agent/chat/{sid}/messages/{mid}", user="demo2")[0] == 404)
+    check("토큰 없으면 401", call("POST", "/api/v1/agent/chat", {"message": "안녕"}, user=None)[0] == 401)
+    check("빈 메시지는 400", call("POST", "/api/v1/agent/chat", {"message": " "})[0] == 400)
+    check("없는 경로 404", call("GET", "/api/v1/agent/nope")[0] == 404)
+
+    # 5. 저장된 메시지에 원문 도구 결과가 없다
+    stored = table.get_item(Key={"PK": "USER#demo1", "SK": f"CHAT#{sid}#{mid}"})["Item"]
+    check("toolCalls에는 이름·성공·시간만", all(set(c) == {"name", "ok", "durationMs"} for c in stored["toolCalls"]))
+
+    # 6. 비동기 이벤트 입구 (같은 작업 두 번 → 한 번만)
+    out = lambda_handler({"agentTask": {"userId": "demo1", "sessionId": sid, "messageId": mid}}, None)
+    check("agentTask 이벤트: 끝난 턴은 SKIPPED", out["status"] == "SKIPPED")
+
+    print(f"\n{sum(results)}/{len(results)} 통과")
+    raise SystemExit(0 if all(results) else 1)
+
+
+main()

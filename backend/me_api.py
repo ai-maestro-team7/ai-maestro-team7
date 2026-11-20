@@ -94,6 +94,9 @@ PROFILE_FIELDS = {
     "priorities": lambda v: isinstance(v, list) and len(v) <= 3 and all(
         p in ("SALARY", "GROWTH", "STABILITY", "WORK_LIFE", "HOUSING", "LOCATION") for p in v),
     "talentPoolConsent": lambda v: isinstance(v, bool),
+    # 채팅 조건 저장 (D-40). 사용자가 화면 버튼을 눌렀을 때만 들어온다
+    "desiredSalaryMin": int_range(0, 100_000),  # 만 원/년
+    "desiredCareerType": enum("NEW", "EXPERIENCED", "ANY"),
 }
 SYSTEM_FIELDS = {"PK", "SK", "entityType", "schemaVersion", "ownerUserId", "createdAt", "updatedAt", "isDemo"}
 
