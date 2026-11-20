@@ -105,7 +105,8 @@
       "youthcenter"
     ],
     "weeklySources": [
-      "work24_gangso"
+      "work24_gangso",
+      "alio_pay"
     ],
     "enrichChunk": 100
   },

@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Any, Protocol
 
 from .models.policy import Policy
-from .models.posting import AltCandidates, CompanyRecord, PostingLatest, PostingName, PostingSnapshot
+from .models.posting import AltCandidates, CompanyRecord, OrgPay, PostingLatest, PostingName, PostingSnapshot
 from .models.profile import BasicProfile, OppPrefs
 from .models.user_state import ExplanationCache, Notification, PolicyAlert, SavedItem
 
@@ -47,6 +47,10 @@ class CatalogRepo(Protocol):
     # 쓰기 (수집·보강 배치만)
     def put_snapshot(self, snapshot: PostingSnapshot) -> None: ...
     def put_latest(self, latest: PostingLatest) -> None: ...
+    def put_org_pay(self, pay: OrgPay) -> None: ...
+    def org_pays(self) -> list[OrgPay]:
+        """공공기관 직원 평균보수 전체 (`ORGPAY`, B-D11). 기관 이름으로 공고에 잇는다."""
+        ...
     def put_regional_index(self, latest: PostingLatest) -> None: ...
     def delete_regional_index(self, job_posting_id: str) -> None: ...
     def list_regional_index(self, *, closes_from: str) -> list[str]:

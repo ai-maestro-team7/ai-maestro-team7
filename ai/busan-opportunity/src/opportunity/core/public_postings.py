@@ -10,12 +10,13 @@ Scan은 쓰지 않는다.
 from datetime import date, datetime
 
 from ..deps import Deps
-from ..models.api import PublicPostingCard, PublicPostingList
+from ..models.api import OrgPayBrief, PublicPostingCard, PublicPostingList
 from ..models.enums import CareerType, EmploymentType, OrgType
 from ..models.errors import invalid_input
-from ..models.posting import PostingLatest, PostingName
+from ..models.posting import OrgPay, PostingLatest, PostingName
 from . import clock, regions
 from .context import freshness
+from .org_pay import org_pay_for, org_pay_index
 from .ranking import (
     REGION_ALL,
     REGION_OVERSEAS,
@@ -75,7 +76,8 @@ def list_public_postings(deps: Deps, *, keyword: str | None = None, region: str 
 
     page = rows[offset:offset + limit]
     latest = deps.catalog.batch_get_latest([n.job_posting_id for n in page])
-    items = [_card(latest[n.job_posting_id]) for n in page
+    pays = org_pay_index(deps)  # 공공기관이면 기관 직원 평균보수 (B-D11). 공개 자료라 로그인 없이 보여도 된다
+    items = [_card(latest[n.job_posting_id], org_pay_for(pays, latest[n.job_posting_id])) for n in page
              if n.job_posting_id in latest and is_open(latest[n.job_posting_id], when)]
     data_as_of, stale = freshness(deps, when)
     return PublicPostingList(items=items, total=len(rows),
@@ -102,10 +104,10 @@ def _region_ok(row: PostingName, region: str, sidos: list[str] | None) -> bool:
     return not row.is_overseas and row.sido is not None and row.sido in sidos
 
 
-def _card(posting: PostingLatest) -> PublicPostingCard:
+def _card(posting: PostingLatest, pay: OrgPay | None = None) -> PublicPostingCard:
     return PublicPostingCard(
         job_posting_id=posting.job_posting_id, title=posting.title, organization=posting.organization,
         org_type=posting.org_type, work_region=posting.work_region, is_busan=posting.is_busan,
         is_overseas=posting.is_overseas or regions.is_overseas(posting.work_region), job=posting.job, closes_at=posting.closes_at, rolling=posting.rolling,
         salary=posting.salary, career_type=posting.career_type, employment_type=posting.employment_type,
-        badges=posting.badges, is_sample=posting.is_sample)
+        badges=posting.badges, is_sample=posting.is_sample, org_pay=OrgPayBrief.of(pay) if pay else None)
