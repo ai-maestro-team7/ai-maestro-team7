@@ -298,7 +298,21 @@ def test_job_name_searches_without_saved_jobs_and_is_not_saved(deps, as_of):
     deps.users.profiles["empty"] = BasicProfile(major="통계학")
     cards = feed(deps, as_of, "empty", job_name="데이터 분석").items
     assert cards
+    assert all("데이터분석" in ranking._norm(c.title + c.job.name) for c in cards)
     assert deps.users.get_basic_profile("empty").desired_jobs == []  # 저장하지 않는다
+
+
+def test_explicit_backend_job_excludes_other_roles(deps, as_of):
+    cards = feed(deps, as_of, job_name="백엔드 개발자").items
+    assert w.BUSAN_BACKEND in ids_of(cards)
+    assert all("백엔드" in ranking._norm(c.title + c.job.name) for c in cards)
+    assert not feed(deps, as_of, job_name="존재하지 않는 직무").items
+
+
+def test_explicit_job_uses_name_index_when_vector_misses_it(deps, as_of, monkeypatch):
+    monkeypatch.setattr(deps.vectors, "query", lambda *args, **kwargs: [])
+    cards = feed(deps, as_of, job_name="백엔드 개발자").items
+    assert w.BUSAN_BACKEND in ids_of(cards)
 
 
 def test_job_name_same_as_saved_keeps_saved_codes(deps):
@@ -381,7 +395,7 @@ def test_capital_cards_have_busan_alternatives_count(deps, as_of):
 def test_card_facts_and_freshness(deps, as_of):
     response = feed(deps, as_of)
     card = next(c for c in response.items if c.job_posting_id == w.BUSAN_DATA)
-    assert card.facts == ["희망 직무와 같은 직종", "필수 조건 2개 중 2개 충족", "마감 D-14"]
+    assert card.facts == ["희망 직무와 같은 직종", "공고 지원 자격 2개 중 2개 충족", "마감 D-14"]
     assert card.eligibility is not None and card.is_sample
     assert response.data_as_of == w.DATA_AS_OF and response.stale is False
     for c in response.items:

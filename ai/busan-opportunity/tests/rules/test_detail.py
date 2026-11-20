@@ -67,7 +67,7 @@ def test_detail_fields(deps, as_of, related_calls):
     response = detail(deps, as_of, w.BUSAN_DATA)
     assert response.posting.requirements and response.is_busan and not response.is_capital_area
     assert response.match_level is not None and response.is_sample
-    assert response.facts == ["희망 직무와 같은 직종", "필수 조건 2개 중 2개 충족", "마감 D-14"]
+    assert response.facts == ["희망 직무와 같은 직종", "공고 지원 자격 2개 중 2개 충족", "마감 D-14"]
     assert [p.policy_id for p in response.related_policies] == [w.P_JOY_DOUBLE]
     assert related_calls == [w.BUSAN_DATA]
     assert response.data_as_of == w.DATA_AS_OF
