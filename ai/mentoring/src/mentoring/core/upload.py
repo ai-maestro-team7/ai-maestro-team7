@@ -3,10 +3,17 @@
 흐름: 업로드 URL 발급(PENDING) → 브라우저가 S3에 바로 PUT → 업로드 완료(크기·형식 확인, UPLOADED)
      → DOCUMENT_EXTRACT 작업(EXTRACTING → EXTRACTED) → PROFILE_EXTRACT 작업(역량 추출, `core/extraction.py`)
 
+업로드 완료 전에 사용자가 떠나도 남지 않게 한다 (고아 정리):
+- 브라우저는 `pending/` 아래 임시 키에 올린다. 버킷 수명 주기가 1일 뒤 지운다 (infra/setup-data.sh)
+- PENDING 문서 기록에는 `expiresAt`을 넣어 DynamoDB TTL이 지운다 (`upload.pendingTtlHours`)
+- 업로드 완료 때 원본을 `users/...` 정식 키로 복사하고 `expiresAt`을 뺀 뒤, 임시 키를 지운다
+
 - presigned URL은 응답에만 넣는다. 멱등 결과·DynamoDB·로그에 남기지 않고, 같은 요청이 다시 오면 새로 서명한다
 - S3 키는 서버가 만든다. 요청으로 받은 키는 쓰지 않는다
 - 작업 ID는 문서·버전으로 정해서 업로드 완료가 두 번 와도 작업이 하나만 생긴다
 """
+from datetime import timedelta
+
 from ..errors import MentoringError, document_not_found, invalid_input, not_implemented
 from ..models import (
     DocumentLatest,
@@ -33,6 +40,14 @@ def original_key(deps, user_id: str, document_id: str, version: int) -> str:
     return f"users/{deps.hash_user_id(user_id)}/documents/{document_id}/v{version}/original.pdf"
 
 
+PENDING_PREFIX = "pending/"
+
+
+def pending_key(deps, user_id: str, document_id: str, version: int) -> str:
+    """업로드 완료 전 임시 키. 버킷 수명 주기 규칙이 이 접두사만 지운다."""
+    return PENDING_PREFIX + original_key(deps, user_id, document_id, version)
+
+
 def _file_too_large(message: str, **details) -> MentoringError:
     return MentoringError(413, "FILE_TOO_LARGE", message, False, details)
 
@@ -57,12 +72,13 @@ def create_upload_url(deps, user_id: str, request: UploadUrlRequest, idempotency
 
     def create() -> dict:
         now = deps.now_iso()
+        expires_at = int((deps.now() + timedelta(hours=cfg.pending_ttl_hours)).timestamp())
         document_id = deps.new_id("doc")
         version = DocumentVersion(
             document_id=document_id, version=1, owner_user_id=user_id, document_type=request.document_type,
             source=DocumentSource.UPLOAD, title=file_name, file_name=file_name, workspace_id=request.workspace_id,
-            original_key=original_key(deps, user_id, document_id, 1), content_type=content_type,
-            size_bytes=request.size_bytes, extraction_status=ExtractionStatus.PENDING,
+            original_key=pending_key(deps, user_id, document_id, 1), content_type=content_type,
+            size_bytes=request.size_bytes, extraction_status=ExtractionStatus.PENDING, expires_at=expires_at,
             created_at=now, updated_at=now)
         deps.users.create_document(DocumentLatest.of(version, now), version)
         log_event("document.upload_url", userHash=user_hash(deps, user_id), feature="profile",
@@ -71,6 +87,8 @@ def create_upload_url(deps, user_id: str, request: UploadUrlRequest, idempotency
 
     result = run_idempotent(deps, user_id, idempotency_key, payload, create)
     version = deps.users.get_document_version(user_id, result["documentId"], result["version"])
+    if version is None:  # 멱등 결과는 남았지만 PENDING 기록은 TTL로 지워진 경우
+        raise document_not_found()
     url = deps.objects.presign_put(version.original_key, content_type=version.content_type,
                                    size_bytes=version.size_bytes, expires_in=cfg.presign_expires_seconds)
     return {**result, "uploadUrl": url, "expiresInSeconds": cfg.presign_expires_seconds}
@@ -91,16 +109,26 @@ def complete_upload(deps, user_id: str, document_id: str) -> dict:
         task = deps.users.get_task(user_id, version.task_id) if version.task_id else None
         return {"documentId": document_id, "version": version.version, "taskId": version.task_id,
                 "status": task.status.value if task else None, "extractionStatus": version.extraction_status.value}
+    if version.expires_at is not None and deps.now().timestamp() >= version.expires_at:
+        # TTL이 기록을 실제로 지우기 전까지 시간이 걸려서, 지난 기록은 여기서 막는다
+        raise invalid_input("업로드할 수 있는 시간이 지났어요. 파일을 다시 올려 주세요.", field="documentId")
     if deps.extractor is None:
         raise not_implemented()
 
-    info = deps.objects.head(version.original_key)
+    staged_key = version.original_key
+    info = deps.objects.head(staged_key)
     if info is None:
         raise invalid_input("업로드된 파일을 찾을 수 없어요. 다시 올려 주세요.", field="documentId")
     stored_type = (info.content_type or "").split(";")[0].strip().lower()
     if info.size_bytes != version.size_bytes or stored_type != version.content_type:
         # ETag만 믿지 않고 발급 때 값과 크기·형식을 비교한다 (개발계획서1 §6.2)
         raise invalid_input("업로드된 파일이 요청한 형식이나 크기와 달라요. 다시 올려 주세요.", field="documentId")
+
+    # 정식 키로 옮긴다. 기록을 바꾸기 전에 복사해서, 중간에 실패해도 다시 완료를 부르면 이어서 된다.
+    # 이 변경 전에 발급한 문서는 이미 정식 키라 복사하지 않는다
+    final_key = original_key(deps, user_id, document_id, version.version)
+    if staged_key != final_key:
+        deps.objects.copy(staged_key, final_key)
 
     now = deps.now_iso()
     task = Task(task_id=f"task-{document_id}-v{version.version}-extract", task_type=TaskType.DOCUMENT_EXTRACT,
@@ -112,11 +140,18 @@ def complete_upload(deps, user_id: str, document_id: str) -> dict:
     except AlreadyExists:
         created = False
     version = version.model_copy(update={"extraction_status": ExtractionStatus.UPLOADED, "task_id": task.task_id,
-                                         "updated_at": now})
+                                         "original_key": final_key, "expires_at": None, "updated_at": now})
     deps.users.save_document(latest.model_copy(update={"extraction_status": ExtractionStatus.UPLOADED,
-                                                       "task_id": task.task_id, "updated_at": now}), version)
+                                                       "task_id": task.task_id, "expires_at": None,
+                                                       "updated_at": now}), version)
     if created:
         deps.tasks.dispatch(tasks.build_message(task))
+    if staged_key != final_key:
+        try:
+            deps.objects.delete(staged_key)
+        except Exception:  # noqa: BLE001 - 남아도 수명 주기 규칙이 1일 뒤 지우므로 완료는 실패시키지 않는다
+            log_event("document.pending_cleanup_failed", userHash=user_hash(deps, user_id), feature="profile",
+                      stage=ExtractionStatus.UPLOADED.value)
     log_event("document.uploaded", userHash=user_hash(deps, user_id), taskId=task.task_id,
               taskType=task.task_type.value, feature="profile", stage=ExtractionStatus.UPLOADED.value)
     return {"documentId": document_id, "version": version.version, "taskId": task.task_id,

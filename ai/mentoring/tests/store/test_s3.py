@@ -29,3 +29,18 @@ def test_s3_round_trip_head_presign_and_missing():
         assert store.head("missing") is None
         store.delete("users/hash/document.txt")
         assert store.get_bytes("users/hash/document.txt") is None
+
+
+def test_s3_copy_keeps_bytes_and_content_type():
+    with mock_aws():
+        client = boto3.client("s3", region_name="ap-northeast-2")
+        client.create_bucket(
+            Bucket="team07-test-docs",
+            CreateBucketConfiguration={"LocationConstraint": "ap-northeast-2"},
+        )
+        client.put_object(Bucket="team07-test-docs", Key="pending/users/hash/original.pdf",
+                          Body=b"%PDF-1.4 virtual", ContentType="application/pdf")
+        store = S3ObjectStore(client, "team07-test-docs")
+        store.copy("pending/users/hash/original.pdf", "users/hash/original.pdf")
+        assert store.get_bytes("users/hash/original.pdf") == b"%PDF-1.4 virtual"
+        assert store.head("users/hash/original.pdf").content_type == "application/pdf"

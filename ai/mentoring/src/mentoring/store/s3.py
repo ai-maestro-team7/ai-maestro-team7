@@ -65,5 +65,13 @@ class S3ObjectStore:
             content_type=response.get("ContentType"),
         )
 
+    def copy(self, source_key: str, target_key: str) -> None:
+        # 서버 안 복사라 Lambda가 파일을 내려받지 않는다. MetadataDirective 기본값(COPY)으로 형식이 그대로 간다
+        self._client.copy_object(
+            Bucket=self._bucket,
+            Key=target_key,
+            CopySource={"Bucket": self._bucket, "Key": source_key},
+        )
+
     def delete(self, key: str) -> None:
         self._client.delete_object(Bucket=self._bucket, Key=key)
