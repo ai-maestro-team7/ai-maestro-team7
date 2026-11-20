@@ -68,6 +68,34 @@ AWS와 네트워크를 부르지 않는다. 메모리 저장소(`store/memory.py
 운영 의존성 (`build_aws_deps`): `TABLE_CATALOG`(있음), `TABLE_REFERENCE`·`KB_ID`(BE-4), `eligibility`(BE-8). 없으면 각각
 공고 분석 501, NCS 분석 501, KB 근거 없음 경고, 지원자격 "확인 필요"로 동작한다.
 
+## 첨삭 (`review/`, Requirement 9~11)
+
+`POST /reviews` `{inputText 또는 documentId, analysisId?, jobPostingId?, questionText?, maxCharacters?, storyIds?}` → 202 →
+`GET /reviews/{reviewId}`. 작업 `REVIEW` (`review/service.py`, 모델은 4번에서만):
+1. 원문 읽기, 글자 수(공백 포함·제외, UTF-8 바이트)는 코드가 센다
+2. 기준: 분석이 고정한 공고 요건(없으면 공고 최신 스냅샷, 둘 다 없으면 일반 첨삭 + `NOT_POSTING_SPECIFIC`),
+   사용자가 **확인한** 경험 블록 필드(`story_for_review`), 확인된 역량
+3. 개인정보 가리기 → 4. [모델] 문항 의도·고칠 곳·수정 예시·확인 질문 (`review-v1`)
+5. 원문에 없는 구간은 버린다. 수정 예시의 숫자·기간·날짜가 원문·확인된 사실에 없으면 예시를 빼고 확인 질문으로 바꾼다 (`factCheck: REJECTED`)
+6. 블라인드 위험 표현(학교·나이·성별·출신·가족)을 설정 규칙으로 한 번 더 찾는다
+7. 본문은 S3 `users/{hash}/reviews/{id}/result.json`, `REVIEW#`에는 메타만. 원문 문서는 바꾸지 않는다 (최종본 저장은 워크스페이스 API)
+
+## 학습 경로 (`learning/`, Requirement 12~14)
+
+`POST /learning-paths` `{analysisId, weeklyStudyHours(1~40), preferredFormat?, targetDate?, startDate?, ncsCode?}` → 202 →
+`GET /learning-paths/{id}`. 분석이 끝나야(`COMPLETED`) 만들 수 있다. 작업 `LEARNING_PATH` (모델은 주차 문장에서만):
+- 학습 대상: 확인된 격차 → 미충족 자격 조건 → 증빙 보완(부분 근거) → (공고 기준이면) 아직 근거가 없는 NCS 능력단위. 미확인 요건은
+  학습 과제가 아니라 `verificationTasks`(먼저 확인할 것). 격차가 하나도 없으면 강점 심화
+- 주 수 = 목표일까지 남은 주(없으면 기본 8주), 주당 시간 = 사용자가 정한 시간. 모두 코드 계산이고 "추정" 표시
+- 자격 후보: 학습 대상 능력단위의 NCS–자격 연계를 `(능력단위, 자격, 구분)`으로 중복 제거하고 `QUAL#…/META`가 있는 것만.
+  공고 필수 자격으로 표시하지 않는다
+- 시험일정: `team07-cache` `EXAM#{자격코드}#{연도}`(#95가 매일 수집)만 읽는다. 없거나 기한이 지났거나 앞으로의 회차가 없으면
+  `SCHEDULE_UNVERIFIED`, 날짜를 만들지 않는다. 합격 발표가 공고 마감 뒤면 경고
+- 교육과정은 MVP에서 연결하지 않는다(`courses: []`, `NO_LIVE_COURSES`). 부산 청년정책은 B 정책 지갑 링크
+- 일정 자료를 못 읽거나 주차 문장을 못 만들면 `PARTIAL_SUCCESS` (문장은 기본 문장으로 채운다)
+
+운영 의존성: `TABLE_CACHE`(#95에서 이미 Lambda에 있음). 없으면 시험일정은 모두 `SCHEDULE_UNVERIFIED`.
+
 ## PDF 업로드 흐름
 
 1. `POST /documents/upload-url` `{fileName, contentType, sizeBytes, documentType}` → 201 `{documentId, uploadUrl, expiresInSeconds, status: PENDING}`
