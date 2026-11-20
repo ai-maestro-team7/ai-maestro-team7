@@ -56,6 +56,15 @@ class TransitInfo(OppModel):
     as_of: str
 
 
+class GuOffice(OppModel):
+    """구·군청 위치. 통근 시간과 직선거리의 기준점이다 (집 주소는 받지 않는다)."""
+
+    sigungu: str
+    name: str
+    lat: float
+    lng: float
+
+
 class LocalLifeData(OppModel):
     """부산 근무지 주변 생활 정보의 원천. 입구가 시드에서 읽어 `Deps.local_life`에 넣는다."""
 
@@ -64,6 +73,9 @@ class LocalLifeData(OppModel):
     commute_minutes: dict[str, int] = Field(default_factory=dict)  # "거주 시군구>근무 시군구" → 대중교통 분
     commute_source: str | None = None
     commute_as_of: str | None = None
+    gu_offices: dict[str, GuOffice] = Field(default_factory=dict)  # 시군구 코드 → 구·군청 위치
+    gu_offices_source: str | None = None
+    gu_offices_as_of: str | None = None
 
 
 class LocalLifeView(OppModel):
@@ -72,5 +84,7 @@ class LocalLifeView(OppModel):
     commute_minutes: int | None = None
     commute_label: str | None = None
     commute_source: str | None = None
+    distance_km: float | None = None   # 구청 사이 직선거리. 통근 시간이 없는 구간에서도 나온다
+    distance_label: str | None = None
     festivals: list[FestivalInfo] = Field(default_factory=list)
     transit: list[TransitInfo] = Field(default_factory=list)

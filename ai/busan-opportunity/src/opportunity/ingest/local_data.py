@@ -25,7 +25,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from ..models.region import FestivalInfo, LocalLifeData, TransitInfo
+from ..models.region import FestivalInfo, GuOffice, LocalLifeData, TransitInfo
 
 FESTIVAL_SOURCE = "부산광역시 부산축제정보"
 SUBWAY_SOURCE = "부산교통공사 도시철도노선정보"
@@ -214,8 +214,17 @@ def load_local_life(path_or_bytes: str | Path | bytes | dict) -> LocalLifeData:
     return validate(data)
 
 
+def load_gu_offices(path: str | Path) -> dict[str, GuOffice]:
+    """카카오 로컬로 구한 구·군청 좌표 JSON ({시군구 코드: {name, x(경도), y(위도)}}) → GuOffice."""
+    raw = json.loads(Path(path).expanduser().read_text(encoding="utf-8"))
+    return {code: GuOffice(sigungu=code, name=row["name"], lat=float(row["y"]), lng=float(row["x"]))
+            for code, row in raw.items()}
+
+
 def build_local_life_data(raw: Path, day: str, *, commute: dict[str, int] | None = None,
-                          commute_source: str | None = None, commute_as_of: str | None = None) -> LocalLifeData:
+                          commute_source: str | None = None, commute_as_of: str | None = None,
+                          gu_offices: dict[str, GuOffice] | None = None, gu_offices_source: str | None = None,
+                          gu_offices_as_of: str | None = None) -> LocalLifeData:
     """원본 폴더 → LocalLifeData. 없는 파일은 건너뛴다. 축제는 UC_SEQ로 중복을 뺀다."""
     festivals: dict[str, FestivalInfo] = {}
     for path in sorted((raw / FESTIVAL_DIR / day).glob(FESTIVAL_PATTERN)):
@@ -235,6 +244,8 @@ def build_local_life_data(raw: Path, day: str, *, commute: dict[str, int] | None
         festivals=list(festivals.values()), transit=[t for t in transit if t is not None],
         commute_minutes=commute or {}, commute_source=commute_source if commute else None,
         commute_as_of=commute_as_of if commute else None,
+        gu_offices=gu_offices or {}, gu_offices_source=gu_offices_source if gu_offices else None,
+        gu_offices_as_of=gu_offices_as_of if gu_offices else None,
     ))
 
 
@@ -255,6 +266,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--commute", type=Path, help="from_sigungu,to_sigungu,minutes CSV")
     parser.add_argument("--commute-source")
     parser.add_argument("--commute-as-of")
+    parser.add_argument("--gu-offices", type=Path, help="구·군청 좌표 JSON (카카오 로컬)")
+    parser.add_argument("--gu-offices-source")
+    parser.add_argument("--gu-offices-as-of")
     args = parser.parse_args(argv)
 
     commute = load_commute_csv(args.commute) if args.commute else None
@@ -262,7 +276,9 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--commute에는 --commute-source와 --commute-as-of가 필요하다")
     try:
         data = build_local_life_data(args.raw.expanduser(), args.day, commute=commute,
-                                     commute_source=args.commute_source, commute_as_of=args.commute_as_of)
+                                     commute_source=args.commute_source, commute_as_of=args.commute_as_of,
+                                     gu_offices=load_gu_offices(args.gu_offices) if args.gu_offices else None,
+                                     gu_offices_source=args.gu_offices_source, gu_offices_as_of=args.gu_offices_as_of)
     except LocalDataError as e:
         print(f"실패: {e}", file=sys.stderr)
         return 1

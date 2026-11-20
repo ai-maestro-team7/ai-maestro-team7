@@ -12,7 +12,7 @@ from ..deps import Deps
 from ..models.posting import PostingLatest, PostingSnapshot, WorkRegion
 from ..models.profile import BasicProfile
 from ..models.region import FestivalInfo, LocalLifeView, TransitInfo
-from . import copy_rules, regions
+from . import copy_rules, facts, regions
 
 # 부산 구·군 코드 → 축제 데이터의 GUGUN_NM. 근무지 구의 축제를 먼저 고를 때만 쓴다
 BUSAN_GUGUN = {
@@ -72,8 +72,10 @@ def build_local_life(deps: Deps, profile: BasicProfile, posting: PostingSnapshot
     festivals = pick_festivals(data.festivals, gugun_name(region), limits.festival_max)
     transit = [t for t in data.transit if _sourced(t)][:max(limits.transit_max, 0)]
     commute = commute_for(deps, profile, region)
-    if not (festivals or transit or commute):
+    distance = facts.distance_km(data, profile, region)
+    if not (festivals or transit or commute or distance is not None):
         return None
     minutes, label, source = commute or (None, None, None)
     return LocalLifeView(commute_minutes=minutes, commute_label=label, commute_source=source,
+                         distance_km=distance, distance_label=facts.distance_fact(distance),
                          festivals=festivals, transit=transit)

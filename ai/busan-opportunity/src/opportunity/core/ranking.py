@@ -350,9 +350,11 @@ def busan_alternatives_count(cfg: OpportunityConfig, alts: AltCandidates | None,
 def _card(deps: Deps, row: dict, as_of: datetime, alt_count: int | None, profile: BasicProfile) -> PostingCard:
     cfg, posting, match = deps.config, row["posting"], row["match"]
     commute = facts.commute_minutes(deps.local_life, profile, posting.work_region)
+    distance = facts.distance_km(deps.local_life, profile, posting.work_region)
     fact_list = facts.compact([facts.job_fact(cfg, match.job_match, basis=match.job_basis),
                                facts.overseas_fact(posting.work_region) if is_overseas_posting(posting) else None,
-                               facts.commute_fact(commute), *facts.eligibility_facts(row["eligibility"]),
+                               facts.commute_fact(commute) or facts.distance_fact(distance),  # 통근 시간이 없으면 거리
+                               *facts.eligibility_facts(row["eligibility"]),
                                facts.deadline_fact(posting.closes_at, as_of)])
     return PostingCard(
         job_posting_id=posting.job_posting_id, title=posting.title, organization=posting.organization,
@@ -362,7 +364,7 @@ def _card(deps: Deps, row: dict, as_of: datetime, alt_count: int | None, profile
         match_score=round(match.score, facts.SCORE_DIGITS), match_level=match_level(cfg, match.score),
         rank_score=round(row["rank"], facts.SCORE_DIGITS), eligibility=row["eligibility"],
         badges=facts.valid_badges(posting.badges), facts=fact_list, busan_alternatives_count=alt_count,
-        commute_minutes=commute, is_sample=posting.is_sample,
+        commute_minutes=commute, distance_km=distance, is_sample=posting.is_sample,
     )
 
 

@@ -73,6 +73,7 @@ class PostingCard(OppModel):
     facts: list[str] = Field(default_factory=list)  # 근거 사실. 문장이 아니라 사실 목록
     busan_alternatives_count: int | None = None     # 수도권 공고에만
     commute_minutes: int | None = None              # 거주 구 → 근무 구 대중교통 분. 값이 있을 때만
+    distance_km: float | None = None                # 구청 사이 직선거리 (km)
     is_sample: bool = False
 
 
