@@ -483,6 +483,24 @@ def _few_busan_jobs(cfg: OpportunityConfig, rows: list[dict]) -> bool:
                    for r in rows)
 
 
+def _add_regional_candidates(deps: Deps, ctx: UserContext, vector: Sequence[float],
+                             similarity: dict[str, float | None]) -> None:
+    """지역 조건 색인에서 사용자에게 맞을 수 있는 공고를 후보에 더한다.
+
+    벡터 상위 후보는 희망 직무와 가까운 공고만 모아, 지역 조건이 맞는 공고가 빠질 수 있다 (2026-11-21, 열린 공고 3,000건 중
+    부산 학교 기준으로 맞는 공고 대부분이 후보 밖이었다). 더한 공고의 유사도는 이름 색인 후보와 같이 `similarities`로 잰다.
+    """
+    cfg = deps.config
+    ids = [i for i in deps.catalog.list_regional_index(closes_from=clock.day(ctx.as_of)) if i not in similarity]
+    if not ids:
+        return
+    latest = deps.catalog.batch_get_latest(ids)
+    keep = [i for i, p in latest.items()
+            if facts.card_regional_talent(cfg, ctx.profile, p) == RegionalTalentStatus.LIKELY]
+    found = deps.vectors.similarities(vector, keep) if keep else {}
+    similarity.update({i: found.get(i) for i in keep})  # 벡터가 아직 없는 공고는 None (내용 유사도를 빼고 계산)
+
+
 def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort | None = None,
                     job_codes: list[str] | None = None, keyword: str | None = None, cursor: str | None = None,
                     limit: int = 20, as_of: str | date | datetime | None = None, job_name: str | None = None,
@@ -499,8 +517,9 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
     대화 조건 (개발계획서4 §9): job_name은 이번 검색에만 희망 직무로 쓰고 저장하지 않는다. query_terms는 질의 글에만
     넣는다. min_salary(만 원/년)·career_type·organization은 거르기만 하고 적합도·정렬 계산은 그대로다.
     scope는 OFFICIAL(공공 API로 모은 공고만)·TEAM(팀이 넣어 둔 공고만)·ALL(기본, 둘 다)이다 (§9.1).
-    regional_talent=True면 지역인재 전형이 있을 수 있는 공고(이전 공공기관 등)만 남긴다. 순서와 점수는 그대로다.
-    학교 소재지가 맞는 공고는 카드의 regionalTalent가 LIKELY다.
+    regional_talent=True면 공고문의 지역 조건(비수도권·이전지역·권역 인재, 지역 제한, 거주자 우대)이 사용자의 학교
+    소재지나 거주지와 맞을 수 있는(LIKELY) 공고만 남긴다. 순서와 점수는 그대로다. 벡터 상위 후보 밖의 공고도 빠지지
+    않게 지역 조건 색인(`INDEX#REGIONAL`)에서 후보를 더한다 (`_add_regional_candidates`).
     """
     cfg = deps.config
     region = (region or REGION_ALL).strip().upper()
@@ -539,6 +558,9 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
     if named:
         found = deps.vectors.similarities(vector, named)
         similarity.update({pid: found.get(pid) for pid in named})
+    #    지역 혜택 필터를 켜면 지역 조건 색인에서 사용자에게 맞을 수 있는 공고를 더한다 (B-D09).
+    if regional_talent:
+        _add_regional_candidates(deps, ctx, vector, similarity)
     latest_by_id = deps.catalog.batch_get_latest(list(similarity))
 
     # 2. 거르기: 마감, 지역, 직종 코드, 검색어, 대화 조건(기관, 최소 연봉, 경력 구분)
@@ -548,7 +570,8 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
                 and _job_code_ok(posting, job_codes) and _keyword_ok(posting, keyword)
                 and _organization_ok(posting, organization) and _salary_ok(posting, min_salary)
                 and _career_ok(posting, career) and _scope_ok(posting, scope)
-                and (not regional_talent or facts.card_regional_talent(cfg, ctx.profile, posting) is not None)):
+                and (not regional_talent
+                     or facts.card_regional_talent(cfg, ctx.profile, posting) == RegionalTalentStatus.LIKELY)):
             continue
         match, result = score_posting(deps, ctx, posting, similarity[pid])
         rank = rank_score(cfg, match.score, is_busan=is_busan_posting(cfg, posting), sort=sort)

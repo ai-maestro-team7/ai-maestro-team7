@@ -23,7 +23,7 @@
 
 | 메서드 | 경로 | 하는 일 | 쿼리·본문 | 응답 예시 |
 |---|---|---|---|---|
-| GET | `/postings` | 맞춤 피드 | 쿼리 `region`(`ALL`·`BUSAN`·`CAPITAL`·`OVERSEAS`·시도 코드, 기본 `ALL`), `sort`(`BUSAN_FIRST`·`MATCH`·`DEADLINE`·`RECENT`), `jobCodes`(쉼표), `keyword`(제목·회사·직무 이름에 들어 있는 글자. 프로필 후보 밖의 공고도 이름 색인에서 찾는다, B-D08), `cursor`, `limit` | `GET_postings.json` |
+| GET | `/postings` | 맞춤 피드 | 쿼리 `region`(`ALL`·`BUSAN`·`CAPITAL`·`OVERSEAS`·시도 코드, 기본 `ALL`), `sort`(`BUSAN_FIRST`·`MATCH`·`DEADLINE`·`RECENT`), `jobCodes`(쉼표), `keyword`(제목·회사·직무 이름에 들어 있는 글자. 프로필 후보 밖의 공고도 이름 색인에서 찾는다, B-D08), `cursor`, `limit`, `regionalTalent`(`true`면 공고문의 지역 조건이 학교 지역·사는 곳과 맞을 수 있는 공고만. 카드의 `regionalTalent`가 `LIKELY`, B-D09) | `GET_postings.json` |
 | GET | `/postings/{id}` | 공고 상세 | - | 서울 `GET_postings_id.json`, 부산 `GET_postings_id_busan.json` |
 | GET | `/postings/{id}/explanation` | 추천 이유 문장 | - | `GET_postings_id_explanation.json` |
 | POST | `/postings/{id}/ask` | 이 공고에 질문 | 본문 `{"question"}` (300자까지) | `POST_postings_id_ask.json`, `POST_postings_id_ask_unanswered.json` |

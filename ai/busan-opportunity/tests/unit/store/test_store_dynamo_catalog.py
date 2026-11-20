@@ -253,3 +253,18 @@ def test_table_name_comes_from_env_when_not_given(ddb, monkeypatch):
     monkeypatch.delenv("TABLE_CATALOG")
     with pytest.raises(Exception, match="TABLE_CATALOG"):
         DynamoCatalog(ddb)
+
+
+def test_regional_index_put_list_delete(loaded, memory_world, raw):
+    """지역 조건 색인은 INDEX#REGIONAL 한 파티션이다. 마감일로 거르고, 지우면 빠진다."""
+    for latest in memory_world.latest.values():
+        if latest.job_posting_id in memory_world.regional_index:
+            loaded.put_regional_index(latest)
+    expected = sorted(memory_world.regional_index)
+    assert expected and loaded.list_regional_index(closes_from="2026-01-01") == expected
+    first = expected[0]
+    row = raw(CATALOG, "INDEX#REGIONAL", f"POSTING#{first}")
+    assert row["entityType"] == "RegionalIndex" and row["closesAt"] == memory_world.regional_index[first]
+    assert loaded.list_regional_index(closes_from="2099-01-01") == []
+    loaded.delete_regional_index(first)
+    assert first not in loaded.list_regional_index(closes_from="2026-01-01")

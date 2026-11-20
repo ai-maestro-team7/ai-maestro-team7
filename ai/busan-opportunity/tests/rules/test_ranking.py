@@ -553,10 +553,10 @@ def test_card_says_likely_only_when_school_is_in_busan(deps, as_of):
     card = next(c for c in feed(deps, as_of, "demo3").items if c.job_posting_id == w.BUSAN_FINANCE_PUBLIC)
     assert card.regional_talent == RegionalTalentStatus.LIKELY
     assert facts.FACT_REGIONAL_TALENT_CARD in card.facts
-    for region in ("11", None):
+    for region, status in (("11", None), (None, RegionalTalentStatus.CHECK_NEEDED)):
         _school(deps, "demo3", region)
         card = next(c for c in feed(deps, as_of, "demo3").items if c.job_posting_id == w.BUSAN_FINANCE_PUBLIC)
-        assert card.regional_talent == RegionalTalentStatus.CHECK_NEEDED
+        assert card.regional_talent == status
         assert facts.FACT_REGIONAL_TALENT_CARD not in card.facts
 
 

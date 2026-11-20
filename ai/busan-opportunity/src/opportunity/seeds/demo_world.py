@@ -13,6 +13,7 @@ import hashlib
 from ..config import OpportunityConfig, load_config
 from ..core.texts import posting_text
 from ..deps import Deps
+from ..ingest.pipeline import sync_regional_index
 from ..models.enums import (
     BadgeType,
     CareerType,
@@ -463,6 +464,7 @@ def build_deps(config: OpportunityConfig | None = None) -> Deps:
         latest = latest_from_snapshot(snap, busan_sido=busan, capital_sido=capital, is_expired=expired)
         catalog.put_snapshot(snap)
         catalog.put_latest(latest)
+        sync_regional_index(catalog, None, latest)
         meta = VectorMeta(is_busan=latest.is_busan, sido=latest.work_region.sido or "", job_major=snap.job.major or "",
                           active=not expired, deadline=int(snap.closes_at.replace("-", "")), title=snap.title)
         vectors.put(snap.job_posting_id, embedder.embed(posting_text(snap)), meta.to_api())
