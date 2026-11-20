@@ -1,0 +1,317 @@
+{
+  "contract": "ErrorEnvelope",
+  "schemaVersion": "1.0",
+  "examples": [
+    {
+      "name": "invalid-input",
+      "data": {
+        "error": {
+          "code": "INVALID_INPUT",
+          "message": "입력 값을 다시 확인해 주세요.",
+          "requestId": "req-demo-001",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "validation-error",
+      "data": {
+        "error": {
+          "code": "VALIDATION_ERROR",
+          "message": "입력 값을 다시 확인해 주세요.",
+          "requestId": "req-demo-002",
+          "retryable": false,
+          "details": {
+            "sourceType": "DEMO"
+          }
+        }
+      }
+    },
+    {
+      "name": "url-not-allowed",
+      "data": {
+        "error": {
+          "code": "URL_NOT_ALLOWED",
+          "message": "고용24와 잡알리오 공고 주소만 분석할 수 있어요.",
+          "requestId": "req-demo-003",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "unauthorized",
+      "data": {
+        "error": {
+          "code": "UNAUTHORIZED",
+          "message": "다시 로그인해 주세요.",
+          "requestId": "req-demo-004",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "invalid-credentials",
+      "data": {
+        "error": {
+          "code": "INVALID_CREDENTIALS",
+          "message": "아이디 또는 비밀번호가 맞지 않아요.",
+          "requestId": "req-demo-005",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "resource-not-owned",
+      "data": {
+        "error": {
+          "code": "RESOURCE_NOT_OWNED",
+          "message": "요청한 정보를 찾을 수 없어요.",
+          "requestId": "req-demo-006",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "not-found",
+      "data": {
+        "error": {
+          "code": "NOT_FOUND",
+          "message": "요청한 정보를 찾을 수 없어요.",
+          "requestId": "req-demo-007",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "document-not-found",
+      "data": {
+        "error": {
+          "code": "DOCUMENT_NOT_FOUND",
+          "message": "문서를 찾을 수 없어요.",
+          "requestId": "req-demo-008",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "profile-not-found",
+      "data": {
+        "error": {
+          "code": "PROFILE_NOT_FOUND",
+          "message": "아직 프로필이 없어요. 기본 정보를 입력해 주세요.",
+          "requestId": "req-demo-009",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "workspace-not-found",
+      "data": {
+        "error": {
+          "code": "WORKSPACE_NOT_FOUND",
+          "message": "워크스페이스를 찾을 수 없어요.",
+          "requestId": "req-demo-010",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "posting-not-found",
+      "data": {
+        "error": {
+          "code": "POSTING_NOT_FOUND",
+          "message": "공고를 찾을 수 없어요.",
+          "requestId": "req-demo-011",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "policy-not-found",
+      "data": {
+        "error": {
+          "code": "POLICY_NOT_FOUND",
+          "message": "정책을 찾을 수 없어요.",
+          "requestId": "req-demo-012",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "session-not-found",
+      "data": {
+        "error": {
+          "code": "SESSION_NOT_FOUND",
+          "message": "면접 세션을 찾을 수 없어요.",
+          "requestId": "req-demo-013",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "precondition-not-met",
+      "data": {
+        "error": {
+          "code": "PRECONDITION_NOT_MET",
+          "message": "먼저 필요한 작업이 끝나지 않았어요.",
+          "requestId": "req-demo-014",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "invalid-state",
+      "data": {
+        "error": {
+          "code": "INVALID_STATE",
+          "message": "지금 단계에서는 할 수 없는 요청이에요.",
+          "requestId": "req-demo-015",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "answer-already-submitted",
+      "data": {
+        "error": {
+          "code": "ANSWER_ALREADY_SUBMITTED",
+          "message": "이미 제출된 답변이에요.",
+          "requestId": "req-demo-016",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "file-too-large",
+      "data": {
+        "error": {
+          "code": "FILE_TOO_LARGE",
+          "message": "파일이 너무 커요.",
+          "requestId": "req-demo-017",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "profile-incomplete",
+      "data": {
+        "error": {
+          "code": "PROFILE_INCOMPLETE",
+          "message": "추천을 받으려면 희망 직무를 입력해 주세요.",
+          "requestId": "req-demo-018",
+          "retryable": false,
+          "details": {
+            "missingFields": [
+              "desiredJobs"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "document-unreadable",
+      "data": {
+        "error": {
+          "code": "DOCUMENT_UNREADABLE",
+          "message": "문서를 읽을 수 없어요. 직접 입력해 주세요.",
+          "requestId": "req-demo-019",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "evidence-mismatch",
+      "data": {
+        "error": {
+          "code": "EVIDENCE_MISMATCH",
+          "message": "원문에서 근거를 확인하지 못했어요.",
+          "requestId": "req-demo-020",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "rate-limited",
+      "data": {
+        "error": {
+          "code": "RATE_LIMITED",
+          "message": "요청이 많아요. 잠시 뒤 다시 시도해 주세요.",
+          "requestId": "req-demo-021",
+          "retryable": true
+        }
+      }
+    },
+    {
+      "name": "ai-output-invalid",
+      "data": {
+        "error": {
+          "code": "AI_OUTPUT_INVALID",
+          "message": "결과를 만들지 못했어요. 다시 시도해 주세요.",
+          "requestId": "req-demo-022",
+          "retryable": true
+        }
+      }
+    },
+    {
+      "name": "internal-error",
+      "data": {
+        "error": {
+          "code": "INTERNAL_ERROR",
+          "message": "잠시 문제가 생겼어요. 다시 시도해 주세요.",
+          "requestId": "req-demo-023",
+          "retryable": true
+        }
+      }
+    },
+    {
+      "name": "not-implemented",
+      "data": {
+        "error": {
+          "code": "NOT_IMPLEMENTED",
+          "message": "아직 준비 중인 기능이에요.",
+          "requestId": "req-demo-024",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "aws-service-error",
+      "data": {
+        "error": {
+          "code": "AWS_SERVICE_ERROR",
+          "message": "외부 서비스 응답이 늦어요. 다시 시도해 주세요.",
+          "requestId": "req-demo-025",
+          "retryable": true
+        }
+      }
+    },
+    {
+      "name": "model-unavailable",
+      "data": {
+        "error": {
+          "code": "MODEL_UNAVAILABLE",
+          "message": "AI 응답이 늦어요. 다시 시도해 주세요.",
+          "requestId": "req-demo-026",
+          "retryable": true,
+          "details": {
+            "sourceType": "DEMO"
+          }
+        }
+      }
+    },
+    {
+      "name": "source-unavailable",
+      "data": {
+        "error": {
+          "code": "SOURCE_UNAVAILABLE",
+          "message": "공식 자료 확인이 지연되고 있어요.",
+          "requestId": "req-demo-027",
+          "retryable": true,
+          "details": {
+            "sourceType": "DEMO"
+          }
+        }
+      }
+    }
+  ]
+}

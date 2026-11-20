@@ -1,0 +1,74 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "projects": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 10,
+      "title": "Projects",
+      "type": "array"
+    },
+    "skills": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 30,
+      "title": "Skills",
+      "type": "array"
+    },
+    "needsConfirmation": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 10,
+      "title": "Needsconfirmation",
+      "type": "array"
+    },
+    "profileId": {
+      "anyOf": [
+        {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Profileid"
+    },
+    "profileVersion": {
+      "anyOf": [
+        {
+          "minimum": 1,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Profileversion"
+    }
+  },
+  "required": [
+    "projects",
+    "skills",
+    "needsConfirmation"
+  ],
+  "title": "CareerProfileSummary",
+  "type": "object",
+  "x-schemaVersion": "1.0",
+  "x-owner": "A",
+  "x-consumers": [
+    "C",
+    "BACKEND"
+  ],
+  "x-sources": [
+    "A §12.2",
+    "C §5.2",
+    "D-12"
+  ]
+}

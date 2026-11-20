@@ -1,0 +1,65 @@
+{
+  "contract": "ErrorEnvelope",
+  "schemaVersion": "1.0",
+  "examples": [
+    {
+      "name": "request-id-top-level",
+      "stage": "validate",
+      "expectedErrorFields": [
+        "requestId"
+      ],
+      "data": {
+        "error": {
+          "code": "INVALID_INPUT",
+          "message": "입력 값을 확인해 주세요.",
+          "retryable": false
+        },
+        "requestId": "req-demo-900"
+      }
+    },
+    {
+      "name": "code-missing",
+      "stage": "validate",
+      "expectedErrorFields": [
+        "error.code"
+      ],
+      "data": {
+        "error": {
+          "message": "오류",
+          "requestId": "req-demo-901",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "name": "retryable-string",
+      "stage": "validate",
+      "expectedErrorFields": [
+        "error.retryable"
+      ],
+      "data": {
+        "error": {
+          "code": "INTERNAL_ERROR",
+          "message": "오류",
+          "requestId": "req-demo-902",
+          "retryable": "false"
+        }
+      }
+    },
+    {
+      "name": "unknown-code",
+      "stage": "validate",
+      "expectedErrorFields": [
+        "error.code"
+      ],
+      "data": {
+        "error": {
+          "code": "NO_SUCH_CODE",
+          "message": "오류",
+          "requestId": "req-demo-903",
+          "retryable": false
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "contract": "InterviewJobContext",
+  "schemaVersion": "1.0",
+  "examples": [
+    {
+      "name": "busan-data-analysis",
+      "derivedFrom": "PostingForAnalysis/busan-data-analysis",
+      "data": {
+        "job": "데이터 분석"
+      }
+    },
+    {
+      "name": "seoul-data-analysis",
+      "derivedFrom": "PostingForAnalysis/seoul-data-analysis",
+      "data": {
+        "job": "데이터 분석"
+      }
+    },
+    {
+      "name": "region-unknown",
+      "derivedFrom": "PostingForAnalysis/region-unknown",
+      "data": {
+        "job": "데이터 분석"
+      }
+    },
+    {
+      "name": "expired",
+      "derivedFrom": "PostingForAnalysis/expired",
+      "data": {
+        "job": "데이터 분석"
+      }
+    }
+  ]
+}
