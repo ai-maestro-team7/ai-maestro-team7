@@ -19,24 +19,24 @@
     - _Requirements: 5.1, 5.2, 5.5, 5.6_
   - 커밋: `feat: 전달력 측정과 점수 설정 파일 추가` (`08808f8`, 272 passed 1 skipped)
 
-- [ ] 3. 질문 음성
-  - [ ] 3.1 `settings.py`에 Polly·Transcribe 상수(#69의 생각 끄기 설정은 그대로), `voice.py`에 클라이언트 함수 3개와 `synthesize_question`을 만든다 (design §3, §4)
-  - [ ] 3.2 `tests/fakes.py`에 `FakePolly`, `tests/test_voice.py`에 Polly 테스트(인자, 빈 문장, 실패 → None)
+- [x] 3. 질문 음성
+  - [x] 3.1 `settings.py`에 Polly·Transcribe 상수(#69의 생각 끄기 설정은 그대로), `voice.py`에 클라이언트 함수 3개와 `synthesize_question`을 만든다 (design §3, §4)
+  - [x] 3.2 `tests/fakes.py`에 `FakePolly`, `tests/test_voice.py`에 Polly 테스트(인자, 빈 문장, 실패 → None)
     - _Requirements: 1.1~1.4_
-  - 커밋: `feat: 질문 음성 생성 함수 추가`
+  - 커밋: `feat: 질문 음성 생성 함수 추가` (`3397aad`)
 
-- [ ] 4. 답변 변환
-  - [ ] 4.1 `voice.py`에 `start_transcription`, `get_transcription_result`, `_split_s3_uri`, `parse_transcript`를 만든다 (design §5, §6)
-  - [ ] 4.2 `samples/transcribe/` 4개 파일을 만든다
-  - [ ] 4.3 `FakeTranscribe`, `FakeS3.get_object`를 추가하고 `test_voice.py`에 design §12 표의 변환 케이스를 쓴다
+- [x] 4. 답변 변환
+  - [x] 4.1 `voice.py`에 `start_transcription`, `get_transcription_result`, `_split_s3_uri`, `parse_transcript`를 만든다 (design §5, §6)
+  - [x] 4.2 `samples/transcribe/` 4개 파일을 만든다
+  - [x] 4.3 `FakeTranscribe`, `FakeS3.get_object`를 추가하고 `test_voice.py`에 design §12 표의 변환 케이스를 쓴다
     - _Requirements: 2.1~2.6, 3.1~3.8_
-  - 커밋: `feat: 답변 음성 변환 함수 추가`
+  - 커밋: `feat: 답변 음성 변환 함수 추가` (`e45b986`)
 
-- [ ] 5. 실제 음성 함수 연결
-  - [ ] 5.1 `__init__.py`를 `voice.py`에서 import하도록 바꾸고, `placeholders.py`에서 음성 함수 3개·`_s3_client`를 지운다. 모듈 설명의 "6개"를 "3개"로 고친다
-  - [ ] 5.2 `test_package.py`(시그니처 그대로, `import interview`가 boto3 없이도 성공), `test_placeholders.py`, `test_logging.py`, `test_backend_flow.py`를 고친다 (design §12)
+- [x] 5. 실제 음성 함수 연결
+  - [x] 5.1 `__init__.py`를 `voice.py`에서 import하도록 바꾸고, `placeholders.py`에서 음성 함수 3개·`_s3_client`를 지운다. 모듈 설명의 "6개"를 "3개"로 고친다
+  - [x] 5.2 `test_package.py`(시그니처 그대로, `import interview`가 boto3 없이도 성공), `test_placeholders.py`, `test_logging.py`, `test_backend_flow.py`를 고친다 (design §12)
     - _Requirements: 7.1~7.3, 8.3, 8.4_
-  - 커밋: `feat: 음성 함수를 실제 구현으로 연결` (백엔드가 부르는 동작이 바뀌므로 `refactor`가 아님)
+  - 커밋: `feat: 음성 함수를 실제 구현으로 연결` (`782d65e`, 340 passed 1 skipped. 백엔드가 부르는 동작이 바뀌므로 `refactor`가 아님)
 
 - [ ] 6. 수동 확인 (실제 AWS, 사람이 실행)
   - [ ] 6.1 `tests/test_voice_manual.py`를 만든다 (design §12). 기본 실행에서는 건너뛴다
