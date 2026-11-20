@@ -19,11 +19,14 @@
     - _Requirements: 2.1~2.7_
   - 커밋: `feat: 면접 답변 내용 평가 추가`
 
-- [ ] 3. 피드백 (C-2)
-  - [ ] 3.1 `prompts/c2_feedback_v1.md`, `feedback.py` `write_feedback`, 금지 표현 검사 (design §6)
-  - [ ] 3.2 `test_feedback.py`, `samples/llm/` C-2 예시
-    - _Requirements: 4.1~4.4_
-  - 커밋: `feat: 면접 피드백 작성 추가`
+- [ ] 3. 피드백 에이전트 (C-2, Strands 툴 사용)
+  - [ ] 3.1 `llm.py`: `ToolLLMClient`, `StrandsLLMClient.run_with_tools`(strands `tool`·`limits`), `_get_model` max_tokens별 캐시, `call_json_with_tools` (design §6.3). `settings.py`에 상한·`feedback_max_tokens()`
+  - [ ] 3.2 `feedback.py`: `FeedbackContext`(frozen), `make_feedback_tools` 읽기 전용 툴 4개, `write_feedback`, 금지 표현 검사 (design §6.1·§6.2·§6.4). `prompts/c2_feedback_v1.md`
+  - [ ] 3.3 `tests/fakes.py`에 툴을 차례로 부르는 `FakeToolLLM`, `test_feedback.py`
+    - 툴 결과가 복사본이고 실행 뒤 점수가 그대로인지, 없는 질문 ID·빈 키워드 오류 사실, 툴 호출 상한, 금지 표현 → 재시도, 상한에 닿아 JSON 없음 → `AI_OUTPUT_INVALID`
+    - `test_llm.py`: 가짜 strands로 `tools`·`limits`·`max_tokens` 2048이 넘어가는지, 설치된 strands로 `strands.tool` 감싸기
+    - _Requirements: 4.1~4.9_
+  - 커밋: `feat: 면접 피드백 에이전트 추가`
 
 - [ ] 4. 리포트 연결
   - [ ] 4.1 `report.py` `generate_report` (design §7), `__init__.py` 연결, `placeholders.py`에서 `generate_report` 삭제
@@ -33,7 +36,7 @@
 
 - [ ] 5. 수동 확인 (실제 Bedrock, 사람이 실행)
   - [ ] 5.1 `test_bedrock_manual.py`에 리포트 생성 테스트 추가 (`RUN_BEDROCK=1`일 때만)
-  - [ ] 5.2 Haiku로 실행해 점수·등급·리포트 생성 시간, 잘림 여부를 PR 참고 사항에 적는다. 같은 Session으로 두 번 돌려 C-1 점수 차이를 본다 (design §13-1)
+  - [ ] 5.2 Haiku로 실행해 점수·등급·리포트 생성 시간, 잘림 여부, C-2 에이전트의 턴 수·툴 호출을 PR 참고 사항에 적는다. 같은 Session으로 두 번 돌려 C-1 점수 차이를 본다 (design §6.5, §13-1)
     - _Requirements: 7.6_
   - 커밋: `test: 리포트 수동 확인 테스트 추가`
 

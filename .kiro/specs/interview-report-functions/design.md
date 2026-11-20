@@ -130,12 +130,72 @@ def calculate_interview_scores(session: Session, frames: list, config: ScoringCo
  "bundles": [{"questionId": "q1", "contentScore": 80, "deliveryScore": 72.5}]}
 ```
 
-## 6. 피드백 (`feedback.py`, C-2)
+## 6. 피드백 에이전트 (`feedback.py`, C-2, requirements 결정 7)
 
-- 한 리포트에 한 번 부른다. 입력은 평가 가능한 묶음마다 질문, 답변, 확정 `contentScore`, 측정값(`speechRate`·`longPausePerMin`·`timeLimitReached`), 검증된 C-1 근거.
-- 출력 `FeedbackOutput`: `{"questions": [{"questionId", "strengths": [..1~2], "improvements": [..1~2], "direction", "comment"}]}`. 점수 필드 없음.
-- 검사: 묶음 ID 집합이 입력과 같음, 문장 5~200자, 금지 표현(`settings.FEEDBACK_BANNED_WORDS`: 합격, 불합격, 확률, 떨어) 없음. 실패 → 재시도 1회 → `AI_OUTPUT_INVALID`.
-- 프롬프트 `c2_feedback_v1.md`: 시스템은 `system_eval_v1.md`. 지시: 확정 점수를 바꾸지 않음, 정답을 알려 주지 않음, 답변에 없는 경험·수치를 만들지 않음, 개선점은 "다음에 이렇게 해 보세요" 형태.
+### 6.1 구조
+```
+write_feedback(context: FeedbackContext, *, llm=None) -> FeedbackOutput
+  context = 점수 계산이 끝난 뒤의 고정 데이터 (frozen 모델)
+            bundles(질문·답변·측정값), score_result, resume_text
+  tools   = make_feedback_tools(context)  # 읽기 전용 함수 4개, context에 묶임
+  output  = llm_module.call_json_with_tools(llm, system_prompt, user_prompt, tools, limits,
+                                            schema=FeedbackOutput, stage="write_feedback")
+```
+- 사용자 메시지에는 평가 가능한 묶음의 `questionId`·질문 유형·질문 문장만 넣는다. 점수·답변·측정값은 에이전트가 툴로 가져온다.
+- 툴은 일반 Python 함수(타입 힌트 + 설명 docstring)로 만든다. `StrandsLLMClient`가 실행할 때만 `strands.tool`로 감싼다. 그래서 단위 테스트는 strands 없이 가짜 클라이언트가 툴을 직접 부른다.
+
+### 6.2 툴 (모두 조회만)
+| 툴 | 인자 | 돌려주는 것 (사실 목록) |
+| --- | --- | --- |
+| `get_confirmed_scores` | `question_id` | `contentScore`, 항목별 `{key, score, evidence(검증된 것만)}`, `deliveryScore`, 영역 점수·미측정 사유 |
+| `get_delivery_metrics` | `question_id` | `speechRate`, `longPausePerMin`, `longPauseCount`, `timeLimitReached`, 미측정 사유 |
+| `get_answer_text` | `question_id` | 질문, 답변 원문, 꼬리질문·꼬리 답변 (평가 가능한 것만) |
+| `find_resume_passages` | `keyword` | 자소서에서 키워드가 든 문장 최대 3개 (공백 정규화 후 부분 문자열, 문장당 200자까지) |
+
+- 읽기 전용 보장:
+  - `FeedbackContext`와 안의 모델은 `frozen=True`. 툴은 `model_dump()` 복사본만 돌려준다.
+  - 점수를 쓰는 툴이 없다. 출력 스키마에 점수 필드가 없다.
+  - 테스트가 에이전트 실행 전후의 `ScoreResult`가 같은지 확인한다.
+- 잘못된 인자: 없는 `question_id` → `{"error": "UNKNOWN_QUESTION", "questionIds": [...]}`, 빈 키워드 → `{"error": "EMPTY_KEYWORD"}`. 예외를 던지지 않아 에이전트가 고쳐 부를 수 있다.
+- 툴 호출 상한: `FEEDBACK_MAX_TOOL_CALLS`(12)를 넘으면 툴이 `{"error": "TOOL_LIMIT", "message": "지금까지 받은 정보로 답을 쓰세요"}`를 돌려준다.
+- 사용자·세션 ID를 인자로 받지 않는다. 툴이 볼 수 있는 데이터는 이 리포트의 `context`뿐이다.
+
+### 6.3 LLM 계층 변경 (`llm.py`)
+- `ToolLLMClient` 프로토콜: `run_with_tools(*, system_prompt, user_prompt, tools, limits) -> str`
+- `StrandsLLMClient.run_with_tools`: `Agent(model=_get_model(max_tokens=settings.feedback_max_tokens()), system_prompt, tools=[strands.tool(f) for f in tools], callback_handler=None)` → `agent(user_prompt, limits={"turns": …, "total_tokens": …})` → `str(result)`
+  - strands 1.65 `Agent.__call__(limits=Limits)`: 상한에 닿으면 예외 없이 다음 턴 경계에서 멈추고 `stop_reason`이 `limit_turns` 등이 된다. 그때는 마지막 텍스트에 피드백 JSON이 없을 수 있어 출력 검사 실패로 이어진다 (재시도 1회 → `AI_OUTPUT_INVALID`).
+  - `MaxTokensReachedException`은 1차처럼 `OutputTruncated`로 바꾼다.
+- `_get_model`을 `max_tokens`별로 한 번씩 만들게 바꾼다 (질문·꼬리질문·C-1은 기본 1024, C-2는 `INTERVIEW_FEEDBACK_MAX_TOKENS` 기본 2048). 생각 끄기 설정은 같다.
+- `call_json_with_tools`: `call_json`과 같은 재시도·오류 규칙. 공통 부분은 내부 함수로 묶는다.
+- 로그: `stage=write_feedback attempt=… turns=… toolCalls=get_answer_text:3,get_confirmed_scores:3 stopReason=… durationMs=…`. 툴 입력·결과는 남기지 않는다. strands 자체 로그(`strands` 로거)는 DEBUG로 켜지 않는다.
+
+### 6.4 출력과 검사
+- `FeedbackOutput`: `{"questions": [{"questionId", "strengths": [..1~2], "improvements": [..1~2], "direction", "comment"}]}`. 점수 필드 없음.
+- 검사: 묶음 ID 집합이 평가 가능한 묶음과 같음, 문장 5~200자, 금지 표현(`settings.FEEDBACK_BANNED_WORDS`: 합격, 불합격, 확률, 떨어) 없음.
+- 프롬프트 `c2_feedback_v1.md`(시스템 `system_eval_v1.md`):
+  - 묶음마다 `get_confirmed_scores`와 `get_answer_text`를 먼저 보라
+  - 말 속도·멈춤을 말할 때는 `get_delivery_metrics` 값만 쓰라
+  - 자소서와 연결할 때만 `find_resume_passages`를 쓰라
+  - 툴 결과에 없는 사실은 쓰지 말라, 점수를 바꾸거나 새로 매기지 말라
+  - 개선점은 "다음에 이렇게 해 보세요" 형태로, 마지막에 JSON 하나만 출력하라
+
+### 6.5 시간·토큰 영향
+- **시간 한도는 240초가 아니라 Lambda 300초다.**
+  - 240초(`TRANSCRIBE_WAIT_SEC`)는 백엔드 `task_answer`가 변환을 기다리는 한도다.
+  - 리포트는 마지막 답변의 `task_answer` 안에서 `make_report`로 이어서 만든다. 그래서 같은 Lambda 실행(300초) 안에 "변환 대기 + `process_answer` + 리포트"가 다 들어가야 한다.
+- 추정 (Haiku 5.5, 생각 끔):
+  - C-1: 묶음 3개 × 1~3초
+  - C-2 에이전트: 턴 3~6번 × 1~3초. 툴은 한 턴에 여러 개를 같이 부를 수 있다
+  - 리포트 전체 약 10~30초
+  - 2차 수동 확인에서 1분 남짓한 답변의 변환은 10~13초였다. 합계는 300초 안에 넉넉하다
+- 위험: 마지막 답변 변환이 240초 가까이 걸리면 리포트까지 300초를 넘어 Lambda가 끊길 수 있다. 끊기면 `run_task`의 실패 처리도 돌지 않아 세션이 `REPORT_GENERATING`에 남는다.
+  - 상한으로 리포트 시간을 묶는다: 턴 6, 툴 호출 12, 총 토큰 30,000
+  - 수동 확인에서 리포트 생성 시간을 잰다 (tasks 5)
+  - 마지막 답변 처리와 리포트 생성을 별도 작업으로 나누는 것은 백엔드 담당과 따로 정한다
+- 토큰:
+  - 툴 결과(답변 원문 3개 약 1~2천 토큰)가 턴마다 다시 입력으로 들어간다. C-2 입력 합계는 약 1만~3만 토큰, 출력은 1~2천 토큰이다
+  - 질문 3개 피드백 JSON은 1024 토큰을 넘을 수 있어 C-2만 `max_tokens` 2048로 둔다
+  - Haiku 기준 비용 영향은 작다 (리포트 1건에 수 센트 이하)
 
 ## 7. 리포트 (`report.py`)
 
@@ -227,7 +287,8 @@ uv run --no-project --python 3.13 --with-requirements ai/interview/requirements-
 | # | 내용 | 제안 |
 | --- | --- | --- |
 | 1 | 같은 답변에 C-1 항목 점수가 호출마다 조금 다를 수 있다 | 점수 계산은 같은 입력에 같은 결과. C-1 흔들림은 수동 테스트로 확인하고, 크면 평가 호출에만 temperature 0을 검토 (별도 결정) |
-| 2 | C-1을 묶음마다 부르면 LLM 호출이 최대 4번(C-1 3 + C-2 1) | 비동기 작업이라 Lambda 300초 안. 수동 테스트에서 리포트 생성 시간을 잰다 |
+| 2 | C-1 3번 + C-2 에이전트 턴 최대 6번. 변환 대기와 같은 Lambda 실행(300초) 안이다 | §6.5. 상한으로 묶고 수동 테스트에서 리포트 생성 시간을 잰다 |
 | 3 | C-2가 실패하면 점수는 있는데 리포트가 없다 | 3차는 오류로 끝낸다. 피드백 없이 점수만 주는 대체 경로는 필요해지면 따로 정한다 |
+| 6 | 에이전트가 툴을 안 부르고 바로 쓰거나, 툴 결과에 없는 사실을 쓸 수 있다 | 프롬프트로 툴 사용을 지시하고, 출력 검사(묶음 ID·금지 표현)로 거른다. 사실 대조(피드백 문장이 툴 결과와 맞는지)는 3차 범위 밖이다. 수동 확인에서 로그의 툴 호출을 본다 |
 | 4 | 태도 미측정이 데모에서 "점수가 빠졌다"로 보일 수 있다 | `notMeasuredMessages`로 이유를 보여 준다. 4차에서 채운다 |
 | 5 | 노션 6 값은 저장소에 없다 | 이 스펙과 설정 파일에 옮겨 적었다. PR 참고 사항에 노션과 대조했다고 적는다 |

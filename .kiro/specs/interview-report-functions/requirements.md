@@ -21,6 +21,12 @@ AI 모의면접 함수의 3차 단계다 (이슈 #92). 면접이 끝나면 답�
 4. **묶음(기본 질문 + 꼬리질문)의 평가 가능 기준**: 기본 답변이 평가 불가면 그 묶음은 제외한다(이때는 꼬리질문이 없다, 1차 규칙). 꼬리 답변만 평가 불가면 기본 답변만으로 평가한다.
 5. **`calculate_interview_scores`는 C-1 결과를 인자로 더 받는다.** C ★는 `(session, frames, config)`지만 내용 항목 점수는 Session에 없다(C-1이 리포트 시점에 만든다). `(session, frames, config, content)`로 두고 C ★ 내부 함수 표를 고친다. 내부 함수라 백엔드 계약에는 영향이 없다.
 6. **평가용 시스템 프롬프트를 따로 둔다.** 1차 `system_v1.md`에 "점수를 말하지 않는다"가 있어 C-1(항목 점수 출력)과 충돌한다. C-1·C-2는 `system_eval_v1.md`를 쓴다.
+7. **`write_feedback`(C-2)은 Strands 툴 사용 에이전트로 만든다.** 점수는 코드가 먼저 확정하고, 에이전트는 읽기 전용 툴 4개(확정 점수 조회, 전달력 수치, 답변 원문, 자소서 관련 부분 찾기)를 골라 부른 뒤 피드백을 쓴다.
+   - 툴은 계산·AWS 호출·저장을 하지 않고, 이미 확정된 값의 복사본만 돌려준다. 점수를 바꾸는 툴은 없다.
+   - C §2.3("AWS 서비스 호출·점수 계산은 에이전트 툴이 아닌 일반 코드")과 tech.md("AWS 호출·측정·점수 계산은 에이전트 툴이 아닌 일반 코드")를 지킨다. 툴은 조회만 한다.
+   - 사용자·세션 ID는 툴 인자로 받지 않는다. 툴은 리포트 하나의 데이터에 묶여 만들어진다 (AGENTS.md "Agent 도구는 userId를 모델 파라미터로 받지 않는다").
+   - 통합 멘토링 Agent와는 별개다. C의 면접관 에이전트 안에서만 쓰고 Action Group으로 내보내지 않는다 (C §10).
+   - 반복 상한(턴 수·토큰)과 호출당 `max_tokens`를 둔다 (AGENTS.md "노션 허브 자료": 도구 반복 상한).
 
 범위에서 제외:
 - 태도 점수 계산, `analyze_face`·`compute_baseline` 실제 구현 (4차)
@@ -78,13 +84,22 @@ AI 모의면접 함수의 3차 단계다 (이슈 #92). 면접이 끝나면 답�
 9. THE Score_Result SHALL 평가 가능한 기본 질문 수(`evaluatedBaseQuestions`)와 계산 기준 문장(`weightBasis`, 예: "내용 70% · 전달력 30%"), 미측정 이유 문장을 담는다. 문장은 코드가 정해진 틀로 만든다.
 10. IF Evaluable_Bundle이 0개면 THEN THE `generate_report` SHALL 점수 함수를 부르지 않는다 (Requirement 5 기준 4).
 
-### Requirement 4: 피드백 (`write_feedback`, 프롬프트 C-2)
+### Requirement 4: 피드백 에이전트 (`write_feedback`, 프롬프트 C-2)
 
 #### Acceptance Criteria
-1. THE 함수 SHALL 확정된 점수, 측정값, 검증된 C-1 근거만 받아 Evaluable_Bundle마다 `strengths`(1~2개), `improvements`(1~2개), `direction`(1문장), `comment`(1문장)를 돌려준다.
-2. THE 함수 SHALL 점수를 바꾸거나 새로 매기지 않는다. 출력 스키마에 점수 필드가 없다.
-3. THE 출력 SHALL 정답 제시, 합격·불합격 가능성 언급, 답변에 없는 경험·수치를 담지 않는다. 금지 표현(`합격`, `불합격`, `확률`, `떨어`)이 있으면 검사 실패로 보고 재시도한다 (제품 원칙 4, 문구 규칙).
-4. THE 출력 SHALL 고정 JSON + Pydantic 검사, 1회 재시도 후 `AI_OUTPUT_INVALID`다. 한 리포트에 한 번만 부른다.
+1. THE 함수 SHALL 점수 계산이 끝난 뒤에만 불리고, Evaluable_Bundle마다 `strengths`(1~2개), `improvements`(1~2개), `direction`(1문장), `comment`(1문장)를 돌려준다.
+2. THE 함수 SHALL Strands 에이전트에 읽기 전용 툴 4개를 주고, 에이전트가 필요한 툴을 골라 불러 정보를 모은 뒤 피드백 JSON을 쓰게 한다 (결정 7).
+   - `get_confirmed_scores(question_id)`: 확정된 내용 점수, 항목별 점수와 검증된 근거, 전달력 점수
+   - `get_delivery_metrics(question_id)`: 말 속도, 분당 긴 침묵, 시간 제한 도달, 미측정 사유
+   - `get_answer_text(question_id)`: 질문과 답변 원문 (꼬리질문 포함)
+   - `find_resume_passages(keyword)`: 자소서에서 키워드가 든 문장 최대 3개 (문자열 검색, LLM 없음)
+3. THE 툴 SHALL 확정된 값의 복사본만 돌려주고 아무것도 바꾸지 않는다. 계산·AWS 호출·저장을 하지 않는다. 에이전트가 끝난 뒤 Score_Result가 호출 전과 같다.
+4. IF 툴 인자가 없는 `question_id`이거나 빈 키워드면 THEN THE 툴 SHALL 예외 대신 오류 사실(`{"error": "UNKNOWN_QUESTION"}` 등)을 돌려준다.
+5. THE 에이전트 SHALL 턴 수 상한(`settings.FEEDBACK_MAX_TURNS`), 토큰 상한(`FEEDBACK_MAX_TOTAL_TOKENS`), 툴 호출 상한(`FEEDBACK_MAX_TOOL_CALLS`), 호출당 `max_tokens`(`INTERVIEW_FEEDBACK_MAX_TOKENS`)를 둔다. 상한에 닿아 피드백 JSON을 못 쓰면 출력 실패로 본다.
+6. THE 출력 스키마 SHALL 점수 필드가 없다. 묶음 ID 집합이 평가 가능한 묶음과 같아야 한다.
+7. THE 출력 SHALL 정답 제시, 합격·불합격 가능성 언급, 답변에 없는 경험·수치를 담지 않는다. 금지 표현(`합격`, `불합격`, `확률`, `떨어`)이 있으면 검사 실패로 보고 재시도한다 (제품 원칙 4, 문구 규칙).
+8. THE 출력 SHALL 고정 JSON + Pydantic 검사, 1회 재시도 후 `AI_OUTPUT_INVALID`다 (1차 `call_json`과 같은 규칙). 한 리포트에 에이전트 실행은 최대 2번이다.
+9. THE 로그 SHALL 툴 이름과 호출 횟수, 턴 수, 멈춘 이유만 남긴다. 툴 입력·결과 원문은 남기지 않는다.
 
 ### Requirement 5: 리포트 (`generate_report`)
 
