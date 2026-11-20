@@ -12,7 +12,7 @@ class BedrockLlm:
             "modelId": self.model_id,
             "system": [{"text": system}],
             "messages": [{"role": "user", "content": [{"text": user}]}],
-            "inferenceConfig": {"maxTokens": max_tokens, "temperature": 0},
+            "inferenceConfig": {"maxTokens": max_tokens},
         }
 
     def invoke(self, system: str, user: str, *, max_tokens: int = 1024) -> str:
