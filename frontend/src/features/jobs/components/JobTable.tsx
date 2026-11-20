@@ -67,7 +67,7 @@ export function JobRow({ job, asOf }: { job: PostingCard; asOf: string }) {
         <span className="truncate text-small text-grey-600">{matchReason(job.facts)}</span>
       </TableCell>
       <TableCell className={COLUMNS.save}>
-        <SaveToggle jobTitle={`${job.organization} ${job.title}`} />
+        <SaveToggle jobPostingId={job.jobPostingId} jobTitle={`${job.organization} ${job.title}`} />
       </TableCell>
     </TableRow>
   );
