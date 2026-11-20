@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
@@ -21,29 +22,15 @@ function errorText(error: unknown): string {
 /**
  * 홈 채팅창 (D-39, 개발계획서4 §2). 말을 보내거나 예시·서류를 고르면 첫 턴을 시작하고 채팅 화면(`/chat/`)으로 넘어간다.
  * 답은 채팅 화면이 기다린다. 대화는 채팅 화면 왼쪽 목록에 남는다.
+ * 로그인 전에도 입력칸과 예시를 그대로 보여 주고, 보내거나 누르면 로그인 화면으로 간다 (PDF 첨부는 로그인 뒤에만).
  */
 export function ChatPanel() {
   const owner = useSessionOwner();
-  if (!owner) {
-    return (
-      <section aria-labelledby="chat-title" className="flex min-w-0 flex-1 flex-col gap-3.5">
-        <ChatTitle />
-        <div className="flex flex-col items-start gap-3 rounded-field border border-grey-200 p-5">
-          <p className="text-body text-grey-900">
-            로그인하면 채팅으로 조건을 말하거나 이력서를 붙여 부산 채용공고와 청년정책을 함께 찾을 수 있어요.
-          </p>
-          <Button href={loginHref("/")} size="M">
-            로그인
-          </Button>
-        </div>
-      </section>
-    );
-  }
   // 사용자가 바뀌면(다른 탭에서 계정 변경 포함) 입력 상태를 새로 만든다
-  return <Launcher key={owner} />;
+  return <Launcher key={owner ?? "guest"} guest={!owner} />;
 }
 
-function Launcher() {
+function Launcher({ guest }: { guest: boolean }) {
   const router = useRouter();
   const [draft, setDraft] = useState("");
   const [starting, setStarting] = useState(false);
@@ -53,9 +40,14 @@ function Launcher() {
   const [docBusy, setDocBusy] = useState(false);
   const locked = starting || docBusy;
 
+  function toLogin() {
+    router.push(loginHref("/"));
+  }
+
   async function start(text: string, attachments?: { documentId: string }[]) {
     const message = text.trim();
     if (!message || locked) return;
+    if (guest) return toLogin();
     setStarting(true);
     setError(null);
     try {
@@ -78,52 +70,71 @@ function Launcher() {
   }
 
   return (
-    <section aria-labelledby="chat-title" className="flex min-w-0 flex-1 flex-col gap-3.5">
-      <div className="flex items-center justify-between gap-3">
-        <ChatTitle />
-        <Link href={chatHref()} className="text-small font-medium text-grey-700 hover:text-grey-900">
-          지난 대화
-        </Link>
-      </div>
+    <section aria-labelledby="chat-title" className="flex w-full min-w-0 flex-col items-center gap-4">
+      {/* 화면에 보이는 제목은 홈 첫 화면 문구가 맡는다. 이 칸 이름은 화면 읽기 프로그램에만 둔다 */}
+      <h2 id="chat-title" className="sr-only">
+        AI 멘토와 채팅으로 찾기
+      </h2>
 
       {resumeOpen ? (
-        <ResumeForm onReady={onResumeReady} onCancel={() => setResumeOpen(false)} onProcessingChange={setDocBusy} />
+        <div className="w-full">
+          <ResumeForm onReady={onResumeReady} onCancel={() => setResumeOpen(false)} onProcessingChange={setDocBusy} />
+        </div>
+      ) : guest ? (
+        <AskBox value={draft} onChange={setDraft} onSubmit={() => void start(draft)} disabled={false} starting={false} />
       ) : (
-        <PdfDropZone disabled={locked} onReady={onPdfReady} onProcessingChange={setDocBusy}>
-          <AskBox value={draft} onChange={setDraft} onSubmit={() => void start(draft)} disabled={locked} starting={starting} />
-        </PdfDropZone>
+        <div className="w-full">
+          <PdfDropZone disabled={locked} onReady={onPdfReady} onProcessingChange={setDocBusy}>
+            <AskBox
+              value={draft}
+              onChange={setDraft}
+              onSubmit={() => void start(draft)}
+              disabled={locked}
+              starting={starting}
+              attach
+            />
+          </PdfDropZone>
+        </div>
       )}
       {error && (
         <p role="alert" className="text-small text-red-500">
           {error}
         </p>
       )}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center justify-center gap-2">
         {CHAT_EXAMPLES.map((example) => (
           <Chip key={example} onClick={() => void start(example)} disabled={locked}>
             {example}
           </Chip>
         ))}
         {!resumeOpen && (
-          <Chip onClick={() => setResumeOpen(true)} disabled={locked}>
+          <Chip onClick={() => (guest ? toLogin() : setResumeOpen(true))} disabled={locked}>
             이력서 붙여넣고 찾기
           </Chip>
         )}
       </div>
-      <p className="text-small text-grey-600">
+      {guest ? (
+        <p className="text-small text-grey-600">
+          로그인하면 바로 대화를 시작할 수 있어요.{" "}
+          <Link href={loginHref("/")} className="font-medium text-blue-500 hover:underline">
+            로그인
+          </Link>
+        </p>
+      ) : (
+        <Link
+          href={chatHref()}
+          className="group flex items-center gap-0.5 text-small font-medium text-grey-600 transition-colors hover:text-grey-900"
+        >
+          지난 대화 보기
+          <ChevronRight aria-hidden className="size-3.5 transition-transform group-hover:translate-x-0.5" strokeWidth={2.2} />
+        </Link>
+      )}
+      <p className="max-w-150 text-center text-small text-grey-500">
         공고·정책은 공식 데이터(고용24·잡알리오·온통청년)에서 먼저 찾고, 없으면 팀이 넣어 둔 데이터에서 찾아 따로 표시해요.
         이력서·자기소개서 PDF는 클립 버튼으로 고르거나 입력칸에 끌어다 놓을 수 있어요 (10MB 이하). 적합도는 실제 합격 확률이
         아닙니다.
       </p>
     </section>
-  );
-}
-
-function ChatTitle() {
-  return (
-    <h2 id="chat-title" className="text-h3 font-bold text-grey-900">
-      AI 멘토와 채팅으로 찾기
-    </h2>
   );
 }
 
@@ -133,12 +144,15 @@ function AskBox({
   onSubmit,
   disabled,
   starting,
+  attach = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   onSubmit: () => void;
   disabled: boolean;
   starting: boolean;
+  /** PDF 첨부 버튼 (로그인 뒤에만) */
+  attach?: boolean;
 }) {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -147,9 +161,9 @@ function AskBox({
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex h-13 w-full items-center gap-2 rounded-field border border-grey-300 pr-1.75 pl-1.75 focus-within:border-blue-500"
+      className="flex h-15 w-full items-center gap-2 rounded-card border border-grey-200 bg-white pr-2.5 pl-2.5 shadow-lg shadow-grey-900/5 transition-[border-color,box-shadow] hover:border-grey-300 focus-within:border-blue-500 focus-within:shadow-xl focus-within:shadow-blue-500/10"
     >
-      <AttachButton disabled={disabled} />
+      {attach ? <AttachButton disabled={disabled} /> : <span className="w-1.5" aria-hidden />}
       <label htmlFor="chat-message" className="sr-only">
         AI 멘토에게 보낼 말
       </label>
