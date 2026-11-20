@@ -3,7 +3,7 @@
 import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useCallback, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { loginHref } from "@/features/auth/lib";
@@ -37,7 +37,14 @@ function Launcher({ guest }: { guest: boolean }) {
   const [error, setError] = useState<string | null>(null);
   const [resumeOpen, setResumeOpen] = useState(false);
   // 서류를 올려 글자·역량을 찾는 중. 이때 보내면 끝난 서류가 대화에 붙지 못하므로 보내기를 막는다
-  const [docBusy, setDocBusy] = useState(false);
+  const [docBusy, setDocBusyState] = useState(false);
+  // 서류를 다 올리면 PdfDropZone·ResumeForm이 잠금을 풀자마자(onProcessingChange(false)) 바로 onReady로 보낸다.
+  // state는 다음 그리기에서야 바뀌어서 그 순간의 docBusy는 아직 true다. 보내기 검사는 바로 바뀌는 ref로 한다
+  const docBusyRef = useRef(false);
+  const setDocBusy = useCallback((busy: boolean) => {
+    docBusyRef.current = busy;
+    setDocBusyState(busy);
+  }, []);
   const locked = starting || docBusy;
 
   function toLogin() {
@@ -46,7 +53,7 @@ function Launcher({ guest }: { guest: boolean }) {
 
   async function start(text: string, attachments?: { documentId: string }[]) {
     const message = text.trim();
-    if (!message || locked) return;
+    if (!message || starting || docBusyRef.current) return;
     if (guest) return toLogin();
     setStarting(true);
     setError(null);
