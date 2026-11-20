@@ -155,6 +155,8 @@ def test_backend_flow_with_follow_up_and_baseline(aws, report_llm):
     actions, session, report, answer_frames = run_interview(aws, responses, [b"\xff\xd8a", b"\xff\xd8b", b"\xff\xd8c"])
 
     assert actions == ["FOLLOW_UP", "NEXT_QUESTION", "NEXT_QUESTION", "REPORT"]
+    # 꼬리질문 판단 결과는 DynamoDB를 거쳐도 답변 기록에 남는다 (#109). 꼬리 답변은 판단하지 않아 null
+    assert [a["followUpCheck"] for a in session["answers"]] == ["ABSTRACT", None, "SUFFICIENT", "SUFFICIENT"]
     # 변환 작업 4개, 결과는 백엔드가 정한 위치에. 함수는 S3에 쓰지 않고 결과만 읽는다
     assert [s["OutputKey"].rsplit("/", 1)[1] for s in aws.transcribe.starts] == ["a-q1-1.json", "a-q1-2.json",
                                                                                  "a-q2-1.json", "a-q3-1.json"]
@@ -191,6 +193,7 @@ def test_backend_flow_baseline_none_with_few_calibration_frames(aws, report_llm)
     sufficient = sample_text("llm/follow_up_sufficient.json")
     actions, session, report, _ = run_interview(aws, [sufficient] * 3, [b"\xff\xd8a", b""], profile=None)
     assert actions == ["NEXT_QUESTION", "NEXT_QUESTION", "REPORT"]
+    assert [a["followUpCheck"] for a in session["answers"]] == ["SUFFICIENT"] * 3
     assert session["baseline"] is None  # 유효 3장 미만 → 태도 미측정, 대체값 없음
     assert session["profile"] is None
     Session.model_validate(session)

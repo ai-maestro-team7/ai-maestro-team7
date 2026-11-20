@@ -9,8 +9,8 @@
 import logging
 from typing import Any, Literal, TypeVar
 
-from pydantic import (BaseModel, ConfigDict, Field, FiniteFloat, StrictBool, ValidationError, field_validator,
-                      model_validator)
+from pydantic import (BaseModel, ConfigDict, Field, FiniteFloat, PrivateAttr, StrictBool, ValidationError,
+                      field_validator, model_validator)
 from pydantic.alias_generators import to_camel
 from team07_contracts import CareerProfileSummary
 
@@ -24,6 +24,8 @@ QuestionType = Literal["experience", "knowledge", "situation"]
 UnevaluableReason = Literal["NO_ANSWER", "TRANSCRIBE_FAILED"]
 TranscriptionStatus = Literal["COMPLETED", "FAILED", "IN_PROGRESS"]
 FollowUpReason = Literal["ABSTRACT", "INCONSISTENT", "SUFFICIENT"]
+# 답변 기록에 남기는 꼬리질문 판단 결과 (follow-up 결정 6). JUDGE_FAILED = 판단 출력이 실패해 꼬리질문 없이 진행
+FollowUpCheck = Literal["ABSTRACT", "INCONSISTENT", "SUFFICIENT", "JUDGE_FAILED"]
 DeliveryReason = Literal["TOO_SHORT", "NON_HANGUL_HEAVY"]
 
 INVALID_INPUT_MESSAGE = "면접 정보를 확인할 수 없어요. 입력 내용을 확인해 주세요."
@@ -193,6 +195,8 @@ class AnswerRecord(_CamelModel):
     reason: UnevaluableReason | None
     time_limit_reached: bool
     delivery: DeliveryMetrics | None = None  # 2차. 1차 Session에는 키가 없다
+    # #109. 꼬리질문을 판단한 기본 답변에만 값이 있다. 예전 Session에는 키가 없다. 리포트·lastAnswer에는 보이지 않는다
+    follow_up_check: FollowUpCheck | None = None
 
     @model_validator(mode="after")
     def _consistent(self) -> "AnswerRecord":
@@ -202,6 +206,8 @@ class AnswerRecord(_CamelModel):
             raise ValueError("unevaluable answer needs a reason")
         if not self.evaluable and self.delivery is not None:
             raise ValueError("unevaluable answer has no delivery metrics")
+        if self.follow_up_check is not None and (self.is_follow_up or not self.evaluable):
+            raise ValueError("follow-up check only on evaluable base answers")
         return self
 
 
@@ -293,32 +299,37 @@ class QuestionsOutput(_LLMOutputModel):
 
 
 class FollowUpOutput(_LLMOutputModel):
-    """Prompt_B 출력. 꼬리질문은 목록으로 받고 첫 번째만 쓴다 (judge_follow_up)."""
+    """Prompt_B 출력. 꼬리질문은 목록으로 받고 첫 번째만 쓴다 (judge_follow_up).
+
+    길이가 맞지 않는 후보(공백 정리 뒤 QUESTION_MIN 미만, FOLLOW_UP_QUESTION_MAX 초과)는 실패시키지 않고 버린다.
+    남은 후보가 없는데 꼬리질문이 필요하다고 하면 출력 실패다 (follow-up 결정 7).
+    """
 
     need_follow_up: bool
     reason: FollowUpReason
     follow_up_questions: list[str] = Field(default_factory=list)
+    _dropped: int = PrivateAttr(default=0)  # 길이 때문에 버린 후보 수 (로그용, 빈 문자열은 세지 않음)
 
-    @field_validator("follow_up_questions")
-    @classmethod
-    def _items(cls, values: list[str]) -> list[str]:
-        out = []
-        for value in values:
+    @model_validator(mode="after")
+    def _filter_and_require(self) -> "FollowUpOutput":
+        kept, dropped = [], 0
+        for value in self.follow_up_questions:
             value = value.strip()
             if not value:
                 continue
-            if len(value) > settings.QUESTION_MAX or len(value) < settings.QUESTION_MIN:
-                raise ValueError("length")
-            out.append(value)
-        return out
-
-    @model_validator(mode="after")
-    def _need_has_question(self) -> "FollowUpOutput":
-        if self.need_follow_up and not self.follow_up_questions:
+            if not settings.QUESTION_MIN <= len(value) <= settings.FOLLOW_UP_QUESTION_MAX:
+                dropped += 1
+                continue
+            kept.append(value)
+        if self.need_follow_up and not kept:
             raise ValueError("follow-up question missing")
-        if not self.need_follow_up:
-            self.follow_up_questions = []
+        self.follow_up_questions = kept if self.need_follow_up else []
+        self._dropped = dropped
         return self
+
+    @property
+    def dropped_candidates(self) -> int:
+        return self._dropped
 
 
 # ---------------------------------------------------------------- 채점 (3차, report design §4·§5)

@@ -1,8 +1,9 @@
-"""실제 Bedrock 확인 (1차 tasks 10.1·10.2, 3차 report tasks 5). 기본 실행에서는 건너뛴다.
+"""실제 Bedrock 확인 (1차 tasks 10.1·10.2, 3차 report tasks 5, #109 follow-up tasks 4). 기본 실행에서는 건너뛴다.
 
 켜는 방법: aws login 뒤 RUN_BEDROCK=1, MODEL_ID를 넣고 이 파일만 -s로 실행한다 (botocore[crt] 포함).
 결과 문장은 커밋하지 않는다. 질문·피드백이 샘플 자소서·답변을 반영하는지 사람이 눈으로 확인한다.
 REPORT_RUNS=2를 넣으면 같은 Session으로 리포트를 두 번 만들어 C-1 점수 차이를 본다.
+FOLLOW_UP_RUNS=2를 넣으면 꼬리질문 판단 시나리오를 시나리오마다 두 번 돌려 판단 흔들림을 본다.
 
 SHOW_RAW=1을 더 넣으면 max_tokens에서 잘린 응답의 길이와 앞 500자를 표준 출력에 찍는다.
 원인 확인용이라 이 파일에서만 한다. 패키지 코드(llm.py)와 운영 로그에는 원문을 남기지 않는다.
@@ -189,6 +190,86 @@ class _ShowRawReportClient:
         if got != sorted(expected):
             return f"FAIL check questionId (expected={sorted(expected)} got={got})"
         return "OK"
+
+
+# ---------------------------------------------------------------- 꼬리질문 판단 에이전트 (#109, follow-up tasks 4)
+
+# 샘플 자소서(resume_data_analysis.txt)와 모순되는 가상 답변: 자소서는 4명 팀, Python 수집·전처리, 관광지 이름 대응표.
+# 행동·결과는 구체적이라 ABSTRACT가 아니라 INCONSISTENT로 판단돼야 한다
+_Q1_INCONSISTENT = ("그 프로젝트는 저 혼자 진행한 개인 프로젝트였습니다. 자료를 하나만 써서 관광지 이름 문제는 생기지 않았고, "
+                    "저는 R로 회귀 모델을 만들어 방문객 수를 예측하는 데 집중했습니다. 변수를 다섯 개로 줄여 다시 학습했더니 "
+                    "예측 오차가 줄었고, 그 결과를 보고서로 정리해 제출했습니다.")
+# 직무 지식 질문에 용어만 나열한 답변: 유형별 기준(원리·이유나 예시 없음)으로 ABSTRACT여야 한다
+_Q2_TERMS_ONLY = "누락 값은 보간하고 형식은 정규화하면 됩니다. 그리고 조인할 때 키를 맞추면 됩니다."
+
+# (이름, 기본 질문 위치, 답변, 앞 답변 포함 여부, 기대 판단)
+_FOLLOW_UP_SCENARIOS = [
+    ("q1 경험·추상적", 0, None, False, "ABSTRACT"),             # 답변은 answers/abstract_q1.json
+    ("q1 경험·자소서와 모순", 0, _Q1_INCONSISTENT, False, "INCONSISTENT"),
+    ("q2 지식·원리 설명", 1, _Q2_ANSWER, True, "SUFFICIENT"),
+    ("q2 지식·용어만", 1, _Q2_TERMS_ONLY, True, "ABSTRACT"),
+]
+
+
+def _follow_up_session(with_previous: bool):
+    """샘플 시작 Session에 자소서 전문을 넣는다. with_previous면 q1 정상 답변을 앞 답변으로 넣는다."""
+    from interview.models import Session
+
+    start = sample_json("session_after_start.json")["session"]
+    data = dict(start, resumeText=sample_text("resume_data_analysis.txt"))
+    if with_previous:
+        q1 = start["questions"][0]
+        data["answers"] = [{"answerId": "a-q1-1", "questionId": "q1", "isFollowUp": False, "question": q1["question"],
+                            "answerText": sample_json("answers/normal_q1.json")["transcription"]["text"],
+                            "evaluable": True, "reason": None, "timeLimitReached": False}]
+    return Session.model_validate(data)
+
+
+def test_follow_up_judgement_with_real_model(caplog):
+    """시나리오마다 실제 에이전트로 꼬리질문을 판단하고 결과·시간·턴·툴 호출을 찍는다.
+
+    판단은 모델 출력이라 기대와 다를 수 있다. 여기서는 형식(사유 코드, 150자 이하)만 확인하고,
+    기대와 같은지는 마지막 요약을 사람이 본다. 툴 결과·답변 원문은 찍지 않는다 (꼬리질문 문장은 찍는다).
+    """
+    import logging
+    import time
+
+    from interview import follow_up, settings
+
+    runs = int(os.environ.get("FOLLOW_UP_RUNS", "1"))
+    abstract_q1 = sample_json("answers/abstract_q1.json")["transcription"]["text"]
+    summary = []
+    print(f"\n[FOLLOW_UP] limits turns={settings.FOLLOW_UP_MAX_TURNS} toolCalls={settings.FOLLOW_UP_MAX_TOOL_CALLS} "
+          f"totalTokens={settings.FOLLOW_UP_MAX_TOTAL_TOKENS} maxTokens={settings.follow_up_max_tokens()}")
+    for name, index, text, with_previous, expected in _FOLLOW_UP_SCENARIOS:
+        session = _follow_up_session(with_previous)
+        base = session.questions[index]
+        ctx = follow_up.build_follow_up_context(session, base, base.question, text or abstract_q1)
+        for n in range(1, runs + 1):
+            caplog.clear()
+            started = time.monotonic()
+            with caplog.at_level(logging.INFO, logger="interview"):
+                decision = follow_up.judge_follow_up(ctx)
+            seconds = time.monotonic() - started
+            lines = [r.getMessage() for r in caplog.records
+                     if r.getMessage().startswith(("stage=judge_follow_up", "stage=agent"))]
+            mark = "MATCH" if decision.reason == expected else "DIFF"
+            summary.append((name, n, expected, decision.reason, mark, seconds))
+            print(f"\n[FOLLOW_UP] {name} run={n} expected={expected} got={decision.reason} {mark} "
+                  f"seconds={seconds:.1f}")
+            for line in lines:
+                print(f"  {line}")
+            if decision.question:
+                print(f"  followUp({len(decision.question)}자) {decision.question}")
+            print(f"  remaining={[q.question_id for q in ctx.remaining]} previous={len(ctx.previous)}")
+            assert decision.reason in ("ABSTRACT", "INCONSISTENT", "SUFFICIENT", "JUDGE_FAILED")
+            assert decision.question is None or len(decision.question) <= settings.FOLLOW_UP_QUESTION_MAX
+    print("\n[FOLLOW_UP] summary")
+    for name, n, expected, got, mark, seconds in summary:
+        print(f"  {mark:5} {name} run={n} expected={expected} got={got} seconds={seconds:.1f}")
+    times = [s[-1] for s in summary]
+    print(f"  match={sum(s[4] == 'MATCH' for s in summary)}/{len(summary)} "
+          f"seconds avg={sum(times) / len(times):.1f} max={max(times):.1f}")
 
 
 def test_generate_report_with_real_model(caplog):
