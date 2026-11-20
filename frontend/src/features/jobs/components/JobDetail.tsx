@@ -27,6 +27,7 @@ import {
   MATCH_LABELS,
   ORG_TYPE_LABELS,
   orgPayText,
+  orgPayYear,
   salaryText,
 } from "../lib";
 import type { OrgPay, PostingDetailResponse } from "../types";
@@ -271,10 +272,10 @@ function OrgPayBlock({ pay }: { pay: OrgPay }) {
   return (
     <div className="flex flex-col gap-1 rounded-field bg-grey-50 px-4 py-3">
       <p className="text-body font-medium text-grey-900">
-        {orgPayText(pay.latestAverage)} <span className="text-small font-normal text-grey-600">({pay.latestYear}년 결산)</span>
+        {orgPayText(pay.latestAverage)} <span className="text-small font-normal text-grey-600">({orgPayYear(pay.latestYear, pay.yearNote)})</span>
       </p>
       <p className="text-small text-grey-600">
-        직원 전체의 1인당 평균 보수라 신입 초봉과 달라요{tenure}
+        직원 전체의 1인당 평균이라 신입 초봉과 달라요{tenure}
       </p>
       <p className="text-small text-grey-600">연도별 (만 원): {years}</p>
       <a

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { type Column, DataTable, DataTableSkeleton, TableCell, TableRow } from "@/components/ui/DataTable";
 import { cn } from "@/lib/cn";
-import { deadlineLines, displayTitle, jobDetailHref, MATCH_LABELS, matchReason, ORG_TYPE_LABELS, orgPayText } from "../lib";
+import { deadlineLines, displayTitle, jobDetailHref, MATCH_LABELS, matchReason, ORG_TYPE_LABELS, orgPayText, orgPayYear } from "../lib";
 import type { PostingCard } from "../types";
 import { SaveToggle } from "./SaveToggle";
 
@@ -43,7 +43,7 @@ export function JobRow({ job, asOf }: { job: PostingCard; asOf: string }) {
       <TableCell className={cn(COLUMNS.company, "flex flex-col justify-center gap-0.5")}>
         <span className="truncate text-body font-medium text-grey-900">{job.organization}</span>
         {job.orgPay && (
-          <span className="truncate text-small text-grey-600" title={`${job.orgPay.year}년 결산 · ${job.orgPay.source}`}>
+          <span className="truncate text-small text-grey-600" title={`${orgPayYear(job.orgPay.year, job.orgPay.yearNote)} · ${job.orgPay.source}`}>
             {orgPayText(job.orgPay.average)}
           </span>
         )}

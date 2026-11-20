@@ -10,6 +10,7 @@ import {
   jobDetailHref,
   ORG_TYPE_LABELS,
   orgPayText,
+  orgPayYear,
 } from "../lib";
 import type { PublicPostingCard } from "../types";
 
@@ -62,7 +63,7 @@ function PublicJobRow({ job, asOf }: { job: PublicPostingCard; asOf: string }) {
           {job.organization}
         </span>
         {job.orgPay && (
-          <span className="truncate text-small text-grey-600" title={`${job.orgPay.year}년 결산 · ${job.orgPay.source}`}>
+          <span className="truncate text-small text-grey-600" title={`${orgPayYear(job.orgPay.year, job.orgPay.yearNote)} · ${job.orgPay.source}`}>
             {orgPayText(job.orgPay.average)}
           </span>
         )}
