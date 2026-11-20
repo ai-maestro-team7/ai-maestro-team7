@@ -16,6 +16,9 @@ const COLUMNS = {
   arrow: "w-4.5 shrink-0",
 } as const;
 
+/** 행·머리글 좌우 안쪽 여백. 공고 표(JobTable)와 같게 맞춰 위아래로 놓여도 글자 시작선이 같다 */
+const ROW_INSET = "px-4";
+
 const POLICY_COLUMNS: Column[] = [
   { key: "policy", label: "정책", className: COLUMNS.policy },
   { key: "benefit", label: "지원 내용", className: COLUMNS.benefit },
@@ -30,7 +33,7 @@ export function PolicyRow({ policy }: { policy: PolicyCard }) {
   const status = POLICY_STATUS[policy.eligibility.status];
   const reasons = [...policy.eligibility.reasons, ...policy.eligibility.manualChecks];
   return (
-    <TableRow className="relative py-4.5 hover:bg-grey-50">
+    <TableRow className={cn("relative py-4.5 hover:bg-grey-50", ROW_INSET)}>
       <TableCell className={COLUMNS.policy}>
         <Link
           href={policyDetailHref(policy.policyId)}
@@ -60,7 +63,7 @@ export function PolicyRow({ policy }: { policy: PolicyCard }) {
 
 export function PolicyTable({ policies }: { policies: PolicyCard[] }) {
   return (
-    <DataTable columns={POLICY_COLUMNS} label="청년 지원 정책 목록">
+    <DataTable columns={POLICY_COLUMNS} label="청년 지원 정책 목록" headerClassName={ROW_INSET}>
       {policies.map((policy) => (
         <PolicyRow key={policy.policyId} policy={policy} />
       ))}
@@ -70,5 +73,13 @@ export function PolicyTable({ policies }: { policies: PolicyCard[] }) {
 
 /** 정책을 불러오는 동안 보여주는 표 자리 */
 export function PolicyTableSkeleton({ rows = 3 }: { rows?: number }) {
-  return <DataTableSkeleton columns={POLICY_COLUMNS} label="정책을 불러오는 중" rows={rows} rowClassName="py-4.5" />;
+  return (
+    <DataTableSkeleton
+      columns={POLICY_COLUMNS}
+      label="정책을 불러오는 중"
+      rows={rows}
+      headerClassName={ROW_INSET}
+      rowClassName={cn("py-4.5", ROW_INSET)}
+    />
+  );
 }

@@ -29,6 +29,7 @@ import {
   salaryText,
 } from "../lib";
 import type { PostingDetailResponse } from "../types";
+import { SaveToggle } from "./SaveToggle";
 
 const SOURCE_LABELS: Record<string, string> = {
   WORK24: "고용24",
@@ -93,6 +94,7 @@ function PostingView({ detail }: { detail: PostingDetailResponse }) {
     <div className="flex w-full flex-col gap-5">
       <Breadcrumb items={[{ label: "채용 공고", href: "/jobs" }, { label: posting.organization }]} />
       <TwoColumn
+        stickyRail
         main={
           <article className="flex flex-col">
             <header className="flex flex-col gap-3.5 pb-7">
@@ -221,7 +223,10 @@ function PostingView({ detail }: { detail: PostingDetailResponse }) {
         rail={
           <Panel as="aside" aria-label="나와의 적합도" className="flex flex-col gap-4 p-5">
             <div className="flex flex-col">
-              <p className="text-small text-grey-600">나와의 적합도</p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-small text-grey-600">나와의 적합도</p>
+                <SaveToggle jobPostingId={posting.jobPostingId} jobTitle={`${posting.organization} ${posting.title}`} />
+              </div>
               <p
                 className={cn(
                   "text-title font-bold",

@@ -78,6 +78,18 @@ export function salaryText(salary?: Salary): string {
 }
 
 /** 표에 보이는 짧은 근거. 마감 사실은 마감 칸에 따로 있으니 뺀다. */
+/**
+ * 표에 보일 공고 제목. 원문 제목이 "2026.10.15(목) 14:00~17:00 [박람회 …]"처럼 일정으로 시작하면 앞의 일정을 뗀다.
+ * 원문은 그대로 두고(상세·툴팁) 표에서만 쓴다. 떼고 나서 비면 원문을 쓴다.
+ */
+const LEADING_SCHEDULE =
+  /^\s*\d{4}\s*[.\-/년]\s*\d{1,2}\s*[.\-/월]\s*\d{1,2}\s*[.일]?\s*(?:\([^)]{1,3}\))?\s*(?:\d{1,2}:\d{2}\s*(?:[~～-]\s*\d{1,2}:\d{2})?)?\s*/;
+
+export function displayTitle(title: string): string {
+  const trimmed = title.replace(LEADING_SCHEDULE, "").trim();
+  return trimmed || title;
+}
+
 export function matchReason(facts: string[]): string {
   return facts.find((fact) => !fact.startsWith("마감")) ?? "";
 }
