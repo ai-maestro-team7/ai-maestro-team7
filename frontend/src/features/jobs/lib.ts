@@ -108,6 +108,11 @@ export function salaryText(salary?: Salary): string {
   return `${fmt((salary.min ?? salary.max) as number)}${unit}`;
 }
 
+/** "2025년 결산" / "2025년" (출처가 연도 성격을 밝히지 않으면 연도만) */
+export function orgPayYear(year: number, note?: string): string {
+  return note ? `${year}년 ${note}` : `${year}년`;
+}
+
 /** 기관 평균보수 한 줄 (예: "기관 평균 연 9,118만 원"). 직원 전체 평균이라 "기관 평균"으로만 쓴다. */
 export function orgPayText(average: number): string {
   return `기관 평균 연 ${average.toLocaleString("ko-KR")}만 원`;

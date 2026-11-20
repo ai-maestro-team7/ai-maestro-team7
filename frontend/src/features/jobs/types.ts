@@ -64,6 +64,8 @@ export type OrgPayBrief = {
   /** 만 원/년 */
   average: number;
   year: number;
+  /** 연도 뒤에 붙이는 말 ("결산"). 빈 글이면 연도만 */
+  yearNote?: string;
   source: string;
   asOf: string;
   sourceUrl: string;
@@ -76,6 +78,7 @@ export type OrgPay = {
   years: { year: number; average: number; budget: boolean }[];
   latestYear: number;
   latestAverage: number;
+  yearNote?: string;
   tenureMonths?: number;
   source: string;
   asOf: string;

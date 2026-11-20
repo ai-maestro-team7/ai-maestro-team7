@@ -10,6 +10,7 @@
 | v1.1 | 면접 담당 요청, 멘토링 담당 피드백 반영 (Workspace, GSI에 userId, `*_LATEST#`, 문서 버전, TASK, 삭제 규칙, 평가 로그) |
 | v1.2 | B 피드백 반영: 공고·정책·기업은 `team07-catalog`(B 설계), B 사용자 데이터는 `career-mentor`의 `OPP#`, 공통 프로필은 `PROFILE#BASIC`로. 알림 ID 형식, 저장 공고 ↔ 워크스페이스 연결 규칙 추가 |
 | v1.6 | B: 공고 이름 색인 `POSTNAMES` / `POSTING#{jobPostingId}` 추가. 검색어·회사 이름 검색에 쓴다 (`ai/busan-opportunity/DECISIONS.md` B-D08) |
+| v1.10 | `ORGPAY`에 지방출자·출연기관(행정안전부 파일, `orgId`는 `klid-` 해시)과 `yearNote`("결산" 또는 빈 글) 추가 (`ai/busan-opportunity/DECISIONS.md` B-D11) |
 | v1.9 | `team07-catalog`: 공공기관 직원 평균보수 `ORGPAY` / `ORG#{orgId}` 추가. 알리오 경영공시를 매주 모아 공고 카드·상세·연봉 조건에 쓴다 (`ai/busan-opportunity/DECISIONS.md` B-D11) |
 | v1.7 | `team07-catalog`: 공고 `regionalTalent`에 `conditions[]{kind, sido, sigungu, label}`(공고문에서 읽은 지역 조건) 추가. 지역 조건 색인 `INDEX#REGIONAL` / `POSTING#{id}` 추가 (`ai/busan-opportunity/DECISIONS.md` B-D09) |
 | v1.8 | B: 이름 색인 `POSTNAMES`에 분류 칸(`orgType`, `sido`, `isOverseas`, `careerType`, `employmentType`) 추가. 로그인 없이 보는 공고 목록에 쓴다 (`ai/busan-opportunity/DECISIONS.md` B-D10) |
@@ -167,7 +168,7 @@ MVP는 CloudWatch 구조화 로그(EMF). 필드 `evaluationId`, `requestId`, `an
 | 부산 대안 후보 | `POSTING#{jobPostingId}` | `ALTS` | — | `candidates[{jobPostingId, similarity}]` (최대 10), `computedAt` |
 | 청년정책 | `POLICY#{policyId}` | `META` | `POLICY#{시도코드}` / `applyEnd` | `title`, `summary`, `amountMax`, `ageMin`, `ageMax`, `residenceRule`, `incomeRule`, `applyStart`, `applyEnd`, `url`, `source`, `kind`, `regions[]`, `category`, `stage`, `eligibility{…}`, `benefit{…}`, `application{…}`, `lastCycle`, `exclusiveWith[]`, `checklist[]`, `verified`, `verifiedBy`, `verifiedAt`, `youthcenterId` |
 | 지역 조건 색인 | `INDEX#REGIONAL` | `POSTING#{jobPostingId}` | — | `jobPostingId`, `closesAt`. 공고문에 지역 조건이 있는 진행 중 공고만. 수집·보강이 `LATEST`를 쓸 때 넣고, 조건이 없어지거나 마감되면 지운다 |
-| 기관 평균보수 | `ORGPAY` | `ORG#{orgId}` | — | `orgId`(알리오 기관 코드, 채용공시 `pblntInstCd`와 같음), `name`, `orgType`, `ministry`, `years[{year, average, budget}]`(만 원/년), `latestYear`, `latestAverage`, `tenureMonths`, `source`, `asOf`, `sourceUrl`. 일반정규직 1인당 평균 보수액이라 신입 초봉이 아니다 |
+| 기관 평균보수 | `ORGPAY` | `ORG#{orgId}` | — | `orgId`(알리오 기관 코드, 채용공시 `pblntInstCd`와 같음. 지방출자·출연기관은 `klid-` 해시), `name`, `orgType`, `ministry`, `years[{year, average, budget}]`(만 원/년), `latestYear`, `latestAverage`, `yearNote`, `tenureMonths`, `source`, `asOf`, `sourceUrl`. 알리오(공공기관, 매주 수집)와 지방출자·출연기관(행정안전부 파일 시드). 직원 전체 1인당 평균이라 신입 초봉이 아니다 |
 | 기업 | `COMPANY#{companyId}` | `META` | `COMPANY#{시도코드}` / `name` | `name`, `bizNo`, `industry`, `size`, `highlights[]`, `source`, `asOf` |
 
 규칙 (B 초안)

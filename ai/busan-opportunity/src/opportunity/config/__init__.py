@@ -190,7 +190,7 @@ class CompaniesConfig(OppModel):
 class BatchConfig(OppModel):
     daily_sources: list[str] = Field(default_factory=lambda: ["alio", "klid", "worldjob", "youthcenter"])
     # 강소기업·기관 평균보수는 자주 바뀌지 않는다 (평균보수는 1년에 한 번 공시, B-D11)
-    weekly_sources: list[str] = Field(default_factory=lambda: ["work24_gangso", "alio_pay"])
+    weekly_sources: list[str] = Field(default_factory=lambda: ["work24_gangso", "alio_pay", "klid_pay"])
     enrich_chunk: int = 100  # 한 번 실행에서 보강할 공고 수 (Lambda 실행 시간 안에 끝나게)
 
 

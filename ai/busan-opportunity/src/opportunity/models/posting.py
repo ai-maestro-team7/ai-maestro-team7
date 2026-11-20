@@ -222,19 +222,21 @@ class OrgPayYear(OppModel):
 
 
 class OrgPay(OppModel):
-    """공공기관 직원 평균보수 (`ORGPAY` / `ORG#{orgId}`). 알리오 경영공시 「직원 평균보수」의 일반정규직 표다.
+    """공공기관 직원 평균보수 (`ORGPAY` / `ORG#{orgId}`). 알리오 경영공시 「직원 평균보수」의 일반정규직 표와,
+    클린아이의 지방출자·출연기관 직원평균임금(행정안전부 파일, `seeds/klid_org_pay.json`)이다.
 
     직원 전체의 평균이라 신입 초봉이 아니다. 화면·대화에서는 "기관 평균"으로만 말한다 (DECISIONS B-D11).
-    orgId는 알리오 기관 코드(C0072)이고 채용공시의 pblntInstCd와 같다. 공고와는 기관 이름으로 잇는다.
+    orgId는 알리오 기관 코드(C0072, 채용공시의 pblntInstCd와 같다)나 `klid-` 해시다. 공고와는 기관 이름으로 잇는다.
     """
 
     org_id: str
     name: str
     org_type: str | None = None   # 공기업(시장형), 준정부기관(위탁집행형), 기타공공기관 …
-    ministry: str | None = None   # 주무부처
+    ministry: str | None = None   # 주무부처. 지방출자·출연기관은 설립 지자체
     years: list[OrgPayYear] = Field(default_factory=list)  # 오래된 해부터
     latest_year: int              # 가장 최근 결산 연도
     latest_average: int           # 그해 1인당 평균 보수액 (만 원/년)
+    year_note: str = "결산"  # 연도 뒤에 붙이는 말 ("2025년 결산"). 출처가 밝히지 않으면 빈 글 (연도만 쓴다)
     tenure_months: int | None = None  # 그해 평균근속연수 (개월)
     source: str
     as_of: str                    # 공시 기준일 (YYYY-MM-DD)
