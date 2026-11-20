@@ -95,7 +95,7 @@
     - _Requirements: 12.1, 12.2, 12.3, 14.5_
 
 - [ ] 10. 실제 Bedrock 확인
-  - [ ] 10.1 `tests/test_bedrock_manual.py`를 쓴다. `RUN_BEDROCK=1`과 `MODEL_ID`가 있을 때만 실행하고 기본은 건너뛴다
+  - [x] 10.1 `tests/test_bedrock_manual.py`를 쓴다. `RUN_BEDROCK=1`과 `MODEL_ID`가 있을 때만 실행하고 기본은 건너뛴다
     - _Requirements: 14.6_
   - [ ] 10.2 사용자 확인 후 `aws login` 상태에서 `MODEL_ID=global.anthropic.claude-haiku-5-5`(`infra/config.sh` 기본값)로 10.1을 실행하고, 질문 3개가 샘플 자소서 내용을 반영하는지 본다. 결과 문장은 커밋하지 않고 PR 본문에 요약만 적는다
     - _Requirements: 14.6_
