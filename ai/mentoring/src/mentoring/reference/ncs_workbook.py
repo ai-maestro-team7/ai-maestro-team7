@@ -1,6 +1,7 @@
 """Read the NCS official workbook published by HRD Korea, scoped to the team's job profiles."""
 import hashlib
 import re
+import ssl
 import tempfile
 from contextlib import closing
 from html.parser import HTMLParser
@@ -48,8 +49,16 @@ class OfficialLinks(HTMLParser):
             self._attachment = None
 
 
+def open_ncs(request, timeout):
+    # The NCS server offers RSA/AES-GCM on TLS 1.2. Keep hostname and CA checks.
+    context = ssl.create_default_context()
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.set_ciphers("ECDHE+AESGCM:AES256-GCM-SHA384")
+    return urlopen(request, timeout=timeout, context=context)
+
+
 def links(url):
-    with urlopen(url, timeout=30) as response:
+    with open_ncs(url, timeout=30) as response:
         doc = OfficialLinks()
         doc.feed(response.read().decode("utf-8"))
         return doc
@@ -60,7 +69,7 @@ def download(book, ids):
     form["downlDstinCd"] = "09"
     request = Request(DOWNLOAD, data=urlencode(form).encode())
     digest = hashlib.sha256()
-    with urlopen(request, timeout=100) as response:
+    with open_ncs(request, timeout=100) as response:
         while block := response.read(1024 * 1024):
             book.write(block)
             digest.update(block)
