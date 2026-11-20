@@ -1,0 +1,10 @@
+[project]
+name = "opportunity"
+version = "0.1.0"
+description = "B 파트: 부산 채용공고·청년정책 맞춤 추천"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "tests"]
+testpaths = ["tests"]
+addopts = "-q --import-mode=importlib"

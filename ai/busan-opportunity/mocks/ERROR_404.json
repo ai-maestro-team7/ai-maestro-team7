@@ -1,0 +1,11 @@
+{
+  "error": {
+    "code": "POSTING_NOT_FOUND",
+    "message": "공고를 찾을 수 없어요.",
+    "requestId": "req-demo",
+    "retryable": false,
+    "details": {
+      "jobPostingId": "wk24-NOPE"
+    }
+  }
+}

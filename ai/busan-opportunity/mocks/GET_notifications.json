@@ -1,0 +1,15 @@
+{
+  "items": [
+    {
+      "notificationId": "20261123T090000-a1b2c3d4",
+      "type": "TARGET_DEADLINE",
+      "title": "목표 공고 마감 D-7",
+      "body": "가상금융공사 · 2026년 신입직원 채용 (데이터)",
+      "link": "/opportunities/postings/alio-DEMO0001",
+      "read": false,
+      "channel": "INBOX",
+      "createdAt": "2026-11-23T09:00:00+09:00",
+      "simulated": true
+    }
+  ]
+}

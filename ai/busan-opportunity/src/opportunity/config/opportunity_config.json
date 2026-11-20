@@ -1,0 +1,24 @@
+{
+  "configVersion": "v1.0",
+  "region": "ap-northeast-2",
+  "models": { "embedDim": 1024 },
+  "match": {
+    "weights": { "jobMatch": 0.35, "contentSim": 0.30, "requiredOk": 0.20, "preferredOk": 0.15 },
+    "jobMatchLevels": { "exact": 1.0, "sameMiddle": 0.6, "sameMajor": 0.3 },
+    "contentSimRange": { "low": 0.20, "high": 0.80 },
+    "unknownConditionValue": 0.5,
+    "levels": { "good": 0.70, "fair": 0.50 }
+  },
+  "ranking": { "busanBoost": 0.06, "boostMinMatch": 0.50, "inversionGuard": 0.15, "candidateTopK": { "busan": 30, "all": 30 } },
+  "alternatives": {
+    "minSimilarity": 0.70, "expandedMinSimilarity": 0.60, "miniCardMax": 2, "viewMax": 3, "precomputeTopK": 10,
+    "weights": { "similarity": 0.6, "match": 0.25, "reason": 0.15 }
+  },
+  "compare": { "rentConversionRate": null, "rentMaxAreaM2": 33, "rentMonths": 6, "minSample": 30 },
+  "policies": { "hideUnverified": true },
+  "notifications": { "immediatePerWeek": 2, "digestHour": 9, "quietHours": [22, 8], "recheckDays": 7, "maxRechecks": 4, "deadlineDays": [7, 3], "retentionDays": 90 },
+  "leaveReason": { "askOncePerUser": true },
+  "explanation": { "cacheHours": 24, "sentences": 2 },
+  "agent": { "maxPostings": 5 },
+  "data": { "staleAfterHours": 36, "busanSido": "26", "capitalAreaSido": ["11", "41", "28"], "demoJobFamilies": ["데이터·IT", "경영·사무·회계", "공공 행정·금융"] }
+}

@@ -1,0 +1,89 @@
+{
+  "profileUsed": {
+    "ageRange": "22~23",
+    "residence": "부산 남구",
+    "employment": "UNEMPLOYED",
+    "income": "UNKNOWN"
+  },
+  "buckets": {
+    "OPEN_NOW": [],
+    "NEXT_CYCLE": [
+      {
+        "policyId": "seed-busan-didimdol-plus",
+        "title": "디딤돌카드+",
+        "summary": "월 30만 원, 최대 6개월",
+        "category": "JOB",
+        "stage": "PREPARE",
+        "bucket": "NEXT_CYCLE",
+        "eligibility": {
+          "status": "ELIGIBLE",
+          "reasons": [
+            "취업 준비 청년 대상: 미취업 충족",
+            "부산 거주 충족"
+          ],
+          "manualChecks": []
+        },
+        "benefit": {
+          "text": "월 30만 원, 최대 6개월",
+          "publicShareMax": 180,
+          "unit": "MANWON"
+        },
+        "application": {
+          "expected": "2027년 상반기 (작년 3월 공지 기준)",
+          "selection": "REVIEW"
+        },
+        "exclusiveWith": [],
+        "alertAvailable": true,
+        "alertSubscribed": false,
+        "source": "BUSAN_SEED",
+        "asOf": "2026-11-20"
+      }
+    ],
+    "AFTER_EMPLOYMENT": [
+      {
+        "policyId": "seed-busan-joy-double",
+        "title": "부산청년 기쁨두배통장",
+        "summary": "월 10만 원 저축 시 시가 같은 금액 지원",
+        "category": "ASSET",
+        "stage": "EMPLOYED",
+        "bucket": "AFTER_EMPLOYMENT",
+        "eligibility": {
+          "status": "AFTER_EMPLOYMENT",
+          "reasons": [
+            "일하는 청년 대상: 지금은 미취업",
+            "나이 18~39세 충족",
+            "부산 거주 충족"
+          ],
+          "manualChecks": []
+        },
+        "benefit": {
+          "text": "월 10만 원 저축 시 시가 같은 금액 지원",
+          "publicShareMax": 360,
+          "selfShareMax": 360,
+          "unit": "MANWON"
+        },
+        "application": {
+          "expected": "2027년 8월 (작년 8.10~8.21 기준)",
+          "selection": "LOTTERY",
+          "lastCompetition": "13:1 (2025)"
+        },
+        "exclusiveWith": [
+          "청년내일저축계좌"
+        ],
+        "alertAvailable": true,
+        "alertSubscribed": false,
+        "source": "BUSAN_SEED",
+        "asOf": "2026-11-20"
+      }
+    ],
+    "SETTLEMENT": [],
+    "CLOSED": []
+  },
+  "totals": {
+    "guaranteedIfEligible": 0,
+    "selectiveMax": 540,
+    "unit": "MANWON",
+    "note": "추첨·심사·선착순 정책은 '선정되면 최대'로 따로 셉니다"
+  },
+  "dataAsOf": "2026-11-21T04:52:00+09:00"
+}
