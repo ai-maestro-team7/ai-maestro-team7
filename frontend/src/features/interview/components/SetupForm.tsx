@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { type FormEvent, useState, useSyncExternalStore } from "react";
+import { type FormEvent, useId, useState, useSyncExternalStore } from "react";
 import { TwoColumn } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -20,9 +20,13 @@ import { interviewDefaults, MODE_OPTIONS, RULES, TYPE_OPTIONS } from "../data";
 import { interviewQuery, modeLabel, parseMode, readJob, typeLabel } from "../lib";
 import type { InterviewMode, InterviewType } from "../types";
 
-type Errors = { job?: string; coverLetter?: string; consent?: string };
+type Errors = { job?: string; coverLetter?: string };
 
-/** 모의면접 1단계: 설정. 입력을 검사하고 세션을 만든 뒤(`POST /interview/start`) 장비 점검으로 넘어간다. */
+/**
+ * 모의면접 1단계: 설정. 입력을 검사하고 세션을 만든 뒤(`POST /interview/start`) 장비 점검으로 넘어간다.
+ * 진행 버튼은 오른쪽 "이번 면접" 요약 아래에 둬서, 바뀐 설정을 확인하고 진행하게 한다.
+ * [장비 점검하기]는 카메라 분석에 동의해야 켜진다. 동의하지 않으면 [카메라 없이 계속]으로 진행한다.
+ */
 export function SetupForm() {
   const owner = useSessionOwner();
   // 계정이 바뀌면 인계 문서와 사용자가 고친 자소서를 포함한 폼 상태를 새로 만든다.
@@ -32,6 +36,8 @@ export function SetupForm() {
 function InterviewSetup({ owner }: { owner: string | null }) {
   const router = useRouter();
   const params = useSearchParams();
+  const formId = useId();
+  const hintId = useId();
   const [job, setJob] = useState(() => readJob(params.get("job")));
   // 채팅에서 넘어왔으면 넘겨받은 자소서를 채운다 (개발계획서4 §10). 서버 렌더에는 값이 없다
   const handoffRaw = useSyncExternalStore(subscribeHandoff, readHandoffRaw, () => null);
@@ -47,7 +53,7 @@ function InterviewSetup({ owner }: { owner: string | null }) {
   const [failure, setFailure] = useState<{ message: string; needsLogin: boolean }>();
   const [pending, setPending] = useState(false);
 
-  function validate(nextMode: InterviewMode): Errors {
+  function validate(): Errors {
     const next: Errors = {};
     const trimmedJob = job.trim();
     if (!trimmedJob) next.job = "희망 직무를 입력해 주세요.";
@@ -57,14 +63,13 @@ function InterviewSetup({ owner }: { owner: string | null }) {
     } else if (coverLetter.length < RULES.resumeMin) next.coverLetter = `자기소개서를 ${RULES.resumeMin}자 이상 입력해 주세요.`;
     else if (coverLetter.length > RULES.resumeMax)
       next.coverLetter = `자기소개서는 ${RULES.resumeMax.toLocaleString()}자까지 쓸 수 있어요.`;
-    if (nextMode === "camera" && !consent) next.consent = "음성 + 카메라로 진행하려면 카메라 분석에 동의해 주세요.";
     return next;
   }
 
   async function start(nextMode: InterviewMode) {
     // 다른 탭에서 로그인 계정이 바뀐 직후, 이전 렌더의 클릭 핸들러가 실행될 수 있다.
     if (owner !== sessionOwner()) return;
-    const next = validate(nextMode);
+    const next = validate();
     setErrors(next);
     if (Object.keys(next).length > 0) return;
 
@@ -96,6 +101,8 @@ function InterviewSetup({ owner }: { owner: string | null }) {
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    // 입력칸에서 Enter를 눌러도 동의 전에는 장비 점검으로 가지 않는다 (버튼이 꺼져 있다)
+    if (!consent) return;
     void start(mode);
   }
 
@@ -116,7 +123,7 @@ function InterviewSetup({ owner }: { owner: string | null }) {
   return (
     <TwoColumn
       main={
-        <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-6">
+        <form id={formId} onSubmit={handleSubmit} noValidate className="flex flex-col gap-6">
           <TextField
             id="interview-job"
             label="희망 직무"
@@ -150,37 +157,12 @@ function InterviewSetup({ owner }: { owner: string | null }) {
             </div>
           </fieldset>
           <RadioList name="interview-mode" legend="진행 방식" options={MODE_OPTIONS} value={mode} onChange={setMode} />
-          <div className="flex flex-col gap-2">
-            <Checkbox checked={consent} onChange={setConsent}>
-              <span className="text-body font-medium text-grey-900">카메라 분석에 동의해요</span>
-              <span className="mt-0.5 text-small text-grey-600">
-                시선과 고개 방향만 확인해요. 얼굴 이미지는 저장하지 않아요.
-              </span>
-            </Checkbox>
-            {errors.consent && (
-              <p role="alert" className="text-small text-red-500">
-                {errors.consent}
-              </p>
-            )}
-          </div>
-          {failure && (
-            <p role="alert" className="flex flex-wrap items-center gap-3 text-small text-red-500">
-              {failure.message}
-              {failure.needsLogin && (
-                <Button href={loginHref("/interview/")} size="M">
-                  로그인
-                </Button>
-              )}
-            </p>
-          )}
-          <div className="flex items-center gap-5">
-            <Button type="submit" disabled={pending}>
-              {pending ? "면접 준비 중" : "장비 점검하기"}
-            </Button>
-            <Button variant="text" onClick={continueWithoutCamera} disabled={pending}>
-              카메라 없이 계속
-            </Button>
-          </div>
+          <Checkbox checked={consent} onChange={setConsent}>
+            <span className="text-body font-medium text-grey-900">카메라 분석에 동의해요</span>
+            <span className="mt-0.5 text-small text-grey-600">
+              시선과 고개 방향만 확인해요. 얼굴 이미지는 저장하지 않아요.
+            </span>
+          </Checkbox>
         </form>
       }
       rail={
@@ -200,6 +182,36 @@ function InterviewSetup({ owner }: { owner: string | null }) {
           <p className="text-small text-grey-600">
             질문은 자기소개서와 희망 직무로 만들어요. 답변은 질문마다 {RULES.answerLimitSec / 60}분까지 할 수 있어요.
           </p>
+          {/* 버튼은 왼쪽 form 밖에 있어 form 속성으로 이어 준다 */}
+          <div className="flex flex-col gap-1.5 pt-1.5">
+            <Button
+              type="submit"
+              form={formId}
+              fullWidth
+              disabled={pending || !consent}
+              aria-describedby={!consent ? hintId : undefined}
+            >
+              {pending ? "면접 준비 중" : "장비 점검하기"}
+            </Button>
+            <Button variant="text" fullWidth onClick={continueWithoutCamera} disabled={pending}>
+              카메라 없이 계속
+            </Button>
+          </div>
+          {!consent && (
+            <p id={hintId} className="text-small text-grey-600">
+              카메라 분석에 동의하면 장비 점검을 할 수 있어요. 카메라 없이 하려면 [카메라 없이 계속]을 눌러 주세요.
+            </p>
+          )}
+          {failure && (
+            <p role="alert" className="flex flex-wrap items-center gap-3 text-small text-red-500">
+              {failure.message}
+              {failure.needsLogin && (
+                <Button href={loginHref("/interview/")} size="M">
+                  로그인
+                </Button>
+              )}
+            </p>
+          )}
         </Panel>
       }
     />
