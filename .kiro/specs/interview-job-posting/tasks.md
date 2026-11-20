@@ -16,15 +16,17 @@
     - _Requirements: 1, 2, 3, 6.1, 7.2, 7.3_
   - 커밋: `feat: 면접 채용공고 입력 모델과 변환 함수 추가` (690 passed 6 skipped)
 
-- [ ] 2. 공고에 맞춘 질문 생성 (A-v3)
-  - [ ] 2.1 `prompting` `DATA_TAGS`·`questions_prompt(job_posting)`, `prompts/a_questions_v3.md`, `versions` A-v3 (design §5·§6)
-  - [ ] 2.2 `questions.py`·`flow.start_interview` 7번째 인자, 로그 (design §1·§7)
-  - [ ] 2.3 `test_prompting.py`·`test_flow.py`·`test_questions.py`·`test_logging.py`·`test_settings.py`·`test_package.py` 수정, `samples/session_after_start.json` promptVersion
+- [x] 2. 공고에 맞춘 질문 생성 (A-v3)
+  - [x] 2.1 `prompting` `DATA_TAGS`·`questions_prompt(job_posting)`, `prompts/a_questions_v3.md`, `versions` A-v3 (design §5·§6)
+  - [x] 2.2 `questions.py`·`flow.start_interview` 7번째 인자, 로그 (design §1·§7)
+  - [x] 2.3 `test_prompting.py`·`test_flow.py`·`test_questions.py`·`test_logging.py`·`test_settings.py`·`test_package.py` 수정, `samples/session_after_start.json` promptVersion
+    - 입력 검사 실패 로그의 필드 이름은 `start_interview`에서 `job_posting.text`, `normalize_job_posting`에서 `text`다 (함수 인자 이름 기준)
     - _Requirements: 4, 5, 6.2~6.4, 7.4_
-  - 커밋: `feat: 채용공고에 맞춘 면접 질문 생성(A-v3)`
+  - 커밋: `feat: 채용공고에 맞춘 면접 질문 생성(A-v3)` (713 passed 6 skipped)
 
-- [ ] 3. 수동 확인 준비
-  - [ ] 3.1 `test_bedrock_manual.py`에 공고 비교 테스트 (같은 자소서, 공고 없음·공고 있음·인재상 없는 공고·지시문이 든 공고·B 공고 변환). 질문·유형·길이·시간 출력. 실행하지 않는다
+- [x] 3. 수동 확인 준비
+  - [x] 3.1 `test_bedrock_manual.py`에 공고 비교 테스트 `test_questions_with_job_posting_with_real_model` (같은 자소서, 공고 없음·공고 있음·인재상 없는 공고·지시문이 든 공고·B 공고 변환, `JOB_POSTING_RUNS`로 반복). 질문·유형·길이·시간·표시(>80, 회사, 기출, 영문) 출력
+    - 가짜 클라이언트로 오프라인 실행해 출력 형식만 확인했다 (AWS 호출 없음). 실제 Bedrock 실행은 C 담당
     - _Requirements: 7.5_
   - 커밋: `test: 면접 채용공고 질문 수동 확인 테스트 추가`
 
