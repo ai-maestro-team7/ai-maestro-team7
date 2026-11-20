@@ -1,0 +1,6 @@
+{"items": [
+  {"key": "relevance", "score": 5, "evidenceType": "quote", "evidence": "먼저 두 자료의 관광지 목록을 뽑아 비교했습니다"},
+  {"key": "specificity", "score": 4, "evidenceType": "quote", "evidence": "같은 장소를 가리키는 이름을 짝지은 대응표를 만들고"},
+  {"key": "structure", "score": 4, "evidenceType": "quote", "evidence": "결과적으로 분석에 쓸 수 있는 하나의 테이블을 만들었습니다"},
+  {"key": "outcome", "score": 3, "evidenceType": "missing", "evidence": "배운 점 언급 없음"}
+]}
