@@ -30,6 +30,7 @@ WHY_SHOWN_BY_REASON = {
 }
 
 REGIONAL_TALENT_LIKELY = "{school} 소재 학교 {status}이라 지역인재 전형 대상일 수 있어요 · 공고문 확인"
+REGIONAL_TALENT_LIKELY_NAMED = "{name}({school}) {status}이라 지역인재 전형 대상일 수 있어요 · 공고문 확인"
 REGIONAL_TALENT_CHECK = "이전 공공기관 공고예요. 지역인재 전형이 있는지 공고문에서 확인해 주세요"
 
 EMPTY_BUSAN = "부산에는 아직 이 직무 공고가 적어요. 비슷한 직무를 함께 보여드려요 · 새 공고 알림 받기"

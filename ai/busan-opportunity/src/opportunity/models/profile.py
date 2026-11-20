@@ -17,7 +17,8 @@ class BasicProfile(OppModel):
     residence_sido: str | None = None
     residence_sigungu: str | None = None
     residence_since: str | None = None
-    university_region: str | None = None  # 최종(예정) 학교 소재지 시·도
+    university_region: str | None = None  # 최종(예정) 학교 소재지 시·도. 대학원이면 학부 대학, 고졸이면 고등학교
+    school_name: str | None = None        # 대학 이름 (사용자 입력, 전문대 이상). 지역인재 안내 문구에만 쓴다
     graduation_status: str | None = None  # ENROLLED, GRADUATING, GRADUATED …
     employment_status: EmploymentStatus | None = None
     monthly_income: int | None = None
@@ -32,6 +33,7 @@ class BasicProfile(OppModel):
     is_demo: bool = False
     # A의 역량 프로필에서 오는 값 (P1). 없으면 온보딩 정보만으로 추천한다
     skills: list[str] = Field(default_factory=list)
+    # 가진 자격증. 기본 정보 화면에서 사용자가 적는다 (PROFILE#BASIC). 자격 요건·우대 조건 비교에 쓴다
     certificates: list[str] = Field(default_factory=list)
     confirmed_missing_certificates: list[str] = Field(default_factory=list)
 

@@ -64,7 +64,11 @@ export function JobRow({ job, asOf }: { job: PostingCard; asOf: string }) {
         <span className={cn("text-body font-bold", job.matchLevel === "GOOD" ? "text-blue-500" : "text-grey-900")}>
           {MATCH_LABELS[job.matchLevel]}
         </span>
-        <span className="truncate text-small text-grey-600">{matchReason(job.facts)}</span>
+        {job.regionalTalent === "LIKELY" ? (
+          <span className="truncate text-small font-medium text-blue-500">지역인재 대상일 수 있음</span>
+        ) : (
+          <span className="truncate text-small text-grey-600">{matchReason(job.facts)}</span>
+        )}
       </TableCell>
       <TableCell className={COLUMNS.save}>
         <SaveToggle jobPostingId={job.jobPostingId} jobTitle={`${job.organization} ${job.title}`} />

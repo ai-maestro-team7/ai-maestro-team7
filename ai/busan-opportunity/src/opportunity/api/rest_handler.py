@@ -56,6 +56,7 @@ class FeedQuery(OppModel):
     keyword: str | None = None
     cursor: str | None = None
     limit: int | None = Field(default=None, ge=1)
+    regional_talent: bool | None = None  # true면 지역인재 전형이 있을 수 있는 공고만
 
 
 class AlternativesQuery(OppModel):
@@ -144,7 +145,7 @@ def rest_search_postings():
     job_codes = [c.strip() for c in q.job_codes.split(",") if c.strip()] if q.job_codes else None
     return search_postings(_deps(), _user_id(), **_drop_none(region=q.region, sort=q.sort, job_codes=job_codes,
                                                              keyword=q.keyword, cursor=q.cursor,
-                                                             limit=q.limit)).to_api()
+                                                             limit=q.limit, regional_talent=q.regional_talent)).to_api()
 
 
 @app.get(f"{PREFIX}/postings/<job_posting_id>")

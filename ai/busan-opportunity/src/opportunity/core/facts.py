@@ -31,6 +31,7 @@ FACT_UNKNOWN = "확인이 필요한 조건 {count}개"
 FACT_SIMILAR = "하는 일이 비슷함 (유사도 {similarity})"
 FACT_SALARY_DISCLOSED = "급여가 공고에 적혀 있음"
 FACT_REGIONAL_TALENT = "{label} · 지역인재 전형 대상일 수 있음"
+FACT_REGIONAL_TALENT_CARD = "지역인재 전형 대상일 수 있음 · 공고문 확인"
 
 GRADUATION_LABEL = {"GRADUATING": "졸업 예정", "GRADUATED": "졸업", "ENROLLED": "재학 중"}
 GRADUATION_DEFAULT = "출신"
@@ -189,10 +190,19 @@ def regional_talent_view(config: OpportunityConfig, profile: BasicProfile, posti
     busan = config.data.busan_sido
     if talent.status == RegionalTalentStatus.LIKELY and profile.university_region == busan:
         status = GRADUATION_LABEL.get(profile.graduation_status or "", GRADUATION_DEFAULT)
-        message = copy_rules.REGIONAL_TALENT_LIKELY.format(school=sido_name(busan), status=status)
+        name = (profile.school_name or "").strip()
+        message = (copy_rules.REGIONAL_TALENT_LIKELY_NAMED.format(name=name, school=sido_name(busan), status=status)
+                   if name else copy_rules.REGIONAL_TALENT_LIKELY.format(school=sido_name(busan), status=status))
         return RegionalTalentView(status=RegionalTalentStatus.LIKELY, basis=talent.basis, message=message)
     return RegionalTalentView(status=RegionalTalentStatus.CHECK_NEEDED, basis=talent.basis,
                               message=copy_rules.REGIONAL_TALENT_CHECK)
+
+
+def card_regional_talent(config: OpportunityConfig, profile: BasicProfile,
+                         posting: PostingLatest) -> RegionalTalentStatus | None:
+    """피드 카드용. 지역인재 전형이 있을 수 있는 공고면 LIKELY(학교 소재지가 맞음)나 CHECK_NEEDED, 아니면 None."""
+    view = regional_talent_view(config, profile, posting)
+    return None if view.status == RegionalTalentStatus.NOT_APPLICABLE else view.status
 
 
 def needs_regional_view(posting: PostingLatest, company_regional_talent: bool = False) -> bool:

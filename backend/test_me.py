@@ -63,6 +63,21 @@ def main():
     s, b = call("GET", "/api/v1/me/profile", user="u-2")
     check("다른 사용자 프로필은 안 보임", s == 404)
 
+    # ---- 출신 학교·자격증 (지역인재 판정, 자격 요건 비교)
+    s, b = call("PUT", "/api/v1/me/profile", {"educationLevel": "BACHELOR", "universityRegion": "26", "schoolName": " 가상대학교 ",
+                                             "certificates": ["ADsP", " 정보처리기사 "]})
+    check("학교 이름·지역·자격증 저장 (앞뒤 공백은 지움)", s == 200 and b["universityRegion"] == "26"
+          and b["schoolName"] == "가상대학교" and b["certificates"] == ["ADsP", "정보처리기사"])
+    s, b = call("PUT", "/api/v1/me/profile", {"certificates": [f"자격{i}" for i in range(11)]})
+    check("자격증 11개 → 400 (최대 10개)", s == 400 and "certificates" in b["error"]["message"])
+    s, b = call("PUT", "/api/v1/me/profile", {"certificates": ["ADsP", "adsp"]})
+    check("같은 자격증 두 번 → 400", s == 400)
+    s, b = call("PUT", "/api/v1/me/profile", {"schoolName": "가" * 51})
+    check("학교 이름 51자 → 400", s == 400 and "schoolName" in b["error"]["message"])
+    s, b = call("PUT", "/api/v1/me/profile", {"educationLevel": "HIGH_SCHOOL", "schoolName": None, "certificates": None})
+    check("고졸로 바꾸며 학교 이름·자격증 지움 (지역은 고등학교 소재지로 남김)", s == 200 and "schoolName" not in b
+          and "certificates" not in b and b["universityRegion"] == "26")
+
     # ---- 워크스페이스
     s, b = call("POST", "/api/v1/me/workspaces", {"jobPostingId": "wk24-K0001", "snapshotId": "20261120-ab12cd34"})
     check("공고로 워크스페이스 생성 → 201, ws-{jobPostingId}", s == 201 and b["workspaceId"] == "ws-wk24-K0001" and b["status"] == "INTEREST")
