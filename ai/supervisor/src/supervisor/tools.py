@@ -28,7 +28,11 @@ OFFICIAL, TEAM = "OFFICIAL", "TEAM"
 
 @dataclass
 class SearchRecord:
-    """마지막 공고 검색. chat_conditions는 모델이 이번 대화에서 직접 넘긴 조건만 담는다 (저장 묻기용)."""
+    """이번 턴의 공고 검색. chat_conditions는 모델이 이번 대화에서 직접 넘긴 조건만 담는다 (저장 묻기용).
+
+    한 턴에 검색을 여러 번 하면(예: "부산이랑 서울 비교해 줘") 공고는 모두 모으고(앞 검색 먼저, 같은 공고는 한 번),
+    지역이 서로 다르면 어느 쪽을 원하는지 알 수 없어 지역은 저장 묻기에서 뺀다.
+    """
 
     feed: dict
     chat_conditions: dict[str, Any]
@@ -52,6 +56,25 @@ class TurnRecord:
     saved_profile: dict | None = None
     profile_loaded: bool = False
     saved_conditions: list[str] | None = None  # 이번 턴에 저장 도구가 저장한 조건 (보여 줄 말)
+
+
+def _merge_search(prev: SearchRecord | None, new: SearchRecord) -> SearchRecord:
+    """같은 턴의 앞 검색과 합친다 (SearchRecord 설명). 앞 검색이 없거나 오류였으면 새 검색 그대로."""
+    if prev is None or "error" in prev.feed:
+        return new
+    if "error" in new.feed:
+        return prev
+    seen = {item.get("jobPostingId") for item in prev.feed.get("items") or []}
+    items = list(prev.feed.get("items") or []) + [i for i in new.feed.get("items") or []
+                                                   if i.get("jobPostingId") not in seen]
+    conditions = dict(new.chat_conditions)
+    before, now = prev.chat_conditions.get("region"), conditions.get("region")
+    if before and now and _clean(before) != _clean(now):
+        conditions.pop("region")
+    elif before and not now:
+        conditions["region"] = before
+    return SearchRecord(feed={**new.feed, "items": items}, chat_conditions=conditions,
+                        job_name=new.job_name or prev.job_name)
 
 
 def _clean(value: str | None, max_chars: int = 50) -> str | None:
@@ -251,7 +274,8 @@ class TurnTools:
         if use_resume:
             applied.append("이력서 역량 함께 사용" if terms else "이력서 역량 없음 (분석 전이거나 이력서가 없어요)")
         saved_job = next((j.get("name") for j in saved.get("desiredJobs") or [] if j.get("name")), None)
-        self.record.search = SearchRecord(feed=feed, chat_conditions=chat, job_name=job or saved_job)
+        self.record.search = _merge_search(self.record.search,
+                                           SearchRecord(feed=feed, chat_conditions=chat, job_name=job or saved_job))
         result = {**feed, "appliedConditions": applied, "officialFound": official_found,
                   "dataSource": "공식 데이터 (공공 API로 모은 공고)" if source == OFFICIAL else team.label}
         if not official_found:

@@ -196,3 +196,31 @@ def test_save_without_candidate_is_error_and_writes_nothing():
     tools["search_job_postings"](job_name="데이터 분석", region="26")  # 저장된 조건과 같다
     assert tools["save_search_conditions"]()["error"]["code"] == "NOTHING_TO_SAVE"
     assert deps.profiles.updates == []
+
+
+def _feed(*ids):
+    return {"items": [{"jobPostingId": i, "title": i} for i in ids], "rankingBasis": "추천순"}
+
+
+def test_compare_two_regions_keeps_both_cards_and_does_not_offer_region():
+    """"부산이랑 서울 비교해 줘"처럼 한 턴에 지역을 바꿔 두 번 찾으면 공고는 둘 다 남기고, 지역은 저장 묻기에서 뺀다.
+    전에는 마지막 검색(서울)만 남아 카드가 서울 공고뿐이고 "지역 서울"을 저장하자고 물었다 (QA 2026-11-21 #3)."""
+    deps = build_deps(None)
+    turn, tools = tools_for(deps)
+    deps.opportunities.feeds["OFFICIAL"] = _feed("busan-1", "both")
+    tools["search_job_postings"](job_name="데이터 분석", region="부산", career_type="NEW")
+    deps.opportunities.feeds["OFFICIAL"] = _feed("both", "seoul-1")
+    tools["search_job_postings"](job_name="데이터 분석", region="서울", career_type="NEW")
+    record = turn.record.search
+    assert [i["jobPostingId"] for i in record.feed["items"]] == ["busan-1", "both", "seoul-1"]
+    assert record.chat_conditions == {"jobName": "데이터 분석", "careerType": "NEW"}
+
+
+def test_same_region_twice_or_region_then_none_keeps_region():
+    deps = build_deps(None)
+    turn, tools = tools_for(deps)
+    tools["search_job_postings"](job_name="데이터 분석", region="부산")
+    tools["search_job_postings"](job_name="데이터 분석", region=" 부산 ")
+    assert turn.record.search.chat_conditions["region"] == "부산"
+    tools["search_job_postings"](job_name="데이터 분석")
+    assert turn.record.search.chat_conditions["region"] == "부산"
