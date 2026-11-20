@@ -12,7 +12,7 @@ def test_bedrock_converse_request(monkeypatch):
         "modelId": "global.test-model",
         "system": [{"text": "system"}],
         "messages": [{"role": "user", "content": [{"text": "user"}]}],
-        "inferenceConfig": {"maxTokens": 200, "temperature": 0},
+        "inferenceConfig": {"maxTokens": 200},
     }
     response = {
         "output": {"message": {"role": "assistant", "content": [{"text": "첫째"}, {"text": "둘째"}]}},
