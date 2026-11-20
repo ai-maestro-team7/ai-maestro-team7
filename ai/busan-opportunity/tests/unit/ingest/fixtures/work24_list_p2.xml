@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<wantedRoot>
+  <total>3</total>
+  <startPage>2</startPage>
+  <display>2</display>
+  <wanted>
+    <wantedAuthNo>K000000003</wantedAuthNo>
+    <company>(주)근무지미상</company>
+    <title>사무 보조</title>
+    <salTpNm>월급</salTpNm>
+    <sal>250만원</sal>
+    <region></region>
+    <basicAddr></basicAddr>
+    <career>무관</career>
+    <minEdubg>고졸</minEdubg>
+    <empTpNm>계약직</empTpNm>
+    <closeDt>2026-12-01</closeDt>
+    <wantedInfoUrl>https://example.invalid/wk24/K000000003</wantedInfoUrl>
+  </wanted>
+</wantedRoot>
