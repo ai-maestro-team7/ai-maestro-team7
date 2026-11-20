@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { type Column, DataTable, TableCell, TableRow } from "@/components/ui/DataTable";
 import { cn } from "@/lib/cn";
-import { deadlineLines, MATCH_LABELS } from "../lib";
-import type { JobPosting } from "../types";
+import { deadlineLines, jobDetailHref, MATCH_LABELS, matchReason, ORG_TYPE_LABELS, orgInitial } from "../lib";
+import type { PostingCard } from "../types";
 import { SaveToggle } from "./SaveToggle";
 
 /** 공고 표 열 (Figma JobRow 27:1640 폭: 기업 180, 근무지 140, 마감 100, 적합도 170, 저장 20) */
@@ -16,17 +16,25 @@ const COLUMNS = {
 } as const;
 
 const JOB_COLUMNS: Column[] = [
-  { key: "company", label: "기업", className: COLUMNS.company },
+  { key: "company", label: "기업·기관", className: COLUMNS.company },
   { key: "posting", label: "공고", className: COLUMNS.posting },
-  { key: "place", label: "근무지 · 고용 형태", className: COLUMNS.place },
+  { key: "place", label: "근무지 · 기관 유형", className: COLUMNS.place },
   { key: "deadline", label: "마감", className: COLUMNS.deadline },
   { key: "match", label: "나와의 적합도", className: COLUMNS.match },
   { key: "save", label: "저장", className: COLUMNS.save, srOnly: true },
 ];
 
+/** 공고 아래 작은 줄: 직종, 배지(출처가 있는 것만 서버가 보낸다), 부산 대안 수 */
+function subline(job: PostingCard): string {
+  const parts = [job.job.name, ...job.badges.map((badge) => badge.label)];
+  if (job.busanAlternativesCount) parts.push(`부산에서 비슷한 공고 ${job.busanAlternativesCount}개`);
+  if (job.isSample) parts.push("예시 데이터");
+  return parts.filter(Boolean).join(" · ");
+}
+
 /** Figma JobRow. 행 전체가 공고 상세 링크이고, 저장 버튼만 따로 누를 수 있다. */
-export function JobRow({ job, asOf }: { job: JobPosting; asOf: string }) {
-  const deadline = deadlineLines(job, asOf);
+export function JobRow({ job, asOf }: { job: PostingCard; asOf: string }) {
+  const deadline = deadlineLines(job.closesAt, job.rolling, asOf);
   return (
     <TableRow className="relative py-4 hover:bg-grey-50">
       <TableCell className={cn(COLUMNS.company, "flex items-center gap-3")}>
@@ -34,45 +42,45 @@ export function JobRow({ job, asOf }: { job: JobPosting; asOf: string }) {
           aria-hidden
           className="flex size-10 shrink-0 items-center justify-center rounded-control bg-grey-100 text-small font-bold text-grey-600"
         >
-          {job.companyInitial}
+          {orgInitial(job.organization)}
         </span>
-        <span className="truncate text-body font-medium text-grey-900">{job.company}</span>
+        <span className="truncate text-body font-medium text-grey-900">{job.organization}</span>
       </TableCell>
       <TableCell className={cn(COLUMNS.posting, "flex flex-col gap-0.5")}>
         {/* after:inset-0 으로 행 전체를 링크 영역으로 넓힌다 */}
         <Link
-          href={`/jobs/${job.id}`}
+          href={jobDetailHref(job.jobPostingId)}
           className="truncate text-body font-bold text-grey-900 after:absolute after:inset-0 after:content-['']"
         >
           {job.title}
         </Link>
-        <span className="truncate text-small text-grey-600">{job.skills.join(" · ")}</span>
+        <span className="truncate text-small text-grey-600">{subline(job)}</span>
       </TableCell>
       <TableCell className={cn(COLUMNS.place, "text-body text-grey-800")}>
-        {job.district} · {job.employmentType}
+        {job.workRegion.label} · {ORG_TYPE_LABELS[job.orgType]}
       </TableCell>
       <TableCell className={cn(COLUMNS.deadline, "flex flex-col")}>
         <span className="text-body text-grey-800">{deadline.main}</span>
         <span className="text-small text-grey-600">{deadline.sub}</span>
       </TableCell>
       <TableCell className={cn(COLUMNS.match, "flex flex-col gap-0.5")}>
-        <span className={cn("text-body font-bold", job.match.level === "GOOD" ? "text-blue-500" : "text-grey-900")}>
-          {MATCH_LABELS[job.match.level]}
+        <span className={cn("text-body font-bold", job.matchLevel === "GOOD" ? "text-blue-500" : "text-grey-900")}>
+          {MATCH_LABELS[job.matchLevel]}
         </span>
-        <span className="truncate text-small text-grey-600">{job.match.reason}</span>
+        <span className="truncate text-small text-grey-600">{matchReason(job.facts)}</span>
       </TableCell>
       <TableCell className={COLUMNS.save}>
-        <SaveToggle jobTitle={`${job.company} ${job.title}`} />
+        <SaveToggle jobTitle={`${job.organization} ${job.title}`} />
       </TableCell>
     </TableRow>
   );
 }
 
-export function JobTable({ jobs, asOf }: { jobs: JobPosting[]; asOf: string }) {
+export function JobTable({ jobs, asOf }: { jobs: PostingCard[]; asOf: string }) {
   return (
     <DataTable columns={JOB_COLUMNS} label="채용 공고 목록">
       {jobs.map((job) => (
-        <JobRow key={job.id} job={job} asOf={asOf} />
+        <JobRow key={job.jobPostingId} job={job} asOf={asOf} />
       ))}
     </DataTable>
   );

@@ -13,7 +13,7 @@ const jobReply: MentorReply = {
     title: "데이터 분석 신입",
     meta: "(주)가상데이터 · 해운대구 · 정규직",
     actionLabel: "공고 보기",
-    href: "/jobs/wk24-DEMO0001",
+    href: "/jobs", // 예시 공고는 실제 수집 데이터에 없어 목록으로 보낸다
   },
 };
 
@@ -30,7 +30,7 @@ export const mentorExamples: MentorExample[] = [
         title: "구직활동비 지원",
         meta: "구직 준비 비용 · 부산 거주 청년",
         actionLabel: "정책 보기",
-        href: "/policies/job-seeking-allowance",
+        href: "/policies", // 예시 정책은 실제 수집 데이터에 없어 목록으로 보낸다
       },
     },
   },
