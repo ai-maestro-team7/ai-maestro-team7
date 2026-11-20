@@ -15,7 +15,7 @@ def test_s04_tools_have_no_user_id_parameter():
     deps = build_deps(None)
     _, tools = tools_for(deps)
     assert set(tools) == {"get_my_status", "search_job_postings", "find_youth_policies", "ask_youth_policy",
-                          "save_search_conditions", "prepare_mock_interview"}
+                          "save_search_conditions", "start_resume_diagnosis", "prepare_mock_interview"}
     for fn in tools.values():
         params = inspect.signature(fn).parameters
         assert not any("user" in p.lower() for p in params), fn.__name__

@@ -42,6 +42,19 @@ class InterviewRecord:
 
 
 @dataclass
+class DiagnosisRecord:
+    """이번 턴에 시작한 A 직무 적합도 분석. 화면이 진단 흐름으로 저장한다."""
+
+    analysis_id: str
+    profile_id: str
+    profile_version: int
+    document_id: str
+    target_role: str
+    target_ncs_code: str | None
+    job_posting_id: str | None
+
+
+@dataclass
 class TurnRecord:
     calls: list[ToolCall] = field(default_factory=list)
     texts: list[str] = field(default_factory=list)  # 숫자 대조에 쓰는 도구 결과 글
@@ -51,6 +64,7 @@ class TurnRecord:
     saved_profile: dict | None = None
     profile_loaded: bool = False
     saved_conditions: list[str] | None = None  # 이번 턴에 저장 도구가 저장한 조건 (보여 줄 말)
+    diagnosis: DiagnosisRecord | None = None
 
 
 def _clean(value: str | None, max_chars: int = 50) -> str | None:
@@ -72,11 +86,17 @@ def won_label(manwon: int) -> str:
 
 class TurnTools:
     def __init__(self, deps: Deps, user_id: str, *, attachments: list[str] | None = None,
-                 pending_save: dict | None = None):
-        """pending_save: 바로 앞 답의 저장 묻기 {conditions, profilePatch}. 사용자가 이번 말로 승낙하면 이것을 저장한다."""
+                 pending_save: dict | None = None, recent_postings: list[dict] | None = None,
+                 turn_key: str | None = None):
+        """pending_save: 바로 앞 답의 저장 묻기 {conditions, profilePatch}. 사용자가 이번 말로 승낙하면 이것을 저장한다.
+        recent_postings: 바로 앞 답의 공고 카드 [{jobPostingId, title, …}]. "이 공고"를 가리킬 수 있는 범위다.
+        turn_key: 이번 턴의 메시지 ID. 진단 같은 생성 요청의 멱등 키로 쓴다 (다시 돌려도 한 번만 만든다).
+        """
         self.deps, self.user_id = deps, user_id
         self.attachments = list(attachments or [])
         self.pending_save = pending_save
+        self.recent_postings = list(recent_postings or [])
+        self.turn_key = turn_key
         self.record = TurnRecord()
 
     # ------------------------------------------------------------ 공통
@@ -160,6 +180,16 @@ class TurnTools:
             (예: "응 저장해 줘", "저장할래"). 입력은 없다. 저장할 값은 바로 앞 검색에서 정해진 조건이다."""
             return tools._call("save_search_conditions", tools._save)
 
+        def start_resume_diagnosis(job_posting_id: str | None = None, job_name: str | None = None) -> dict:
+            """내 이력서(역량 프로필)를 공고나 희망 직무와 비교하는 이력서·직무 진단을 시작한다. 사용자가 "이 공고와 내
+            이력서 비교", "진단해 줘", "자소서 다듬기"처럼 진단·첨삭을 원할 때 쓴다. 결과는 1분쯤 뒤 진단 화면에서 본다.
+
+            Args:
+                job_posting_id: 비교할 공고 ID. 이번 검색 결과나 <user_context>의 recentPostings에 있는 것만
+                job_name: 공고 없이 희망 직무로 진단할 때 직무 이름 (저장된 희망 직무 가운데 하나)
+            """
+            return tools._call("start_resume_diagnosis", lambda: tools._diagnose(job_posting_id, job_name))
+
         def prepare_mock_interview(job: str) -> dict:
             """모의면접 체험을 준비한다. 저장된 자소서가 있는지 확인한다. 사용자가 면접 연습을 원할 때 쓴다.
 
@@ -169,7 +199,7 @@ class TurnTools:
             return tools._call("prepare_mock_interview", lambda: tools._prepare_interview(job))
 
         return [get_my_status, search_job_postings, find_youth_policies, ask_youth_policy, save_search_conditions,
-                prepare_mock_interview]
+                start_resume_diagnosis, prepare_mock_interview]
 
     # ------------------------------------------------------------ 구현
     def _status(self) -> dict:
@@ -294,6 +324,45 @@ class TurnTools:
         self.record.profile_loaded = False  # 다음에 읽을 때 저장된 값을 다시 읽는다
         return {"saved": True, "conditions": labels, "next": "다음 검색부터 이 조건을 써요"}
 
+    def known_postings(self) -> dict[str, dict]:
+        """모델이 가리킬 수 있는 공고: 이번 턴 검색 결과와 바로 앞 답의 공고 카드. 모델이 지어낸 ID는 받지 않는다."""
+        rows = list(self.recent_postings)
+        if self.record.search and "error" not in self.record.search.feed:
+            rows += list(self.record.search.feed.get("items") or [])
+        return {r["jobPostingId"]: r for r in rows if isinstance(r, dict) and r.get("jobPostingId")}
+
+    def _diagnose(self, job_posting_id: str | None, job_name: str | None) -> dict:
+        if self.deps.mentoring is None:
+            return {"error": {"code": "NOT_IMPLEMENTED", "message": "이력서 진단이 아직 연결되지 않았어요."}}
+        saved = self.saved_profile()
+        posting = None
+        target_ncs = None
+        pid = (job_posting_id or "").strip() or None
+        if pid:
+            posting = self.known_postings().get(pid)
+            if posting is None:
+                return {"error": {"code": "UNKNOWN_POSTING",
+                                  "message": "방금 보여 드린 공고 가운데서 골라 주세요. 어떤 공고인지 다시 알려 주세요."}}
+            role = posting.get("title") or "선택한 공고"
+        else:
+            jobs = [j for j in saved.get("desiredJobs") or [] if isinstance(j, dict) and j.get("ncsCode")]
+            wanted = _clean(job_name)
+            match = next((j for j in jobs if wanted and _norm(j.get("name")) == _norm(wanted)), None) or (jobs[0] if jobs else None)
+            if match is None:
+                return {"error": {"code": "NEED_TARGET",
+                                  "message": "비교할 공고를 먼저 찾아 주세요. 희망 직무를 저장하면 직무 기준으로도 진단할 수 있어요."}}
+            target_ncs, role = match["ncsCode"], match.get("name") or "희망 직무"
+        key = f"chat-diagnosis-{self.turn_key or 'none'}-{pid or target_ncs}"
+        started = self.deps.mentoring.start_job_fit(self.user_id, job_posting_id=pid, target_ncs_code=target_ncs,
+                                                    idempotency_key=key[:200])
+        self.record.diagnosis = DiagnosisRecord(
+            analysis_id=started["analysisId"], profile_id=started["profileId"],
+            profile_version=int(started["profileVersion"]), document_id=started.get("documentId") or "",
+            target_role=role[:self.deps.config.interview_job_max_chars], target_ncs_code=target_ncs,
+            job_posting_id=pid)
+        return {"started": True, "status": started.get("status", "PENDING"), "target": role,
+                "next": "진단은 1분쯤 걸려요. 화면의 [진단 결과 보기]에서 강점·보완할 역량을 보고, 이어서 자소서 첨삭과 학습 로드맵으로 갈 수 있어요"}
+
     def _prepare_interview(self, job: str) -> dict:
         name = _clean(job, 200)
         if not name or len(name) > self.deps.config.interview_job_max_chars:
@@ -307,6 +376,10 @@ class TurnTools:
                     "next": "화면에 [모의면접 시작하기] 버튼이 떠요. 체험용 면접이에요"}
         return {"ready": False, "job": name, "needsCoverLetter": True,
                 "next": f"화면에 자소서 입력 칸이 떠요. {limits.min_chars:,}~{limits.max_chars:,}자로 붙여 넣으면 면접 화면으로 넘어가요"}
+
+
+def _norm(text: str | None) -> str:
+    return "".join((text or "").lower().replace("·", "").split())
 
 
 def _flatten(value: Any) -> str:

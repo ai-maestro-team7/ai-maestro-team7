@@ -54,6 +54,7 @@ class SupervisorConfig(_Model):
     interview_job_max_chars: int = Field(gt=0)
     team_data: TeamData
     max_companies: int = Field(ge=0)
+    recent_postings: int = Field(ge=0)  # 바로 앞 답의 공고 카드를 문맥에 몇 개까지 넣을지 ("이 공고" 가리키기)
     savable_profile_fields: tuple[str, ...]
     banned_phrases: tuple[str, ...]
     allowed_phrases: tuple[str, ...] = ()

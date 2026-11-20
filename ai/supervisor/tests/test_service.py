@@ -38,12 +38,11 @@ def test_s01_chat_conditions_give_cards_and_actions():
     assert message["reply"].startswith("부산 데이터 분석") and message["followUps"] == ["서울 공고도 같이 볼래요"]
     kinds = [c["type"] for c in message["cards"]]
     assert kinds.count("POSTING") == 1 and kinds.count("POLICY") == deps.config.max_policies
-    save, suggest = message["actions"]
+    [save] = message["actions"]  # 면접 체험 제안은 코드 칩이 아니라 follow_ups로 한다
     assert save["type"] == "SAVE_CONDITIONS"
     # 저장된 직무·지역과 같은 것은 빼고, 다른 것만 묻는다
     assert save["profilePatch"] == {"desiredSalaryMin": 3000, "desiredCareerType": "NEW"}
     assert save["conditions"] == ["연봉 3,000만 원 이상", "신입"]
-    assert suggest == {"type": "SUGGEST_INTERVIEW", "job": "데이터 분석", "conditions": []}
     assert message["notice"] == "적합도는 실제 합격 확률이 아닙니다" and message["dataAsOf"]
     assert "toolCalls" not in message and "ownerUserId" not in message
     stored = deps.store.get_message("demo1", started["sessionId"], started["messageId"])
@@ -62,13 +61,13 @@ def test_s01_new_job_goes_first_and_keeps_saved_codes():
 def test_s02_same_as_saved_has_no_save_action():
     deps = build_deps(ScriptedRunner(search_and_policies(job_name="데이터 분석", region="부산")))
     _, _, message = ask(deps)
-    assert [a["type"] for a in message["actions"]] == ["SUGGEST_INTERVIEW"]
+    assert message["actions"] == [] and message["followUps"] == ["서울 공고도 같이 볼래요"]
 
 
 def test_region_that_cannot_be_saved_is_not_in_patch():
     deps = build_deps(ScriptedRunner(search_and_policies(region="수도권")))
     _, _, message = ask(deps)
-    assert [a["type"] for a in message["actions"]] == ["SUGGEST_INTERVIEW"]
+    assert message["actions"] == []
 
 
 # ---------------------------------------------------------------- S-03
@@ -92,7 +91,7 @@ def test_s03_cover_letter_starts_interview():
                                    "title": "데이터 분석 자소서", "conditions": []}]
 
 
-def test_interview_prepared_replaces_suggestion():
+def test_interview_prepared_gives_only_interview_card():
     def script(tools):
         tools["search_job_postings"]()
         tools["prepare_mock_interview"](job="데이터 분석")
@@ -337,4 +336,66 @@ def test_prompt_v3_rules():
     for rule in ("공식 데이터에는 조건에 맞는 공고가 없어요", "teamDataNote", "save_search_conditions",
                  "`saved=true`일 때만", "묻지 않았는데 저장하지 않는다", "실시간으로 부르지 않는다"):
         assert rule in prompt
-    assert deps.config.prompt_version == "chat-v3"
+    assert deps.config.prompt_version == "chat-v4"
+
+
+# ---------------------------------------------------------------- A 이력서·직무 진단 (user-flow ⑤, 개발계획서1 F-02)
+def test_this_posting_from_previous_answer_starts_diagnosis():
+    def show(tools):
+        tools["search_job_postings"](job_name="데이터 분석")
+        return reply("공고 1개를 찾았어요.", ["이 공고와 내 이력서 비교해 보기"])
+
+    def diagnose(tools):
+        out = tools["start_resume_diagnosis"](job_posting_id="demo-busan-data")
+        return reply("진단을 시작했어요. 1분쯤 걸려요." if out.get("started") else out["error"]["message"])
+
+    deps = build_deps(ScriptedRunner(show, diagnose), summary=SUMMARY)
+    started, _, _ = ask(deps)
+    deps.clock["now"] = NOW + timedelta(seconds=20)
+    again = service.start_turn(deps, "demo1", {"sessionId": started["sessionId"], "message": "이 공고와 내 이력서 비교해 보기"})
+    service.run_turn(deps, deps.dispatcher.events[-1]["agentTask"])
+    # 바로 앞 답의 공고가 문맥에 들어간다
+    block = json.loads(deps.runner.runs[-1]["message"].split("<user_context>\n", 1)[1].split("\n</user_context>", 1)[0])
+    assert block["recentPostings"][0]["jobPostingId"] == "demo-busan-data"
+    message = service.get_message(deps, "demo1", started["sessionId"], again["messageId"])
+    assert message["actions"] == [{"type": "OPEN_DIAGNOSIS", "job": "데이터 분석 신입", "documentId": "doc-r1",
+                                   "conditions": [], "analysisId": "analysis-0001", "profileId": "profile-1",
+                                   "profileVersion": 2, "jobPostingId": "demo-busan-data"}]
+    user, posting, ncs, key = deps.mentoring.calls[-1]
+    assert (user, posting, ncs) == ("demo1", "demo-busan-data", None) and again["messageId"] in key
+
+
+def test_diagnosis_rejects_made_up_posting_and_uses_desired_job():
+    deps = build_deps(None)
+    from supervisor.tools import TurnTools
+
+    tools = {f.__name__: f for f in TurnTools(deps, "demo1", turn_key="m-1").functions()}
+    assert tools["start_resume_diagnosis"](job_posting_id="wk24-made-up")["error"]["code"] == "UNKNOWN_POSTING"
+    out = tools["start_resume_diagnosis"]()
+    assert out["started"] is True and deps.mentoring.calls[-1][1:3] == (None, "20010105")
+
+
+def test_diagnosis_errors_are_facts():
+    from fakes import FakeError, FakeMentoring
+    from supervisor.tools import TurnTools
+
+    deps = build_deps(None, profiles={"demo1": {"desiredJobs": [{"name": "마케팅"}]}})  # NCS 코드 없는 직무
+    tools = {f.__name__: f for f in TurnTools(deps, "demo1").functions()}
+    assert tools["start_resume_diagnosis"]()["error"]["code"] == "NEED_TARGET"
+    deps = build_deps(None)
+    deps.mentoring = FakeMentoring(FakeError("PROFILE_NOT_FOUND", "역량 프로필이 없어요. 이력서를 먼저 올려 주세요."))
+    tools = {f.__name__: f for f in TurnTools(deps, "demo1").functions()}
+    assert tools["start_resume_diagnosis"]()["error"]["code"] == "PROFILE_NOT_FOUND"
+    deps.mentoring = None
+    tools = {f.__name__: f for f in TurnTools(deps, "demo1").functions()}
+    assert tools["start_resume_diagnosis"]()["error"]["code"] == "NOT_IMPLEMENTED"
+
+
+def test_prompt_v4_rules():
+    deps = build_deps(ScriptedRunner(lambda tools: reply()))
+    ask(deps)
+    prompt = deps.runner.runs[-1]["system_prompt"]
+    for rule in ("recentPostings", "start_resume_diagnosis", "진단 점수를 네가 말하지 않는다",
+                 "면접을 원하지 않는다고 했으면 다시 권하지 않는다", "이 공고로 모의면접 체험해 볼래요",
+                 "여러 기능을 한 번에 이어 실행하지 않는다"):
+        assert rule in prompt

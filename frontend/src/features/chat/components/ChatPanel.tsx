@@ -9,7 +9,7 @@ import { ApiError } from "@/lib/api";
 import { getChatSession, sendChat, waitForReply } from "../api";
 import { asOfLabel, readChatSessionId, saveChatSessionId } from "../lib";
 import type { ChatMessage } from "../types";
-import { CoverLetterForm, SaveConditions, StartInterview } from "./ChatActions";
+import { CoverLetterForm, OpenDiagnosis, SaveConditions, StartInterview } from "./ChatActions";
 import { PolicyCard, PostingCard } from "./ChatCards";
 import { AttachButton, PdfDropZone } from "./PdfAttach";
 import { ResumeForm } from "./ResumeForm";
@@ -46,16 +46,30 @@ export function ChatPanel() {
     const saved = readChatSessionId();
     if (!saved) return;
     let active = true;
+    const controller = new AbortController();
     getChatSession(saved).then(
       (session) => {
         if (!active) return;
         setSessionId(session.sessionId);
         setMessages(session.messages);
+        // 답을 만드는 중에 새로 고침했으면 그 답을 다시 기다린다
+        const pending = [...session.messages]
+          .reverse()
+          .find((m) => m.role === "ASSISTANT" && (m.status === "PENDING" || m.status === "PROCESSING"));
+        if (!pending) return;
+        setBusy(true);
+        waitForReply(session.sessionId, pending.messageId, controller.signal)
+          .then(
+            (reply) => active && setMessages((prev) => prev.map((m) => (m.messageId === reply.messageId ? reply : m))),
+            () => undefined,
+          )
+          .finally(() => active && setBusy(false));
       },
       () => active && saveChatSessionId(null),
     );
     return () => {
       active = false;
+      controller.abort();
     };
   }, [username]);
 
@@ -117,8 +131,9 @@ export function ChatPanel() {
     void send("이력서를 올렸어요. 이력서로 맞는 공고와 청년정책 찾아 줘", [{ documentId }]);
   }
 
-  function onPdfReady(documentId: string, fileName: string) {
-    void send(`‘${fileName}’을 올렸어요. 내 서류로 맞는 공고와 청년정책 찾아 줘`, [{ documentId }]);
+  function onPdfReady(documentId: string, fileName: string, kind: "RESUME" | "COVER_LETTER") {
+    const what = kind === "COVER_LETTER" ? "자기소개서" : "이력서";
+    void send(`${what} ‘${fileName}’을 올렸어요. 내 서류로 맞는 공고와 청년정책 찾아 줘`, [{ documentId }]);
   }
 
   if (!username) {
@@ -271,6 +286,7 @@ function AssistantMessage({
         if (action.type === "SAVE_CONDITIONS") return <SaveConditions key={key} action={action} />;
         if (action.type === "START_INTERVIEW") return <StartInterview key={key} action={action} />;
         if (action.type === "REQUEST_COVER_LETTER") return <CoverLetterForm key={key} action={action} />;
+        if (action.type === "OPEN_DIAGNOSIS") return <OpenDiagnosis key={key} action={action} />;
         if (action.type === "CONDITIONS_SAVED")
           return (
             <p key={key} className="text-small text-grey-800">

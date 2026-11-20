@@ -51,15 +51,23 @@ def profile_patch(deps: Deps, chat: dict, saved: dict) -> tuple[dict, list[str]]
 
 
 def actions(deps: Deps, record: TurnRecord) -> list[ChatAction]:
+    """면접 체험 제안은 코드 칩이 아니라 모델의 follow_ups로 한다. 사용자가 면접을 원하지 않으면 다시 권하지 않아야 해서다
+    (docs/user-flow.md ⑤). 면접 준비 도구를 부른 턴에만 시작·자소서 입력 카드를 만든다."""
     out: list[ChatAction] = []
     search = record.search
-    found = bool(search and "error" not in search.feed and search.feed.get("items"))
     if record.saved_conditions is not None:
         out.append(ChatAction(type=ActionType.CONDITIONS_SAVED, conditions=record.saved_conditions))
     elif search and "error" not in search.feed and search.chat_conditions:
         patch, labels = profile_patch(deps, search.chat_conditions, record.saved_profile or {})
         if patch:
             out.append(ChatAction(type=ActionType.SAVE_CONDITIONS, conditions=labels, profile_patch=patch))
+
+    diagnosis = record.diagnosis
+    if diagnosis is not None:
+        out.append(ChatAction(type=ActionType.OPEN_DIAGNOSIS, job=diagnosis.target_role,
+                              analysis_id=diagnosis.analysis_id, profile_id=diagnosis.profile_id,
+                              profile_version=diagnosis.profile_version, document_id=diagnosis.document_id,
+                              target_ncs_code=diagnosis.target_ncs_code, job_posting_id=diagnosis.job_posting_id))
 
     interview = record.interview
     if interview is not None:
@@ -71,10 +79,6 @@ def actions(deps: Deps, record: TurnRecord) -> list[ChatAction]:
             limits = deps.config.cover_letter
             out.append(ChatAction(type=ActionType.REQUEST_COVER_LETTER, job=interview.job,
                                   min_chars=limits.min_chars, max_chars=limits.max_chars))
-    elif found:
-        job = search.job_name or (search.feed["items"][0].get("title") or "")[:deps.config.interview_job_max_chars]
-        if job:
-            out.append(ChatAction(type=ActionType.SUGGEST_INTERVIEW, job=job))
     return out
 
 

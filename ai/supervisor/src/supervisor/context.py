@@ -14,6 +14,9 @@ PROFILE_KEYS = ("desiredJobs", "desiredRegion", "desiredSalaryMin", "desiredCare
                 "graduationStatus", "employmentStatus", "careerYears")
 
 
+POSTING_KEYS = ("jobPostingId", "title", "organization", "workRegion", "isSample")
+
+
 def build_user_context(tools: TurnTools) -> dict:
     saved = tools.saved_profile()
     profile = {k: saved[k] for k in PROFILE_KEYS if saved.get(k) not in (None, "", [])}
@@ -27,6 +30,9 @@ def build_user_context(tools: TurnTools) -> dict:
         "attachedThisMessage": [d.document_type for d in docs if d.document_id in tools.attachments],
         "hasCoverLetter": tools.cover_letter() is not None,
         "careerProfile": summary,
+        # 바로 앞 답에서 보여 준 공고. "이 공고", "첫 번째 공고"가 무엇인지 알 수 있게 한다
+        "recentPostings": [{k: p[k] for k in POSTING_KEYS if k in p}
+                           for p in tools.recent_postings[:tools.deps.config.recent_postings]],
     }
 
 

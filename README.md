@@ -34,7 +34,7 @@ uv run --no-project --python 3.13 python test_eligibility.py
 uv run --no-project --python 3.13 --with boto3 --with "moto[dynamodb]" python test_me.py
 uv run --no-project --python 3.13 --with boto3 --with "moto[dynamodb,s3]" python test_interview.py
 uv run --no-project --python 3.13 --with boto3 --with "moto[dynamodb,scheduler]" --with-requirements ../ai/busan-opportunity/requirements.txt python test_opportunities.py
-uv run --no-project --python 3.13 --with boto3 --with "moto[dynamodb]" --with-requirements ../ai/busan-opportunity/requirements.txt --with-requirements ../ai/supervisor/requirements.txt python test_agent_api.py
+uv run --no-project --python 3.13 --with boto3 --with "moto[dynamodb]" --with-requirements ../ai/busan-opportunity/requirements.txt --with-requirements ../ai/supervisor/requirements.txt --with-requirements ../ai/mentoring/requirements.txt --with-requirements ../contracts/requirements.txt python test_agent_api.py
 
 # 채팅 Agent 패키지
 cd ../ai/supervisor && uv run --no-project --python 3.13 --with-requirements requirements-dev.txt python -m pytest

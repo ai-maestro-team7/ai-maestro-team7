@@ -127,10 +127,19 @@ def _pending_save(messages: list[ChatMessage], user_message: ChatMessage) -> dic
     return {"conditions": action.conditions, "profilePatch": action.profile_patch} if action else None
 
 
+def _recent_postings(messages: list[ChatMessage], user_message: ChatMessage) -> list[dict]:
+    """바로 앞 Agent 답의 공고 카드."""
+    before = [m for m in messages if m.message_id < user_message.message_id and m.role == Role.ASSISTANT]
+    if not before:
+        return []
+    return [c.posting for c in before[-1].cards if c.posting]
+
+
 def _run_once(deps: Deps, user_id: str, history: list[dict], user_message: ChatMessage,
-              pending_save: dict | None = None) -> tuple[ChatReply, TurnTools]:
+              pending_save: dict | None = None, recent: list[dict] | None = None,
+              turn_key: str | None = None) -> tuple[ChatReply, TurnTools]:
     tools = TurnTools(deps, user_id, attachments=[a.document_id for a in user_message.attachments],
-                      pending_save=pending_save)
+                      pending_save=pending_save, recent_postings=recent, turn_key=turn_key)
     context = context_block(build_user_context(tools))  # 이력서·경험 요약. 저장하지 않고 턴마다 새로 만든다
     reply = deps.runner.run(system_prompt=system_prompt(deps.config.prompt_version), history=history,
                             message=_model_message(user_message, context), tools=tools.functions(),
@@ -163,9 +172,10 @@ def run_turn(deps: Deps, task: dict) -> dict:
         if user_message is None:
             raise SupervisorError(500, "INTERNAL_ERROR", "대화를 읽지 못했어요.", True)
         pending = _pending_save(messages, user_message)
+        recent = _recent_postings(messages, user_message)
         for attempt in range(1, MAX_ATTEMPTS + 1):
             try:
-                reply, tools = _run_once(deps, user_id, history, user_message, pending)
+                reply, tools = _run_once(deps, user_id, history, user_message, pending, recent, message_id)
                 break
             except OutputInvalid as invalid:
                 logger.warning("stage=chat.check attempt=%d userHash=%s reason=%s", attempt, user_hash, invalid.reason)

@@ -1,7 +1,7 @@
 """채팅 Agent 백엔드 흐름 테스트 (moto DynamoDB, B는 데모 데이터 메모리 저장소, 모델은 대본 실행기).
 실행: cd backend && uv run --no-project --python 3.13 --with boto3 --with "moto[dynamodb]" \
   --with-requirements ../ai/busan-opportunity/requirements.txt --with-requirements ../ai/supervisor/requirements.txt \
-  python test_agent_api.py
+  --with-requirements ../ai/mentoring/requirements.txt --with-requirements ../contracts/requirements.txt python test_agent_api.py
 """
 import json
 import os
@@ -9,7 +9,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-sys.path[:0] = [str(ROOT / "ai/supervisor/src"), str(ROOT / "ai/busan-opportunity/src")]
+sys.path[:0] = [str(ROOT / "ai/supervisor/src"), str(ROOT / "ai/busan-opportunity/src"), str(ROOT / "ai/mentoring/src"),
+                str(ROOT / "ai/mentoring/tests"), str(ROOT / "contracts/src")]
 os.environ.update(AWS_DEFAULT_REGION="ap-northeast-2", AWS_REGION="ap-northeast-2", AWS_ACCESS_KEY_ID="test",
                   AWS_SECRET_ACCESS_KEY="test", TABLE_CAREER_MENTOR="test-cm", RUN_TASKS_INLINE="1",
                   ALLOW_DEV_USER_HEADER="1", MODEL_ID="test-model")
@@ -97,7 +98,7 @@ def main():
     actions = {a["type"]: a for a in m["actions"]}
     check("저장 묻기는 바뀐 조건만", actions.get("SAVE_CONDITIONS", {}).get("profilePatch") ==
           {"desiredSalaryMin": 3000, "desiredCareerType": "NEW"})
-    check("면접 체험 제안", actions.get("SUGGEST_INTERVIEW", {}).get("job") == "데이터 분석")
+    check("면접 체험 제안은 follow_ups 칩으로 (코드 칩 없음)", "SUGGEST_INTERVIEW" not in actions and m["followUps"] == ["모의면접 체험해 볼래요"])
     check("본문 userId는 무시 (demo1로 저장)", table.get_item(Key={"PK": "USER#demo1", "SK": f"SESSION#{sid}"}).get("Item"))
 
     # 2. 저장 버튼 → PUT /me/profile (D-40)
@@ -200,6 +201,22 @@ def main():
     basic = table.get_item(Key={"PK": "USER#demo1", "SK": "PROFILE#BASIC"})["Item"]
     check("채팅 승낙 → PROFILE#BASIC 저장", int(basic["desiredSalaryMin"]) == 2500 and m["reply"] == "저장했어요.")
     check("저장 완료 카드", m["actions"] == [{"type": "CONDITIONS_SAVED", "conditions": ["연봉 2,500만 원 이상"]}])
+
+    # 5-4. A 이력서·직무 진단 어댑터 (A 메모리 대역으로 실제 create_analysis를 부른다)
+    from support.fit import USER as A_USER, fit_deps
+
+    fdeps = fit_deps()
+    agent_api.MentoringAdapter._deps = lambda self: fdeps
+    adapter = agent_api.MentoringAdapter()
+    first = adapter.start_job_fit(A_USER, job_posting_id="job-demo-busan-001", target_ncs_code=None, idempotency_key="chat-k1")
+    again = adapter.start_job_fit(A_USER, job_posting_id="job-demo-busan-001", target_ncs_code=None, idempotency_key="chat-k1")
+    check("진단 시작 → analysisId·프로필 버전", first["analysisId"] and first["profileId"] == "profile-1" and first["status"] == "PENDING")
+    check("같은 턴 키로 다시 불러도 분석은 하나 (멱등)", again["analysisId"] == first["analysisId"])
+    try:
+        adapter.start_job_fit("no-profile-user", job_posting_id=None, target_ncs_code="20010105", idempotency_key="chat-k2")
+        check("역량 프로필이 없으면 오류", False)
+    except Exception as error:  # noqa: BLE001
+        check("역량 프로필이 없으면 코드·문장이 있는 오류", getattr(error, "code", "").endswith("NOT_FOUND") and getattr(error, "message", ""))
 
     # 6. 비동기 이벤트 입구 (같은 작업 두 번 → 한 번만)
     out = lambda_handler({"agentTask": {"userId": "demo1", "sessionId": sid, "messageId": mid}}, None)
