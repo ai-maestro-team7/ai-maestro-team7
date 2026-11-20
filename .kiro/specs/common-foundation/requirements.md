@@ -6,8 +6,9 @@
 
 근거와 전제:
 - B §9와 C §9는 해커톤 0~2시간에 계약을 합의하고 API 명세와 가짜 응답을 프론트·백엔드에 넘기도록 계획한다. 공통 기반은 이 시간 안에 끝낼 수 있는 크기로 유지한다.
-- 저장소에는 문서와 빈 폴더만 있다 (structure.md "저장소 구성", PR #1 커밋 `9d5958c`, PR #2 커밋 `b941a68`에서 폴더 이름 소문자로 변경). 이전 뼈대(커밋 `4aa11cc`)는 "저장소 초기화"(`089499a`)로 빠졌고 재사용 여부는 미정이다.
-- steering(`product.md`, `tech.md`, `structure.md`)과 `AGENTS.md`가 "미확정"으로 둔 항목은 이 스펙에서 확정하지 않는다. 해당 항목은 인터페이스 뒤에 두거나, 출처가 있는 제안 기본값과 함께 Decision_Log에 올려 팀 확인을 받는다 (AGENTS.md "미확정", structure.md "Spec·작업 진행 원칙").
+- 최상위 폴더는 PR #1·#2로 정했고, 백엔드·인프라·공통 문서는 PR #9~#14로 들어왔다 (이전 뼈대 `4aa11cc`를 정리해 다시 넣음, D-25).
+- 결정 상태 (2026-11-20): 확정 담당이 정한 항목은 `CONFIRMED`이고 이 스펙의 기준은 그 결정을 따른다. 결정 내용과 구현은 "결정 기록" 표, `docs/api.md`(공통 API 규칙), `docs/db-schema.md`(v1.3), `backend/`·`infra/`(PR #9~#14, 배포됨)가 기준이다. 결정이 없는 항목(D-23 통합 Agent 프레임워크, D-24 프론트엔드 프레임워크, D-27 MVP 우선순위)만 `OPEN`으로 남기고, 그 항목은 인터페이스 뒤에 두거나 담당이 정할 때까지 임의로 정하지 않는다.
+- 아래 각 Requirement의 기준 중 결정과 이름·형식이 다른 곳은 Requirement 첫머리의 "결정 반영" 문단이 우선한다.
 - 문서 표기: A = `docs/개발계획서1.md`, B = `docs/개발계획서2.md`, C = `docs/개발계획서3.md`, 제안서 = `docs/프로젝트_제안서.md`.
 
 범위에서 제외 (다른 스펙이 담당):
@@ -148,6 +149,8 @@
 
 출처: A §6 "공통 정책"·F-06 "검증 정책"·§5 F-08 "보안 필수", B §5.1·§5.9·T-20, C §5.1 "인증", tech.md "기술 미확정" 1·"보안·개인정보"
 
+결정 반영 (D-07·D-35 CONFIRMED): Identity_Resolver는 `backend/common.py`의 `get_user_id()`다. Identity_Mode 기본값은 Cognito JWT(사용자 풀 `team07-users`, 아이디·비밀번호 로그인 `POST /api/v1/auth/login`)이고 출처는 API Gateway JWT authorizer가 검증한 `sub`다. 개발용 사용자 헤더는 `X-User-Id`, 설정 값은 `ALLOW_DEV_USER_HEADER=1`이며 로컬 테스트에서만 켠다. 배포 Lambda에는 이 값을 두지 않는다(`infra/setup-auth.sh`가 지움). 기준 7·11의 "설정이 없으면 오류"는 "설정이 없으면 Cognito JWT 모드"로 읽는다.
+
 #### Acceptance Criteria
 
 1. THE Identity_Resolver SHALL REST 핸들러와 Agent 도구 입구가 사용자 ID를 얻는 유일한 함수가 되도록 하나의 공개 인터페이스를 제공한다. 이 인터페이스는 입구 종류(REST 또는 Agent 도구)와 해당 입구 데이터를 인자로 받는다.
@@ -174,22 +177,26 @@
 
 #### Acceptance Criteria
 
-1. THE Contract_Package SHALL Common_Profile을 Decision_Log D-08의 제안 기본값(B §10.3)에 따라 정의한다. 필수 필드는 `birthYear`, `residence`, `school`, `educationLevel`, `major`, `desiredJobs`, `employmentStatus`이고, 선택 필드는 `priorities`, `incomeBand`이다. D-08이 `CONFIRMED`가 되기 전까지 이 필드 목록은 제안 상태로 표시한다.
-2. THE Contract_Package SHALL `desiredJobs`를 직종 코드 문자열 1개 이상 3개 이하의 목록으로 검사한다. 각 코드는 빈 문자열이 아니고, 목록 안에서 중복되지 않으며, Posting_For_Analysis의 `job.code`와 같은 코드 체계를 쓴다 (B §10.3, B §5.3 `job.code`).
-3. THE Contract_Package SHALL `residence`를 시·도 코드(`sido`)와 시·군·구 코드(`sigungu`)를 모두 가진 객체로 검사하고, `school`을 시·도 코드(`sido`)와 재학 상태(`status`)를 가진 객체로 검사한다. 시·도 코드는 2자리 숫자 문자열이고, 시·군·구 코드는 해당 시·도 코드로 시작하는 5자리 숫자 문자열이다 (B §10.3 `residence {sido: 26, sigungu: 26290}`, `school {sido: 26, status: GRADUATING}`, B §5.3 예시 `sido: "26"`, `sigungu: "26350"`, `sido: "11"`, `sigungu: "11680"`).
-4. THE Contract_Package SHALL 생년을 4자리 정수 연도(`birthYear`)로만 받고, 검사 시점의 연도보다 큰 값과 월·일이 들어간 날짜 형식 값은 검사 오류로 거부한다 (B §4.2 B-08 "생년만 받으므로", B §10.3 예 `2003`).
+결정 반영 (D-08·D-33 CONFIRMED): Common_Profile은 `team07-career-mentor`의 `PROFILE#BASIC`이고 API는 `GET`/`PUT /api/v1/me/profile`(`backend/me_api.py`)이다. B 피드백 v0.1이 이 필드 이름을 따른다.
+
+1. THE Contract_Package SHALL Common_Profile 필드를 `birthYear`, `residenceSido`, `residenceSigungu`, `residenceSince`, `universityRegion`, `graduationStatus`, `educationLevel`, `major`, `careerYears`, `employmentStatus`, `monthlyIncome`, `householdIncomeLevel`, `desiredJobs`, `desiredRegion`, `priorities`, `talentPoolConsent`로 정의한다. 저장은 부분 수정을 허용하므로 모든 필드가 선택이다. 기능에 필요한 최소 필드는 소비 Part가 검사하고 없으면 오류를 낸다 (B `PROFILE_INCOMPLETE` + `missingFields`).
+2. THE Contract_Package SHALL `desiredJobs`를 0개 이상 3개 이하의 객체 목록으로 검사한다. 객체 필드는 `name`(1~50자, 필수), `work24Code`(고용24 직종 코드, 선택), `ncsCode`(NCS 코드, 선택)이고, 코드는 영문·숫자·밑줄 1~20자다 (고용24·NCS 병행, `docs/api.md` §6.2).
+3. THE Contract_Package SHALL `residenceSido`·`universityRegion`을 2자리 숫자 문자열(시·도 코드), `residenceSigungu`를 5자리 숫자 문자열(시·군·구 코드), `residenceSince`를 `YYYY-MM`, `desiredRegion`을 `ALL` 또는 시·도 코드로 검사한다.
+4. THE Contract_Package SHALL 생년을 1950~2015 사이의 정수 연도(`birthYear`)로만 받고, 문자열과 월·일이 들어간 날짜 형식 값은 검사 오류로 거부한다 (B §4.2 B-08 "생년만 받으므로", B §10.3 예 `2003`).
 5. IF Common_Profile 데이터에 1번에 정의되지 않은 필드가 있으면, THEN THE Contract_Package SHALL 정의되지 않은 필드 이름을 모두 담은 검사 오류를 내고, 해당 필드를 뺀 부분 객체를 돌려주지 않고 데이터 전체를 거부한다 (실명·연락처·주민번호 수집 금지, product.md 원칙 7).
 6. FOR ALL 유효한 Common_Profile 객체, THE Contract_Package SHALL JSON으로 직렬화한 뒤 다시 읽은 결과가 원래 객체와 같도록 한다. 같다는 것은 필드 집합과 모든 필드 값이 같다는 뜻이며, 원래 객체에 없던 선택 필드는 다시 읽은 결과에도 없어야 하고 `null`로 채워지면 안 된다 (왕복 속성).
 7. THE Contract_Package SHALL Common_Profile 계약 정의에 소유 Part를 BACKEND로, A·B·C를 읽기 전용 소비자로 적는다 (B §1 담당 구분, §10.1).
-8. IF Common_Profile 데이터에 필수 필드가 없거나, 필드 값이 2~4번 규칙 또는 9번 허용 값 목록을 어기면, THEN THE Contract_Package SHALL 문제가 된 필드 이름과 위반 규칙을 필드마다 담은 검사 오류를 내고 데이터 전체를 거부한다. 선택 필드 `priorities`와 `incomeBand`가 없는 것은 오류로 보지 않는다 (B §10.3 "필수"/"선택" 구분).
-9. THE Contract_Package SHALL 열거형 필드마다 허용 값 목록을 한곳에 둔다. `employmentStatus`는 B §10.3에 나온 `UNEMPLOYED`, `EMPLOYED`, `STUDENT`를 허용한다. `educationLevel`(`BACHELOR`), `school.status`(`GRADUATING`), `priorities`(`SALARY`, `STABILITY`)는 B §10.3에 예로 나온 값만 처음 목록에 넣는다. B §10.3에 없는 값과 `incomeBand` 구간 값은 Decision_Log 항목 `D-33`으로 올리고, 팀 확인 뒤에 목록에 추가한다.
-10. WHEN Common_Profile 데이터에 선택 필드 `priorities`가 있을 때, THE Contract_Package SHALL `priorities`를 9번 허용 값 목록의 값 1개 이상 2개 이하로 이루어진 중복 없는 목록으로 검사한다 (B §10.3 "1~2개").
+8. IF Common_Profile 데이터에 필수 필드가 없거나, 필드 값이 2~4번 규칙 또는 9번 허용 값 목록을 어기면, THEN THE Contract_Package SHALL 문제가 된 필드 이름과 위반 규칙을 필드마다 담은 검사 오류를 내고 데이터 전체를 거부한다. 필드가 없는 것은 오류로 보지 않는다 (기준 1). `null`을 보내면 그 필드를 지운다.
+9. THE Contract_Package SHALL 열거형 필드의 허용 값을 다음으로 둔다 (D-33): `educationLevel` `HIGH_SCHOOL`·`ASSOCIATE`·`BACHELOR`·`MASTER`·`DOCTOR`, `graduationStatus` `ENROLLED`·`GRADUATING`·`GRADUATED`, `employmentStatus` `UNEMPLOYED`·`EMPLOYED`·`PART_TIME`·`STUDENT`, `householdIncomeLevel` `under_100`·`under_150`·`over_150`·`unknown`, `priorities` `SALARY`·`GROWTH`·`STABILITY`·`WORK_LIFE`·`HOUSING`·`LOCATION`.
+10. WHEN Common_Profile 데이터에 `priorities`가 있을 때, THE Contract_Package SHALL `priorities`를 9번 허용 값으로 이루어진 3개 이하의 목록으로 검사한다.
 
 ### Requirement 8: 공고 계약 (B → A·C)
 
 **User Story:** As a A 파트와 C 파트 개발자, I want B가 만드는 공고 데이터를 정해진 형식으로 받기를, so that B의 수집이 끝나기 전에도 예시 공고로 적합도·첨삭·면접 기능을 만들 수 있다.
 
 출처: B §3.2·§3.5·§6.1·§10.1·§10.2, A §4.1·§4.4·§7.3·§12.3, C §5.2, tech.md "기술 미확정" 5
+
+결정 반영 (D-09·D-10·D-34 CONFIRMED, B 피드백 v0.1): 공고 계약은 `team07-catalog`의 `POSTING#{jobPostingId}` / `SNAP#{snapshotId}`·`LATEST` 형식(`docs/db-schema.md` §3)이 기준이다. 내용이 바뀔 때만 새 스냅샷을 쓰고 마감돼도 지우지 않는다. B §10.2의 옛 이름은 다음처럼 바뀌었고, 아래 기준의 옛 이름은 이 대응으로 읽는다: `postingId`→`jobPostingId`, `deadline`→`closesAt`, `sourceUrl`→`officialUrl`, `collectedAt`→`checkedAt`, `company.name`→`organization`, `active=false`→`isExpired=true`, `requirements{required, preferred}`→`requirements[]{requirementId, name, kind(REQUIRED_SKILL/PREFERRED_SKILL), weight(기본 1.0), sourceQuote, extractedBy}`, `evidence`→`sourceQuote`, 공고 버전 식별자 = `snapshotId`(`{수집일 YYYYMMDD}-{contentHash 8자}`). 지원 자격 조건은 스냅샷의 `eligibilityRules[]`, 판정은 `backend/eligibility.py`의 `evaluate_eligibility()` 하나로 한다 (D-11).
 
 #### Acceptance Criteria
 
@@ -211,6 +218,8 @@
 **User Story:** As a C 파트 개발자, I want A의 역량 분석 결과를 정해진 요약 형식으로 받기를, so that A 기능이 끝나기 전에도 예시 요약으로 질문 생성을 시험할 수 있다.
 
 출처: A §4.2·§12.2, C §3 "입력 (선택)"·§5.2 `profile`, C §10
+
+결정 반영 (D-12 CONFIRMED, C 요청): Career_Profile_Summary 필드는 `projects`, `skills`, `needsConfirmation`(각 문자열 목록, 빈 목록 허용)과 선택 `profileId`·`profileVersion`이다. 원천은 `PROFILE#LATEST`가 가리키는 최신 역량 프로필 버전이고, 백엔드(`backend/interview_api.py`)가 읽어 `start_interview(profile=…)`에 넘긴다. 목표 직무는 이 객체가 아니라 `start_interview`의 `job`으로 넘긴다. 아래 기준의 `targetJob`→`job`, `gapsToVerify`→`needsConfirmation`으로 읽고, `strengths`는 두지 않는다.
 
 #### Acceptance Criteria
 
@@ -250,13 +259,13 @@
 
 1. THE Fixture_Set SHALL Contract_Package의 계약마다 유효한 예시를 하나 이상 포함하고, 각 예시에 대상 계약 이름과 계약 버전을 적는다 (Requirement 10).
 2. THE Fixture_Set SHALL B §7.1의 페르소나 3명마다 Common_Profile 예시를 하나씩 포함하고, 각 예시는 B §7.1 표의 프로필 칸에 적힌 값만 Common_Profile 계약 필드로 담는다. 해당 값은 출생연도, 거주 구, 학교 소재지와 재학·졸업 상태, 전공, 희망 직무, 취업 상태, 그리고 표에 적힌 경우 중요 조건이다. B §7.1 표의 기대 결과 칸은 B 소유 데이터로 두고 Fixture_Set에 넣지 않는다.
-3. THE Fixture_Set SHALL Posting_For_Analysis 예시로 부산 근무 공고(근무지 시도 코드 `26`)와 수도권 근무 공고(시도 코드 `11`, `41`, `28` 중 하나)를 각각 하나 이상 포함한다 (B §6.5 설정 `busanSido`·`capitalAreaSido`). 수도권 공고 중 하나 이상은 서울 데이터 분석 직무 공고로 두고 (B §7.1 페르소나 ①), 부산 공고 중 하나 이상은 `job.name`이 "백엔드 개발"인 공고로 둔다 (C §3 시연 직무). 모든 공고 예시의 `sourceType`은 `DEMO`로, 회사명은 "가상"이라는 말이 들어간 이름으로 둔다 (A §4.4 "시연용 가상 기업", A §10.3, B §5.3 "회사명은 가상").
+3. THE Fixture_Set SHALL Posting_For_Analysis 예시로 부산 근무 공고(근무지 시도 코드 `26`)와 수도권 근무 공고(시도 코드 `11`, `41`, `28` 중 하나)를 각각 하나 이상 포함한다 (B §6.5 설정 `busanSido`·`capitalAreaSido`). 수도권 공고 중 하나 이상은 서울 데이터 분석 직무 공고로 두고 (B §7.1 페르소나 ①), 부산 공고 중 하나 이상은 `job.name`이 "데이터 분석"인 공고로 둔다 (통합 데모 직무, D-37). 모든 공고 예시의 `sourceType`은 `DEMO`로, 회사명은 "가상"이라는 말이 들어간 이름으로 둔다 (A §4.4 "시연용 가상 기업", A §10.3, B §5.3 "회사명은 가상").
 4. THE Fixture_Set SHALL Error_Code_Catalog의 코드마다 Error_Envelope 예시를 하나씩 포함한다. Async_Task_Status 예시는 `PENDING`, `PROCESSING`, `COMPLETED`, `FAILED` 상태마다 하나씩, 선언된 Status_Extension 값마다 하나씩 포함한다. `FAILED` 예시에는 Error_Envelope의 `error` 객체를 넣는다 (Requirement 5).
 5. WHEN Local_Check가 실행되면, THE Local_Check SHALL 다음 세 가지를 확인한다. 유효한 예시는 모두 대응 계약의 검사를 통과해야 한다. 잘못된 예시는 모두 기대한 필드 이름을 담은 검사 오류로 거부되어야 한다. Job_Requirement_View·Interview_Job_Context 예시는 대응하는 Posting_For_Analysis 예시를 Contract_Package 변환 함수에 넣은 결과와 같아야 한다.
 6. IF Fixture_Set 파일에 AWS 계정 ID 형태(앞뒤가 숫자가 아닌 연속 12자리 숫자), 액세스 키 형태(`AKIA` 또는 `ASIA` 뒤에 영문 대문자나 숫자 16자가 이어지는 20자 문자열), 이메일 주소, 전화번호, 주민등록번호 형태(6자리-7자리 숫자)의 문자열이 있으면, THEN THE Secret_Scanner SHALL 각 문자열의 파일 경로와 줄 번호를 보고하고 Local_Check를 실패로 끝낸다 (tech.md "보안·개인정보": 공개 저장소). 계정 ID·액세스 키 형태의 정의와 `<계정ID>` 같은 꺾쇠 자리표시자 제외 규칙은 Requirement 13 기준 5·6과 같고, 이메일 주소·전화번호·주민등록번호 형태 검사는 Fixture_Set 파일에만 추가로 적용한다.
 7. THE Fixture_Set SHALL Python 이외의 소비자(프론트엔드)가 읽을 수 있는 UTF-8 JSON 파일로 제공되고, 위치를 루트 README에 적는다. 파트 내부 가짜 데이터는 각 Part 소유로 두고 Fixture_Set에 넣지 않는다. 여기에는 B `mocks/`, C `samples/`, A `MockLLM` fixture가 들어간다 (B §9, C §7, A §10.3).
 8. THE Fixture_Set SHALL Contract_Package의 계약마다 잘못된 예시를 하나 이상 포함하고, 각 잘못된 예시에 검사 오류로 거부될 것으로 기대하는 필드 이름을 적는다. 잘못된 예시에는 Career_Profile_Summary에 정의되지 않은 필드를 넣은 예시가 들어간다. 필수 필드를 뺀 예시도 들어가며, `job.name`이 비었거나 50자를 넘는 예시가 그 하나다 (Requirement 8 기준 7, Requirement 9 기준 6).
-9. THE Fixture_Set SHALL C §3의 시연용 가상 자소서(백엔드 개발)에 맞춘 Career_Profile_Summary 예시를 하나 이상 포함한다. 이 예시는 `targetJob`을 "백엔드 개발"로 두고, `projects`, `skills`, `strengths`, `gapsToVerify`에 각각 값을 하나 이상 넣으며, 이력서 원문 필드는 넣지 않는다 (C §5.2 `profile`, A §12.2 `allowRawResume: false`).
+9. THE Fixture_Set SHALL 통합 데모 직무(데이터 분석, D-37)의 가상 자소서에 맞춘 Career_Profile_Summary 예시를 하나 이상 포함한다. 이 예시는 `targetJob`을 "데이터 분석"으로 두고, `projects`, `skills`, `strengths`, `gapsToVerify`에 각각 값을 하나 이상 넣으며, 이력서 원문 필드는 넣지 않는다 (C §5.2 `profile`, A §12.2 `allowRawResume: false`).
 10. IF 유효한 예시가 대응 계약의 검사를 통과하지 못하거나, 잘못된 예시가 기대한 필드 이름의 검사 오류로 거부되지 않으면, THEN THE Local_Check SHALL 해당 예시의 파일 경로, 계약 이름, 기대한 결과와 실제 결과를 보고하고 실패로 끝난다.
 11. THE Fixture_Set SHALL 모든 예시의 숫자 값과 숫자 문자열에서 연속된 숫자를 11자리 이하로 두어, 기준 6과 Requirement 13 기준 5의 AWS 계정 ID 형태 검사에 걸리지 않게 한다.
 
@@ -314,44 +323,46 @@
 8. WHEN Decision_Log 항목이 더 이상 유효하지 않게 되면, THE Contract_Change_Procedure SHALL 그 항목을 삭제하지 않고 Decision_Status를 `SUPERSEDED`로 바꾸고 대체한 항목의 ID를 적도록 요구한다.
 9. IF Local_Check가 Decision_Log에서 6번의 검사 중 하나라도 통과하지 못한 항목을 찾으면, THEN THE Local_Check SHALL 실패로 끝나고, 실패한 항목의 ID와 문제가 된 칸 이름을 모두 출력하고, Decision_Log 파일은 수정하지 않는다.
 
-## 결정 필요 항목 (Decision_Log 초기 후보)
+## 결정 기록 (Decision_Log)
 
-아래 항목은 Requirement 14에 따라 Decision_Log의 첫 내용이 된다. 제안 기본값이 있는 항목은 `PROPOSED`, 제안 기본값이 "없음"인 항목은 `OPEN`이다 (Requirement 14 기준 5·7). 어느 항목도 팀 확인 전에는 확정이 아니다. 출처는 각 항목의 근거 문서와 절이고, 이 스펙이 새로 찾은 항목은 항목 칸에 출처 Requirement를 적는다 (Requirement 14 기준 2).
+2026-11-20 BACKEND 담당이 결정을 확정했다. `CONFIRMED`는 고른 값("결정" 칸), 확정 날짜, 확정자를 적는다. `OPEN` 항목은 담당이 정할 때까지 임의로 정하지 않는다 (Requirement 14 기준 5·7).
 
-| ID | 항목 | 선택지 (출처) | 제안 기본값 (근거) | 확정 담당 | Decision_Status |
+| ID | 항목 | 선택지 (출처) | 결정 / 제안 기본값 | 확정 담당 | Decision_Status |
 |---|---|---|---|---|---|
-| D-01 | API 경로 접두사 | `/api/v1/{mentoring\|opportunities\|interview}` (A §6, B §5.1, C §5.1) / `/chat` 등 (이전 api.md) | `/api/v1/{part}` (파트 명세 3개가 같음) | BACKEND | PROPOSED |
-| D-02 | JSON 키 표기 | 카멜 (A·B·C) / snake_case (이전 api.md) | 카멜, Python 코드는 snake_case (C "백엔드와의 약속") | BACKEND | PROPOSED |
-| D-03 | 오류 형식 | `error` 안에 `requestId` (B §5.1, C §5.1) / `error` 밖에 `requestId` + `details` (A §6.6) / `{"error","message"}` (이전 api.md) | `error` 안에 `code·message·requestId·retryable` + 선택 `details` (B §5.1, C §5.1) | BACKEND | PROPOSED |
-| D-04 | 오류 코드 별칭 | A `VALIDATION_ERROR`·`MODEL_UNAVAILABLE`·`SOURCE_UNAVAILABLE` / B·C `INVALID_INPUT`·`AWS_SERVICE_ERROR` | 두 이름을 모두 목록에 두고 별칭으로 연결 (어느 파트 명세도 바꾸지 않음) | BACKEND + A·B·C | PROPOSED |
-| D-05 | 비동기 상태 값 | 공통 4개 (B·C) / A 추가 2개 / C `stage` / 이전 소문자 `pending…` | 공통 4개 + Part별 Status_Extension (B §5.1, C §5.1) | BACKEND | PROPOSED |
-| D-06 | 데이터 기준일 필드 | A `checkedAt` / B `dataAsOf` | 파트 명세의 이름을 유지하고 의미만 API_Convention_Doc에 정의 | BACKEND | PROPOSED |
-| D-07 | 사용자 식별 방식 | Cognito JWT `sub` (A §6, B §5.1) / 무로그인 UUID (이전 api.md) / MVP 무인증 (C §5.1) | Identity_Resolver를 Seam으로 두고, Cognito 연동 전에는 개발용 사용자 헤더 (B §5.1) | BACKEND | PROPOSED |
-| D-08 | 공통 프로필 필드 | B §10.3 코드 기반 / 이전 api.md 이름 기반 | B §10.3 | BACKEND (A·B 의견) | PROPOSED |
-| D-09 | 공고 버전 식별 | A `jobPostingId`+`snapshotId` 스냅샷 보존 (A §4.4) / B `postingId` 덮어쓰기 + `contentHash` + TTL 마감+14일 (B §3.5·§6.1) / 이전 db-schema catalog 스냅샷 | `postingId` + `contentHash`를 버전 식별자로 쓰고, A는 분석에 쓴 공고 필드를 분석 결과에 함께 저장 (A §7.3) | A + B | PROPOSED |
-| D-10 | 공고 요건 구조와 Job_Requirement_View `weight` 기본값 | 요건 구조: A `requirements[{kind, weight, sourceQuote}]` / B `requirements{required, preferred, …, evidence}`. `weight` 기본값: B 명세에 없음 / A §4.4 예시 `1.0` | 계약은 생산자 형식(B §10.2)을 쓰고, Contract_Package의 변환 함수로 Job_Requirement_View 제공. `weight` 기본값은 `1.0` (A §4.4 예시) (`weight` 출처 Requirement 8 기준 4) | A + B | PROPOSED |
-| D-11 | 지원자격 상태 값 이름 | A·B 공고·B 정책·이전 api.md 네 가지 | 통일하지 않고 Part별 이름을 API_Convention_Doc에 나열 (각 값의 의미가 다름) | A + B | PROPOSED |
-| D-12 | 역량 요약 필드 (A → C)와 검사 한도 | 필드: A §12.2 / C §5.2 `profile` ("형식은 팀과 확정"). 한도: `targetJob` 글자 수 명세에 없음 / C §5.2 `job` 1~50자 적용. 목록 최대 항목 수·항목 최대 글자 수: 명세에 없음 | C §5.2 필드 + 선택 `profileId`·`profileVersion`. `targetJob` 1~50자 (C §5.2 `job`). 목록 최대 항목 수·항목 최대 글자 수는 출처 문서에 값이 없어 design 단계에서 값을 제안해 이 항목에 추가 (한도 출처 Requirement 9 기준 1·7) | A + C | PROPOSED |
-| D-13 | DynamoDB 구성 | 통합 4테이블 (이전 db-schema) / Part별 테이블 (A §7.1 `CareerMentor`, B §6, C §6) | Part별 테이블, 이름에 `team07-` 접두사 | BACKEND | PROPOSED |
-| D-14 | 이력서 업로드 버킷 | `uploads` 7일 삭제 (이전 api.md) / `career-docs` (A §7.2, 이전 db-schema) | 없음. 이유: A 기능의 데이터 보존 기간과 직결되어 팀 확인이 먼저 필요 | BACKEND + A | OPEN |
-| D-15 | Python 버전 | 3.12 (A §3 "3.12+", B §2.2) / 3.13 (이전 `.python-version`) | 3.12 문법 기준 (두 파트 명세 모두 충족) | BACKEND | PROPOSED |
-| D-16 | IaC 도구 | CDK (B §2.2·§13) / AWS CLI 스크립트 (이전 뼈대, CloudFormation 권한 없음) | 없음. 이유: 계정 권한(CloudFormation 사용 가능 여부) 확인 후 결정 | BACKEND | OPEN |
-| D-17 | Backend–Ai 패키징·Lambda 분리 | 단일 `team07-api` (이전 뼈대) / 기능별 Lambda (B §2.2, A §11) | 없음. 이유: 배포 구조는 backend-platform에서 정함. Integration_Seam_Doc의 입구 목록만 먼저 고정 | BACKEND | OPEN |
-| D-18 | 공통 계약 위치 | 새 최상위 폴더 / `backend/` 아래 | 새 최상위 폴더 (Ai → Backend import 금지 규칙과 충돌하지 않음). PR #1·#2의 폴더 구성에 추가되므로 팀 확인 필요 | COMMON (팀 리더) | PROPOSED |
-| D-19 | 비동기 처리 방식 | SQS + DLQ (A §10) / `/jobs` 폴링 (이전) / 상태 조회 때 다음 단계 진행 (C §2.3) | 없음. 이유: Part마다 처리 방식이 다르고 Async_Task_Status 형식만 공통으로 두면 병렬 개발이 가능 | BACKEND | OPEN |
-| D-20 | 모의면접 API·저장 | 동기 질문·S3 캡처 7일 (이전 api.md) / 202 + `/status`·이미지 미저장·Lambda 60초 이상 (C §5·§11) | C 명세 (C §5·§11) | C + BACKEND | PROPOSED |
-| D-21 | 자원 접두사·태그 | `team07-`, `team=team07` (이전 뼈대) | 이전 뼈대 값 (tech.md "이전 뼈대에서 정한 환경") | BACKEND | PROPOSED |
-| D-22 | 벡터 저장소·임베딩 모델 | S3 Vectors / OpenSearch, Cohere v4 / Titan v2 (A §3, B §2.2) | 없음. 이유: A·B의 KB 설계 스펙에서 정할 사항 | A + B | OPEN |
-| D-23 | 통합 Agent 프레임워크 | Bedrock Agents + Action Group (A F-06, B §5.9) / Strands (이전 뼈대) | 없음. 이유: A 소유 (mentoring-agent-quality) | A | OPEN |
-| D-24 | 프론트엔드 프레임워크 | 문서에 없음 (tech.md "기술 미확정" 12) | 없음. 이유: FRONTEND 소유 (frontend-app) | FRONTEND | OPEN |
-| D-25 | 이전 뼈대(`4aa11cc`) 재사용 | 재사용 / 미사용 | 없음. 이유: 팀 리더 결정 사항. 이 표의 "이전" 선택지에 영향 | 팀 리더 | OPEN |
-| D-26 | AI·데이터 작업 영역 라벨 | CONTRIBUTING에는 `fe`·`be`·`common`만 있음 | 없음. 이유: CONTRIBUTING 규칙 변경은 팀 리더 결정 사항 | 팀 리더 | OPEN |
-| D-27 | MVP 우선순위 차이·담당 없는 기능 | 제안서 9.2 / 파트 명세 (product.md "MVP" 표) | 없음. 이유: 범위 결정은 팀 리더 결정 사항 | 팀 리더 | OPEN |
-| D-28 | B `infra/` 위치, B `AGENTS.md`, `CONTRIBUTING.md` 위치 | structure.md "구조 미확정" | 없음. 이유: B `infra/`·B `AGENTS.md`는 B 소유, `CONTRIBUTING.md` 위치는 팀 리더 결정 사항 | B / 팀 리더 | OPEN |
-| D-29 | 시각 표기 오프셋 (출처 Requirement 3 기준 4) | `+09:00` 오프셋 (B §5.1, tech.md API 공통 항목) / `Z` UTC 표기 (A §4.4 예시 `checkedAt`) | `+09:00` (B §5.1, tech.md API 공통 항목) | BACKEND + A | PROPOSED |
-| D-30 | 금액 표기 (출처 Requirement 3 기준 5) | 정수 + 단위 필드 (B §5.1·§5.6) / 원 단위 정수 (이전 api.md) | 정수 + 단위 필드 (B §5.1) | BACKEND + B | PROPOSED |
-| D-31 | 같은 `Idempotency-Key`에 다른 본문이 온 경우 (출처 Requirement 3 기준 13) | 409로 거부 (A §7.1 `requestHash` 비교) / 첫 요청 결과 반환 | 없음. 이유: A·B 멱등 처리 방식(A §7.1, B §6.4 Powertools)이 달라 팀 확인이 먼저 필요 | BACKEND + A + B | OPEN |
-| D-32 | 오류 코드 HTTP 상태·기본 `retryable` 미정 칸 (출처 Requirement 4 기준 3) | `RESOURCE_NOT_OWNED` 403 / 404 (A §6.6). `MODEL_UNAVAILABLE`·`SOURCE_UNAVAILABLE` 502 / 503 (A §6.6). A 코드의 기본 `retryable`: A §6.6 표에 열 없음 / 같은 HTTP 상태의 C §5.1 값 적용 | 출처 값을 제안 기본값으로 둔다: `RESOURCE_NOT_OWNED` 404, `MODEL_UNAVAILABLE`·`SOURCE_UNAVAILABLE` 503 (A §6.6 허용 값 중 하나, 503은 C §5.1 `AWS_SERVICE_ERROR`와 같음). A 코드의 기본 `retryable`은 A §6.6 예시(`SOURCE_UNAVAILABLE` true)와 같은 HTTP 상태의 C §5.1 값(4xx false, 5xx true)을 따름 | BACKEND + A | PROPOSED |
-| D-33 | Common_Profile 열거형 값 중 B §10.3에 없는 값 (출처 Requirement 7 기준 9) | `educationLevel`·`school.status`·`priorities` 전체 목록: B §10.3에는 예시 값만 있음 / B 내부 코드표. `incomeBand` 구간: B §10.3에 구간 정의 없음 | 없음. 이유: 출처 문서에 전체 값 목록과 구간 정의가 없음 | BACKEND + B | OPEN |
-| D-34 | 공고 마감 여부 필드 이름 (출처 Requirement 8 기준 1·11) | B `active=false` (B §4.2 B-01) / B `closed: true` (B §5.8) / A `isExpired` (A §12.3) | Posting_For_Analysis에는 B 이름, Job_Requirement_View에는 `isExpired` (B §5.8, A §12.3) | A + B | PROPOSED |
-| D-35 | 개발용 사용자 헤더 이름과 공개 배포 환경 설정 값 이름 (출처 Requirement 6 기준 6·7) | B §5.1 "개발용 사용자 헤더"(이름 미정) / Cognito 연동 뒤 헤더 제거 (B §5.1 "공개 배포 전에 제거") | 없음. 이유: B §5.1은 헤더를 쓴다는 것만 적고 헤더 이름과 배포 환경 설정 값 이름은 정하지 않음 | BACKEND | OPEN |
+| D-01 | API 경로 접두사 | `/api/v1/{mentoring\|opportunities\|interview}` (A §6, B §5.1, C §5.1) / `/chat` 등 (이전 api.md) | `/api/v1/{part}` + 공통 `/api/v1/me`, `/api/v1/auth`, `/api/v1/health` (`docs/api.md` §1) | BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-02 | JSON 키 표기 | 카멜 (A·B·C) / snake_case (이전 api.md) | 카멜, Python 코드는 snake_case | BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-03 | 오류 형식 | `error` 안에 `requestId` (B §5.1, C §5.1) / `error` 밖 + `details` (A §6.6) | `error{code, message, requestId, retryable, details?}` (`backend/common.py`) | BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-04 | 오류 코드 별칭 | A `VALIDATION_ERROR`·`MODEL_UNAVAILABLE`·`SOURCE_UNAVAILABLE` / B·C `INVALID_INPUT`·`AWS_SERVICE_ERROR` | 대표 코드 `INVALID_INPUT`·`AWS_SERVICE_ERROR`, A 코드는 별칭으로 받고 응답 때 대표 코드로 (`docs/api.md` §5) | BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-05 | 비동기 상태 값 | 공통 4개 (B·C) / A 추가 2개 / C `stage` | 공통 4개 + Part별 Status_Extension | BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-06 | 데이터 기준일 필드 | A `checkedAt` / B `dataAsOf` | 파트 이름 유지, 의미만 공통 정의 | BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-07 | 사용자 식별 방식 | Cognito JWT `sub` (A §6, B §5.1) / 무로그인 UUID / MVP 무인증 (C) | Cognito JWT `sub`, 아이디·비밀번호 로그인, 데모 계정 `demo1`~`demo3` (`backend/auth_api.py`, `infra/setup-auth.sh`) | BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-08 | 공통 프로필 필드 | B §10.3 코드 기반 / 이전 api.md 이름 기반 | `PROFILE#BASIC` 필드 (Requirement 7 결정 반영) | BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-09 | 공고 버전 식별 | A 스냅샷 / B 덮어쓰기 / catalog 스냅샷 | catalog `SNAP#{snapshotId}` + `LATEST`, 바뀔 때만 새 스냅샷 (B 피드백 v0.1) | A + B | CONFIRMED · 2026-11-20 · BACKEND 담당 (B v0.1 동의) |
+| D-10 | 요건 구조와 `weight` | A `requirements[{kind, weight, sourceQuote}]` / B `requirements{required, preferred}` | A 형식(`kind` `REQUIRED_SKILL`/`PREFERRED_SKILL`), `weight` 기본 1.0 (B v0.1 팀 필드) | A + B | CONFIRMED · 2026-11-20 · BACKEND 담당 (B v0.1 동의) |
+| D-11 | 지원자격 상태 값 | A·B 공고·B 정책 각각 | Part별 이름 유지, 공고 자격 판정은 `backend/eligibility.py` 하나로 (조건별 B 값, 전체 A 값) | A + B | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-12 | 역량 요약 필드 (A → C) | A §12.2 / C §5.2 `profile` | `projects`, `skills`, `needsConfirmation` + 선택 `profileId`·`profileVersion` (C 요청, Requirement 9 결정 반영) | A + C | CONFIRMED · 2026-11-20 · BACKEND 담당 (C 동의) |
+| D-13 | DynamoDB 구성 | 통합 4테이블 / Part별 테이블 | `team07-career-mentor`·`catalog`·`reference`·`cache` (`docs/db-schema.md` v1.3, B·C 동의) | BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-14 | 이력서 업로드 버킷 | `uploads` 7일 삭제 / `career-docs` | 이력서 `career-docs`(보존), 면접 녹음·질문 음성 `uploads`(7일) | BACKEND + A | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-15 | Python 버전 | 3.12 (A·B) / 3.13 (이전 뼈대) | 3.13 (`.python-version`, Lambda `python3.13`). 3.12 이상 요구를 충족 | BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-16 | IaC 도구 | CDK (B) / AWS CLI 스크립트 | AWS CLI 스크립트 `infra/` (CloudFormation 권한 없음) | BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-17 | Backend–Ai 패키징·Lambda 분리 | 단일 `team07-api` / 기능별 Lambda | 단일 `team07-api`. `ai/interview/`를 `interview` 패키지로 묶음 (`infra/package.sh`). 다른 Part도 하이픈 없는 패키지 이름 + 파트별 `requirements.txt` | BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-18 | 공통 계약 위치 | 새 최상위 폴더 / `backend/` 아래 | 계약 문서는 `docs/api.md`·`docs/db-schema.md`, 공통 함수는 `backend/common.py`·`eligibility.py`·`workspace.py`. 기계 검사용 Contract_Package는 만들 때 새 최상위 `contracts/` | COMMON | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-19 | 비동기 처리 방식 | SQS + DLQ (A) / `/jobs` 폴링 / 상태 조회 때 진행 (C) | Lambda 비동기 자기 호출 (면접에서 동작). SQS 권한이 생겨 필요하면 전환, 함수 입출력은 그대로 | BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-20 | 모의면접 API·저장 | 이전 api.md / C 명세 | C 명세 + 면접 담당 요청 (`docs/db-schema.md` §2.4, `backend/interview_api.py`) | C + BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 (C 동의) |
+| D-21 | 자원 접두사·태그 | `team07-`, `team=team07` | `team07-`, `team=team07`, 리전 `ap-northeast-2` | BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-22 | 벡터 저장소·임베딩 모델 | S3 Vectors / OpenSearch, Cohere v4 / Titan v2 | S3 Vectors (`team07-opp-vectors`/`postings-v1`, 1024차원, 코사인), 임베딩 `cohere.embed-v4:0` (한국어, 1024) | A + B | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-23 | 통합 Agent 프레임워크 | Bedrock Agents + Action Group (A F-06, B §5.9) / Strands | 없음. 이유: A 소유 (mentoring-agent-quality) | A | OPEN |
+| D-24 | 프론트엔드 프레임워크 | 문서에 없음 | 없음. 이유: FRONTEND 소유 (frontend-app) | FRONTEND | OPEN |
+| D-25 | 이전 뼈대(`4aa11cc`) 재사용 | 재사용 / 미사용 | 정리해 재사용 (PR #9~#14) | 팀 리더 | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-26 | AI·데이터 작업 영역 라벨 | `fe`·`be`·`common`만 | AI·데이터·인프라 작업은 `be` | 팀 리더 | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-27 | MVP 우선순위·담당 없는 기능 | 제안서 9.2 / 파트 명세 | 없음. 이유: 범위 결정은 팀 리더. 워크스페이스·문서 버전은 D-36으로 분리해 확정 | 팀 리더 | OPEN |
+| D-28 | B `infra/`·B `AGENTS.md`·`CONTRIBUTING.md` 위치 | structure.md "구조 미확정" | 인프라는 루트 `infra/`, B `AGENTS.md`는 두지 않고 루트 `AGENTS.md`·steering, `CONTRIBUTING.md`는 `docs/` | B / 팀 리더 | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-29 | 시각 표기 오프셋 | `+09:00` / `Z` | `+09:00` | BACKEND + A | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-30 | 금액 표기 | 정수 + 단위 필드 / 원 단위 정수 | 정수 + 단위 필드 (`MANWON_YEAR`, `MANWON_MONTH`, `MANWON`, `WON`) | BACKEND + B | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-31 | 같은 `Idempotency-Key`에 다른 본문 | 409 거부 (A §7.1) / 첫 결과 반환 | 409 `PRECONDITION_NOT_MET` (`IDEM#`의 `requestHash` 비교) | BACKEND + A + B | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-32 | 오류 코드 HTTP 상태·기본 `retryable` | A §6.6 허용 값 / C §5.1 값 | `RESOURCE_NOT_OWNED` 404, A 별칭은 대표 코드의 HTTP·`retryable` (4xx false, 5xx true) | BACKEND + A | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-33 | Common_Profile 열거형 값 | B §10.3 예시 값만 | Requirement 7 기준 9의 목록 | BACKEND + B | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-34 | 공고 마감 여부 필드 이름 | B `active` / `closed` / A `isExpired` | `isExpired` (catalog `LATEST`, B v0.1) | A + B | CONFIRMED · 2026-11-20 · BACKEND 담당 (B v0.1 동의) |
+| D-35 | 개발용 사용자 헤더·배포 설정 값 이름 | 이름 미정 | `X-User-Id`, `ALLOW_DEV_USER_HEADER=1`(로컬 테스트만, 배포 Lambda에는 없음) | BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-36 | 공고별 워크스페이스·문서 버전 담당 (product.md "범위 관련 미확정") | 담당 미정 | 워크스페이스 BACKEND (`backend/workspace.py`, `/api/v1/me/workspaces`), 지원 상태는 워크스페이스에만. 문서 버전 저장 구조는 `docs/db-schema.md` §2.1 | BACKEND | CONFIRMED · 2026-11-20 · BACKEND 담당 |
+| D-37 | 통합 데모 페르소나·직무 (product.md "범위 관련 미확정") | C 백엔드 개발 / B 페르소나 ① 데이터 분석 / A NCS 11개 직무 | 페르소나 ① 데이터 분석 (NCS 20010105), 데모 계정 `demo1`~`demo3` | 팀 리더 | CONFIRMED · 2026-11-20 · BACKEND 담당 |

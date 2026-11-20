@@ -10,8 +10,9 @@ AI 코딩 에이전트(Claude Code 등)가 이 저장소에서 작업할 때 지
 - 방향: 부산에 남으라고 밀지 않는다. 부산에서도 맞는 기회를 발견하고 사용자가 스스로 고르게 돕는다.
 
 ## 저장소 현황
-- 최상위 폴더는 `ai/{mentoring, busan-opportunity, interview}`, `backend/`, `frontend/`로 정했다 (PR #1, PR #2에서 소문자로 변경). 폴더만 있고 코드는 없다. README, `.gitignore`, 빌드·테스트·배포 명령, CI도 없다.
-- 이전 뼈대(커밋 `4aa11cc`: `backend/`, `infra/`, `docs/api.md`·`db-schema.md`·`team-guide.md`)는 커밋 `089499a` "저장소 초기화"로 `main`에서 빠졌다. 그 내용을 다시 쓸지는 팀 확인이 필요하다.
+- 최상위 폴더는 `ai/{mentoring, busan-opportunity, interview}`, `backend/`, `frontend/`, `infra/`, `examples/` (PR #1·#2, #9~#14).
+- 백엔드·인프라·공통 문서가 들어와 배포돼 있다: `README.md`, `.gitignore`, `.python-version`(3.13), `backend/`(단일 Lambda `team07-api`, 테스트 62개), `infra/`(AWS CLI 스크립트), `docs/api.md`(공통 API 규칙)·`docs/db-schema.md`(v1.3)·`docs/team-guide.md`. 테스트·배포 명령은 README. CI는 없다.
+- 이전 뼈대(`4aa11cc`)는 정리해 PR #9~#14로 다시 들어왔다 (D-25).
 - 지식 패키지 ZIP, A의 `openapi.yaml`, 노션 문서는 저장소에 없다. 없는 파일을 있다고 가정하지 않는다.
 
 | 문서 | 볼 때 |
@@ -58,7 +59,7 @@ AI 코딩 에이전트(Claude Code 등)가 이 저장소에서 작업할 때 지
 - 모델 ID, 가중치, 임계값, 버킷·테이블 이름은 설정 파일이나 환경변수에서 읽는다. 코드에 숫자를 박지 않는다.
 - 날짜는 `asOf`를 받아 계산한다. 상태는 DB에만 둔다. 저장은 멱등하게 처리한다 (`Idempotency-Key`, 조건부 쓰기).
 - 조회와 저장을 나눈다. Agent 툴 설명에는 무엇을, 언제, 입출력을 적고 응답은 문장 대신 사실 목록으로 준다.
-- Python 함수·인자는 snake_case. JSON 키 표기는 API 규약 합의를 따른다 (아래 미확정 참고).
+- Python 함수·인자는 snake_case. JSON 키는 카멜 표기 (`docs/api.md`, D-02).
 - 테스트는 외부 서비스 없이 돌게 mock·fixture를 쓴다. 각 명세의 테스트 시나리오(A UT·INT·EVAL, B T-01~T-22·페르소나, C 연결 시나리오)를 완료 기준으로 쓴다.
 
 ## AI·데이터 규칙
@@ -95,13 +96,7 @@ AI 코딩 에이전트(Claude Code 등)가 이 저장소에서 작업할 때 지
 - 명세에 없는 기술·기능을 더하지 않는다. 필요하면 대안과 이유를 제시하고 확인받는다.
 - 아래 미확정 항목에 걸리는 부분은 임의로 정하지 않는다. 인터페이스로 분리하거나 사용자에게 확인한다.
 
-## 미확정 (합의 전 임의 결정 금지)
-자세한 비교는 `tech.md` "기술 미확정", `product.md` "범위 관련 미확정", `structure.md` "구조 미확정"에 있다.
-- 사용자 인증: UUID 무로그인 / Cognito JWT / C는 MVP 무인증
-- 통합 Agent 프레임워크: Bedrock Agents + Action Group / Strands
-- API 규약: 경로(`/chat` 등 vs `/api/v1/*`), 필드 표기(snake_case vs camelCase), 오류 형식, 비동기 상태 값
-- DynamoDB 테이블 구성과 키 구조, 공고 데이터 계약(A 스냅샷 vs B 덮어쓰기), 상태 값 이름
-- 벡터 저장소와 임베딩 모델, 프론트엔드 프레임워크
-- Python 3.12·CDK(B 명세) vs Python 3.13·AWS CLI 스크립트(이전 뼈대)
-- `backend/`가 `ai/` 코드를 import·패키징하는 방식, Lambda 분리, B `infra/`(CDK) 위치, 이전 뼈대 재사용 여부
-- MVP 우선순위가 제안서 9.2와 파트 명세에서 다른 기능, 담당이 없는 기능(워크스페이스, 문서 버전, 진로 설문, 캘린더, 기업 관계 그래프)
+## 결정 상태
+결정 기록은 `.kiro/specs/common-foundation/requirements.md` "결정 기록"이 기준이다 (2026-11-20 확정). 자세한 규칙은 `docs/api.md`, `docs/db-schema.md`.
+- 확정: 인증 Cognito JWT(로그인 `/api/v1/auth/login`, 데모 계정) · API `/api/v1/{part}`, 카멜, 오류 `error{code, message, requestId, retryable}` · DB `team07-career-mentor`·`catalog`·`reference`·`cache` · 공고 스냅샷 보존(`SNAP#`·`LATEST`) · 자격 판정 `backend/eligibility.py` 하나 · 공통 프로필 `PROFILE#BASIC` · 워크스페이스 BACKEND · Python 3.13 · AWS CLI 스크립트 · 단일 Lambda + `ai/interview` 패키징 · 비동기는 Lambda 자기 호출 · S3 Vectors + Cohere v4 · 데모 직무 데이터 분석
+- 미확정 (임의 결정 금지): 통합 Agent 프레임워크 (D-23, A) · 프론트엔드 프레임워크 (D-24) · MVP 우선순위와 진로 설문·캘린더·기업 관계 그래프 담당 (D-27, 팀 리더)
