@@ -1,0 +1,21 @@
+{
+  "jobName": "team07-sample-english",
+  "status": "COMPLETED",
+  "results": {
+    "transcripts": [
+      {"transcript": "저는 SQL과 Python으로 2023년 관광 데이터를 정리하고 대시보드를 만들었습니다."}
+    ],
+    "items": [
+      {"type": "pronunciation", "start_time": "0.20", "end_time": "1.90", "alternatives": [{"confidence": "0.99", "content": "저는"}]},
+      {"type": "pronunciation", "start_time": "2.20", "end_time": "3.90", "alternatives": [{"confidence": "0.95", "content": "SQL과"}]},
+      {"type": "pronunciation", "start_time": "4.20", "end_time": "5.90", "alternatives": [{"confidence": "0.94", "content": "Python으로"}]},
+      {"type": "pronunciation", "start_time": "6.20", "end_time": "7.90", "alternatives": [{"confidence": "0.97", "content": "2023년"}]},
+      {"type": "pronunciation", "start_time": "8.20", "end_time": "9.90", "alternatives": [{"confidence": "0.99", "content": "관광"}]},
+      {"type": "pronunciation", "start_time": "10.20", "end_time": "11.90", "alternatives": [{"confidence": "0.99", "content": "데이터를"}]},
+      {"type": "pronunciation", "start_time": "12.20", "end_time": "13.90", "alternatives": [{"confidence": "0.98", "content": "정리하고"}]},
+      {"type": "pronunciation", "start_time": "14.20", "end_time": "15.90", "alternatives": [{"confidence": "0.97", "content": "대시보드를"}]},
+      {"type": "pronunciation", "start_time": "16.20", "end_time": "17.90", "alternatives": [{"confidence": "0.98", "content": "만들었습니다"}]},
+      {"type": "punctuation", "alternatives": [{"confidence": "0.0", "content": "."}]}
+    ]
+  }
+}

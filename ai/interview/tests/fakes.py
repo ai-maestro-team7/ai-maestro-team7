@@ -38,6 +38,50 @@ class FakeS3:
         return {"Body": io.BytesIO(body if isinstance(body, bytes) else body.encode("utf-8"))}
 
 
+class FakeTranscribe:
+    """Transcribe 가짜. 시작한 작업과 조회 호출을 기록한다.
+
+    - get_responses: get_transcription_job이 차례로 돌려줄 TranscriptionJob 값(또는 던질 예외). 다 쓰면 아래 규칙
+    - 시작한 작업은 pending_polls번 IN_PROGRESS를 준 뒤 COMPLETED와 결과 주소(경로형)를 준다
+    - start_error가 있으면 start_transcription_job에서 던진다
+    """
+
+    def __init__(self, get_responses=None, start_error=None, pending_polls=0, region="ap-northeast-2"):
+        self.get_responses = list(get_responses or [])
+        self.start_error = start_error
+        self.pending_polls = pending_polls
+        self.region = region
+        self.starts = []
+        self.gets = []
+        self._jobs = {}
+
+    def start_transcription_job(self, **kwargs):
+        self.starts.append(kwargs)
+        if self.start_error is not None:
+            raise self.start_error
+        self._jobs[kwargs["TranscriptionJobName"]] = {"polls": 0, **kwargs}
+        return {"TranscriptionJob": {"TranscriptionJobName": kwargs["TranscriptionJobName"],
+                                     "TranscriptionJobStatus": "IN_PROGRESS"}}
+
+    def get_transcription_job(self, *, TranscriptionJobName):
+        self.gets.append(TranscriptionJobName)
+        if self.get_responses:
+            item = self.get_responses.pop(0)
+            if isinstance(item, BaseException):
+                raise item
+            return {"TranscriptionJob": item}
+        job = self._jobs.get(TranscriptionJobName)
+        if job is None:
+            raise client_error("BadRequestException", "GetTranscriptionJob")
+        job["polls"] += 1
+        if job["polls"] <= self.pending_polls:
+            return {"TranscriptionJob": {"TranscriptionJobName": TranscriptionJobName,
+                                         "TranscriptionJobStatus": "IN_PROGRESS"}}
+        uri = f"https://s3.{self.region}.amazonaws.com/{job['OutputBucketName']}/{job['OutputKey']}"
+        return {"TranscriptionJob": {"TranscriptionJobName": TranscriptionJobName,
+                                     "TranscriptionJobStatus": "COMPLETED", "Transcript": {"TranscriptFileUri": uri}}}
+
+
 class FakePolly:
     """synthesize_speech 호출 인자를 기록하고 audio를 돌려준다. error가 있으면 던진다."""
 

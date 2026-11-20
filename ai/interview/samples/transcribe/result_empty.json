@@ -1,0 +1,10 @@
+{
+  "jobName": "team07-sample-empty",
+  "status": "COMPLETED",
+  "results": {
+    "transcripts": [
+      {"transcript": ""}
+    ],
+    "items": []
+  }
+}
