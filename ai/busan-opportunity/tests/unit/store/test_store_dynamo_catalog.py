@@ -201,6 +201,18 @@ def test_data_as_of_is_updated_in_place(catalog, raw, fake_clock):
     assert item["updatedAt"] > created
 
 
+def test_posting_names_follow_latest(loaded, memory_world):
+    """LATEST를 쓰면 이름 색인도 같이 쓰고, 마감 처리하면 지운다 (B-D08). 메모리 구현과 같은 답이다."""
+    names = loaded.posting_names()
+    assert {n.job_posting_id for n in names} == {p.job_posting_id for p in memory_world.latest.values()
+                                                 if not p.is_expired}
+    assert names == memory_world.posting_names()
+    closed = loaded.get_latest(w.BUSAN_DATA).model_copy(update={"is_expired": True})
+    loaded.put_latest(closed)  # 쓰면 1분 캐시도 버린다
+    assert w.BUSAN_DATA not in {n.job_posting_id for n in loaded.posting_names()}
+    assert loaded.t.get(loaded.NAMES_PK, f"POSTING#{w.BUSAN_DATA}") is None
+
+
 def test_never_scans(loaded, memory_world):
     seen = []
     from botocore.client import BaseClient
@@ -217,6 +229,7 @@ def test_never_scans(loaded, memory_world):
         loaded.query_policies("26")
         loaded.list_companies("26")
         loaded.data_as_of()
+        loaded.posting_names()
     assert seen and "Scan" not in seen
     assert set(seen) <= {"GetItem", "BatchGetItem", "Query"}
 

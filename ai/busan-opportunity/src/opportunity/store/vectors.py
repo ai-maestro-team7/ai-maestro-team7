@@ -4,6 +4,7 @@
 거리는 코사인 distance라서 similarity = 1 - distance로 바꾼다.
 """
 
+import math
 from collections.abc import Sequence
 
 from ..config import require_env
@@ -12,6 +13,7 @@ from .dynamo import aws_errors
 
 SERVICE = "s3vectors"
 MAX_TOP_K = 100  # S3 Vectors가 질의 한 번에 돌려주는 최대 개수
+MAX_GET_KEYS = 100  # GetVectors 한 번에 읽을 수 있는 키 수
 
 
 def to_s3_filter(filter: dict) -> dict:
@@ -63,6 +65,24 @@ class S3VectorIndex:
     def delete(self, key: str) -> None:
         with aws_errors(SERVICE):
             self.client.delete_vectors(**self._target(), keys=[key])
+
+    def similarities(self, vector: Sequence[float], keys: Sequence[str]) -> dict[str, float]:
+        """키마다 벡터를 읽어(GetVectors, 100개씩) 코사인 유사도를 직접 계산한다. query가 주는 1 - distance와 같은 값이다."""
+        keys = list(dict.fromkeys(keys))
+        found: dict[str, float] = {}
+        for start in range(0, len(keys), MAX_GET_KEYS):
+            with aws_errors(SERVICE):
+                response = self.client.get_vectors(**self._target(), keys=keys[start:start + MAX_GET_KEYS],
+                                                   returnData=True)
+            for row in response.get("vectors", []):
+                found[row["key"]] = _similarity(1.0 - _cosine(vector, row["data"]["float32"]))
+        return found
+
+
+def _cosine(a: Sequence[float], b: Sequence[float]) -> float:
+    na = math.sqrt(sum(x * x for x in a))
+    nb = math.sqrt(sum(y * y for y in b))
+    return sum(x * y for x, y in zip(a, b)) / (na * nb) if na and nb else 0.0
 
 
 def _similarity(distance: float | None) -> float:

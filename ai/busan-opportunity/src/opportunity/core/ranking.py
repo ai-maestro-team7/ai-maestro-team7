@@ -37,6 +37,7 @@ REGION_ALL, REGION_BUSAN, REGION_CAPITAL, REGION_OVERSEAS = "ALL", "BUSAN", "CAP
 # 데이터 범위 (개발계획서4 §9.1). OFFICIAL = 공공 API로 모은 공고, TEAM = 팀이 넣어 둔 공고(지금은 시연용 DEMO)
 SCOPE_ALL, SCOPE_OFFICIAL, SCOPE_TEAM = "ALL", "OFFICIAL", "TEAM"
 SCOPES = (SCOPE_ALL, SCOPE_OFFICIAL, SCOPE_TEAM)
+NAME_MATCH_LIMIT = 300  # 이름 색인에서 더하는 후보 상한 (B-D08). 넘으면 기관·회사 이름이 맞는 공고부터 넣는다
 
 # 직무 일치의 근거. 사실 문구를 고를 때 쓴다 (facts.job_fact)
 BASIS_WORK24, BASIS_NAME, BASIS_NCS = facts.BASIS_WORK24, facts.BASIS_NAME, facts.BASIS_NCS
@@ -334,11 +335,16 @@ def _job_code_ok(posting: PostingLatest, codes: list[str] | None) -> bool:
     return any(job.code and job.code.startswith(code) or code in (job.middle, job.major) for code in codes)
 
 
-def _keyword_ok(posting: PostingLatest, keyword: str | None) -> bool:
+def _keyword_hit(keyword: str | None, texts: Sequence[str | None]) -> bool:
+    """검색어가 제목·기관·직무 이름 가운데 하나에 들어 있는지 (대소문자 무시)."""
     if not keyword or not keyword.strip():
         return True
     needle = keyword.strip().lower()
-    return any(needle in (text or "").lower() for text in (posting.title, posting.organization, posting.job.name))
+    return any(needle in (text or "").lower() for text in texts)
+
+
+def _keyword_ok(posting: PostingLatest, keyword: str | None) -> bool:
+    return _keyword_hit(keyword, (posting.title, posting.organization, posting.job.name))
 
 
 def is_team_data(posting: PostingLatest) -> bool:
@@ -354,10 +360,30 @@ def _scope_ok(posting: PostingLatest, scope: str) -> bool:
     return True
 
 
-def _organization_ok(posting: PostingLatest, organization: str | None) -> bool:
+def _organization_hit(organization: str | None, name: str | None) -> bool:
     """기관·회사 이름에 들어 있는지. 대소문자·공백·가운뎃점은 무시한다 (개발계획서4 §9)."""
     needle = _norm(organization)
-    return not needle or needle in _norm(posting.organization)
+    return not needle or needle in _norm(name)
+
+
+def _organization_ok(posting: PostingLatest, organization: str | None) -> bool:
+    return _organization_hit(organization, posting.organization)
+
+
+def _name_candidates(deps: Deps, as_of: datetime, keyword: str | None, organization: str | None) -> list[str]:
+    """검색어·회사 조건에 맞는 진행 중 공고 ID를 이름 색인에서 찾는다 (B-D08). 조건이 없으면 색인을 읽지 않는다.
+
+    맞는 방식은 `_keyword_ok`·`_organization_ok`와 같다. 상한을 넘으면 기관·회사 이름이 맞는 공고를 먼저 둔다.
+    """
+    if not (keyword or "").strip() and not (organization or "").strip():
+        return []
+    needle = (keyword or "").strip().lower()
+    rows = [n for n in deps.catalog.posting_names()
+            if not clock.is_expired(n.closes_at, as_of)
+            and _keyword_hit(keyword, (n.title, n.organization, n.job_name))
+            and _organization_hit(organization, n.organization)]
+    rows.sort(key=lambda n: (bool(needle) and needle not in n.organization.lower(), n.job_posting_id))
+    return [n.job_posting_id for n in rows[:NAME_MATCH_LIMIT]]
 
 
 def _salary_ok(posting: PostingLatest, min_salary: int | None) -> bool:
@@ -464,7 +490,7 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
                     career_type: str | CareerType | None = None, organization: str | None = None,
                     scope: str | None = None, regional_talent: bool = False) -> FeedResponse:
     """전국 공고를 찾아 정렬한다. 후보는 벡터 질의 두 번(부산, 전국)으로 모으고, 지역을 골랐으면 그 지역 질의를 더한다.
-    이 경로에 LLM은 없다.
+    검색어나 회사 조건이 있으면 이름 색인에서 찾은 공고도 더한다 (B-D08). 이 경로에 LLM은 없다.
 
     sort가 None이면 사용자 설정을 쓴다. BUSAN_FIRST와 MATCH는 공고 집합이 같고 순서만 다르다 (T-01).
     마감된 공고는 뺀다 (T-21). 수도권 공고에는 busanAlternativesCount를 붙인다.
@@ -501,10 +527,18 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
     queries = [(top_k.feed, active_filter(ctx.as_of, isBusan=True)), (top_k.feed, active_filter(ctx.as_of))]
     if sidos:
         queries.append((top_k.feed, active_filter(ctx.as_of, sido={"$in": sidos})))
-    similarity: dict[str, float] = {}
+    similarity: dict[str, float | None] = {}
     for hits in (deps.vectors.query(vector, top_k=k, filter=f) for k, f in queries):
         for hit in hits:
             similarity[hit.key] = max(hit.similarity, similarity.get(hit.key, hit.similarity))
+    #    검색어나 회사 조건이 있으면 이름 색인에서 찾은 진행 중 공고를 더한다 (B-D08). 벡터 후보는 프로필과 비슷한
+    #    공고라서, 프로필과 먼 회사의 공고는 거르기 전에 이미 빠져 있다 ("삼성"을 찾으면 0건이었다, 2026-11-21).
+    #    더한 공고의 유사도는 벡터 질의와 같은 값으로 계산해서, 후보로 들어온 길에 따라 적합도가 달라지지 않게 한다.
+    #    벡터가 아직 없는 공고는 None이다 (내용 유사도를 빼고 계산한다).
+    named = [pid for pid in _name_candidates(deps, ctx.as_of, keyword, organization) if pid not in similarity]
+    if named:
+        found = deps.vectors.similarities(vector, named)
+        similarity.update({pid: found.get(pid) for pid in named})
     latest_by_id = deps.catalog.batch_get_latest(list(similarity))
 
     # 2. 거르기: 마감, 지역, 직종 코드, 검색어, 대화 조건(기관, 최소 연봉, 경력 구분)
