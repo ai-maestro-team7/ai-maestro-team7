@@ -24,16 +24,16 @@
     - 카멜 직렬화, 모르는 키 거절, `job`·`resume_text` 경계값, `camera_consent` 엄격 불리언, `profile` 계약 검사(정상, C §5.2 예시 형식 거절, 항목 수 초과 거절), `QuestionsOutput` 개수·중복, `FollowUpOutput`의 필요=true·질문 0개 거절
     - _Requirements: 3.4, 7.5, 8.2, 8.3, 10.4_
 
-- [ ] 3. 임시 구현과 공개 함수 내보내기
-  - [ ] 3.1 `placeholders.py`에 Temporary_Implementation 6개를 만든다 (design §9)
+- [x] 3. 임시 구현과 공개 함수 내보내기
+  - [x] 3.1 `placeholders.py`에 Temporary_Implementation 6개를 만든다 (design §9)
     - `backend/interview_stub.py`(PR #31 반영본)와 같은 입출력
     - `start_transcription`은 인자 5개, `_s3_client()`로 가짜 결과 JSON을 `output_bucket`·`output_key`에 쓴다 (`boto3` 지연 import)
     - `analyze_face`는 `eyesOpen` 포함, `compute_baseline`은 유효 3개 미만이면 `None`
     - 함수 설명에 "임시 구현, N차 PR에서 교체"와 실제 구현과 다른 점
     - _Requirements: 11.1, 11.2, 11.3, 11.4, 11.5, 11.6_
-  - [ ] 3.2 `__init__.py`에서 공개 함수 8개와 `InterviewError`를 내보낸다. `start_interview`·`process_answer`는 이 단계에서 `flow.py`의 빈 함수(`NotImplementedError`)로 둔다
+  - [x] 3.2 `__init__.py`에서 공개 함수 8개와 `InterviewError`를 내보낸다. `start_interview`·`process_answer`는 이 단계에서 `flow.py`의 빈 함수(`NotImplementedError`)로 둔다
     - _Requirements: 1.1_
-  - [ ] 3.3 `tests/test_package.py`, `tests/test_placeholders.py`를 쓴다
+  - [x] 3.3 `tests/test_package.py`, `tests/test_placeholders.py`를 쓴다
     - `__all__` 이름, 백엔드 호출 형태로 `inspect.signature().bind`(`start_interview` 위치 인자 6개, `start_transcription` 5개 등), AST로 `backend`·`interview_stub`·`common` import 없음, `MODEL_ID`를 지운 상태에서 `import interview` 성공
     - 임시 구현의 반환 값, 가짜 S3 클라이언트에 기록된 `put_object` 인자, `compute_baseline` 유효 2개 → `None`·3개 → 기준값
     - _Requirements: 1.3, 1.4, 1.5, 11.2, 11.3, 11.4, 11.5, 14.1, 14.4_
