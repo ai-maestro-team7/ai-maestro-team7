@@ -1,7 +1,15 @@
 import Link from "next/link";
 import { type Column, DataTable, DataTableSkeleton, TableCell, TableRow } from "@/components/ui/DataTable";
 import { cn } from "@/lib/cn";
-import { CAREER_LABELS, deadlineLines, displayTitle, EMPLOYMENT_LABELS, jobDetailHref, ORG_TYPE_LABELS } from "../lib";
+import {
+  CAREER_LABELS,
+  deadlineLines,
+  displayTitle,
+  EMPLOYMENT_LABELS,
+  jobDetailHref,
+  ORG_TYPE_LABELS,
+  orgPayText,
+} from "../lib";
 import type { PublicPostingCard } from "../types";
 
 /** 로그인 없이 보는 공고 표. 맞춤 표(JobTable)의 적합도·저장 열 대신 경력·고용 형태 열이 있다. */
@@ -43,10 +51,15 @@ function PublicJobRow({ job, asOf }: { job: PublicPostingCard; asOf: string }) {
   const deadline = deadlineLines(job.closesAt, job.rolling, asOf);
   return (
     <TableRow className={cn("relative py-4 hover:bg-grey-50", ROW_INSET)}>
-      <TableCell className={cn(COLUMNS.company, "flex items-center")}>
+      <TableCell className={cn(COLUMNS.company, "flex flex-col justify-center gap-0.5")}>
         <span className="truncate text-body font-medium text-grey-900" title={job.organization}>
           {job.organization}
         </span>
+        {job.orgPay && (
+          <span className="truncate text-small text-grey-600" title={`${job.orgPay.year}년 결산 · ${job.orgPay.source}`}>
+            {orgPayText(job.orgPay.average)}
+          </span>
+        )}
       </TableCell>
       <TableCell className={cn(COLUMNS.posting, "flex flex-col gap-0.5")}>
         <Link

@@ -14,7 +14,7 @@ from datetime import date, datetime
 
 from ..config import OpportunityConfig
 from ..deps import Deps
-from ..models.api import EligibilityResult, FeedResponse, PostingCard, Ranking
+from ..models.api import EligibilityResult, FeedResponse, OrgPayBrief, PostingCard, Ranking
 from ..models.enums import (
     CareerType,
     CheonggeulType,
@@ -26,10 +26,11 @@ from ..models.enums import (
     Sort,
 )
 from ..models.errors import invalid_input
-from ..models.posting import AltCandidates, Job, PostingLatest
+from ..models.posting import AltCandidates, Job, OrgPay, PostingLatest
 from ..models.profile import BasicProfile, DesiredJob
 from . import clock, copy_rules, facts, regions
 from .context import UserContext, freshness, load_context
+from .org_pay import org_pay_for, org_pay_index
 from .eligibility import judge, required_ratio
 from .texts import profile_text
 
@@ -408,15 +409,20 @@ def _name_candidates(deps: Deps, as_of: datetime, keyword: str | None, organizat
     return [n.job_posting_id for n in rows[:NAME_MATCH_LIMIT]]
 
 
-def _salary_ok(posting: PostingLatest, min_salary: int | None) -> bool:
-    """공개된 급여의 상한(없으면 하한)이 min_salary보다 낮으면 뺀다. 비공개·미확인 급여는 남긴다 (미확인 ≠ 미달)."""
+def _salary_ok(posting: PostingLatest, min_salary: int | None, org_pay: OrgPay | None = None) -> bool:
+    """공개된 급여의 상한(없으면 하한)이 min_salary보다 낮으면 뺀다.
+
+    공고에 급여가 없으면 기관 직원 평균보수(B-D11, 최근 결산)로 본다. 그것도 없으면 남긴다 (미확인 ≠ 미달).
+    """
     if min_salary is None:
         return True
     salary = posting.salary
     top = salary.max if salary.max is not None else salary.min
-    if not salary.disclosed or top is None:
-        return True
-    return top >= min_salary
+    if salary.disclosed and top is not None:
+        return top >= min_salary
+    if org_pay is not None:
+        return org_pay.latest_average >= min_salary
+    return True
 
 
 # 요청한 경력 구분마다 남길 공고 값. 무관(ANY)과 미확인(UNKNOWN)은 어느 쪽이든 남긴다
@@ -475,7 +481,8 @@ def busan_alternatives_count(cfg: OpportunityConfig, alts: AltCandidates | None,
     return min(count, cfg.alternatives.view_max)
 
 
-def _card(deps: Deps, row: dict, as_of: datetime, alt_count: int | None, profile: BasicProfile) -> PostingCard:
+def _card(deps: Deps, row: dict, as_of: datetime, alt_count: int | None, profile: BasicProfile,
+          pay: OrgPay | None = None) -> PostingCard:
     cfg, posting, match = deps.config, row["posting"], row["match"]
     commute = facts.commute_minutes(deps.local_life, profile, posting.work_region)
     distance = facts.distance_km(deps.local_life, profile, posting.work_region)
@@ -495,6 +502,7 @@ def _card(deps: Deps, row: dict, as_of: datetime, alt_count: int | None, profile
         rank_score=round(row["rank"], facts.SCORE_DIGITS), eligibility=row["eligibility"],
         badges=facts.valid_badges(posting.badges), facts=fact_list, busan_alternatives_count=alt_count,
         commute_minutes=commute, distance_km=distance, regional_talent=talent, is_sample=posting.is_sample,
+        org_pay=OrgPayBrief.of(pay) if pay else None,
     )
 
 
@@ -586,13 +594,15 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
     if regional_talent:
         _add_regional_candidates(deps, ctx, vector, similarity)
     latest_by_id = deps.catalog.batch_get_latest(list(similarity))
+    pay_index = org_pay_index(deps)  # 기관 평균보수 (B-D11). 급여가 없는 공고의 연봉 조건과 카드에 쓴다
 
     # 2. 거르기: 마감, 지역, 직종 코드, 검색어, 대화 조건(기관, 최소 연봉, 경력 구분)
     rows = []
     for pid, posting in latest_by_id.items():
         if not (is_open(posting, ctx.as_of) and _in_region(posting, region, sidos)
                 and _job_code_ok(posting, job_codes) and _keyword_ok(posting, keyword)
-                and _organization_ok(posting, organization) and _salary_ok(posting, min_salary)
+                and _organization_ok(posting, organization)
+                and _salary_ok(posting, min_salary, org_pay_for(pay_index, posting))
                 and _career_ok(posting, career) and _scope_ok(posting, scope) and sector_ok(posting.org_type, sector)
                 and (not regional_talent
                      or facts.card_regional_talent(cfg, ctx.profile, posting) == RegionalTalentStatus.LIKELY)):
@@ -617,7 +627,7 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
         count = None
         if posting.job_posting_id in alts_by_id:
             count = busan_alternatives_count(cfg, alts_by_id[posting.job_posting_id], ctx.as_of, cand_latest)
-        cards.append(_card(deps, row, ctx.as_of, count, ctx.profile))
+        cards.append(_card(deps, row, ctx.as_of, count, ctx.profile, org_pay_for(pay_index, posting)))
 
     # 5. 이유 질문: 수도권으로 처음 바꿨을 때 한 번
     ask = False

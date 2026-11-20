@@ -108,6 +108,11 @@ export function salaryText(salary?: Salary): string {
   return `${fmt((salary.min ?? salary.max) as number)}${unit}`;
 }
 
+/** 기관 평균보수 한 줄 (예: "기관 평균 연 9,118만 원"). 직원 전체 평균이라 "기관 평균"으로만 쓴다. */
+export function orgPayText(average: number): string {
+  return `기관 평균 연 ${average.toLocaleString("ko-KR")}만 원`;
+}
+
 /** 표에 보이는 짧은 근거. 마감 사실은 마감 칸에 따로 있으니 뺀다. */
 /**
  * 표에 보일 공고 제목. 원문 제목이 "2026.10.15(목) 14:00~17:00 [박람회 …]"처럼 일정으로 시작하면 앞의 일정을 뗀다.

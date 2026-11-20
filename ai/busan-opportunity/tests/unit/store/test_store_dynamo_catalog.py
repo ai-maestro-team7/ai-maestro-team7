@@ -268,3 +268,20 @@ def test_regional_index_put_list_delete(loaded, memory_world, raw):
     assert loaded.list_regional_index(closes_from="2099-01-01") == []
     loaded.delete_regional_index(first)
     assert first not in loaded.list_regional_index(closes_from="2026-01-01")
+
+
+def test_org_pay_partition_roundtrip_and_cache(catalog, raw):
+    """기관 평균보수는 ORGPAY 한 파티션이다 (B-D11). 읽은 목록은 캐시하고, 쓰면 캐시를 버린다."""
+    from opportunity.models.posting import OrgPay, OrgPayYear
+
+    pay = OrgPay(org_id="C0072", name="부산항만공사", org_type="공기업(준시장형)", latest_year=2025, latest_average=9118,
+                 years=[OrgPayYear(year=2025, average=9118), OrgPayYear(year=2026, average=8511, budget=True)],
+                 tenure_months=132, source="알리오 경영공시 · 직원 평균보수 (일반정규직)", as_of="2025-12-31",
+                 source_url="https://www.alio.go.kr/item/itemReportTerm.do?apbaId=C0072")
+    assert catalog.org_pays() == []
+    catalog.put_org_pay(pay)
+    assert catalog.org_pays() == [pay]
+    row = raw(CATALOG, "ORGPAY", "ORG#C0072")
+    assert row["entityType"] == "OrgPay" and row["latestAverage"] == 9118 and "GSI1PK" not in row
+    with mock.patch.object(catalog.t, "query", side_effect=AssertionError("캐시를 써야 한다")):
+        assert catalog.org_pays() == [pay]
