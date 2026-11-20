@@ -92,7 +92,8 @@
       "Resource": [
         "arn:aws:bedrock:*:${ACCOUNT_ID}:inference-profile/global.anthropic.*",
         "arn:aws:bedrock:*::foundation-model/anthropic.*",
-        "arn:aws:bedrock:ap-northeast-2::foundation-model/cohere.embed-*",
+        "arn:aws:bedrock:*:${ACCOUNT_ID}:inference-profile/global.cohere.*",
+        "arn:aws:bedrock:*::foundation-model/cohere.embed-*",
         "arn:aws:bedrock:ap-northeast-2::foundation-model/amazon.titan-embed-*"
       ]
     },

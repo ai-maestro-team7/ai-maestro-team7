@@ -153,7 +153,7 @@ B(부산 채용공고·청년정책 맞춤 추천) 코드를 짤 때는 이 절�
 | `deadline`, `sourceUrl`, `collectedAt`, `company.name`, 정책 `name` | `closesAt`, `officialUrl`, `checkedAt`, `organization`, `title` | db-schema §3 |
 | `requirements{required, preferred}`, `evidence` | `requirements[]{requirementId, name, kind, weight, sourceQuote}` (`kind`는 `REQUIRED_SKILL`/`PREFERRED_SKILL`, `weight` 기본 1.0) | D-10 |
 | 모델 ID를 `opportunity_config.json`에 | 환경변수 `MODEL_ID`, `EMBEDDING_MODEL_ID`. 설정 파일 `models`에는 `embedDim`만 남긴다 | B rev 55 §6.5 (Requirement 13 표는 아직 설정 파일로 적혀 있어 같이 고친다) |
-| 벡터 저장소 미정 | S3 Vectors `team07-opp-vectors`/`postings-v1`, `cohere.embed-v4:0`, 1024차원, 코사인 | D-22 |
+| 벡터 저장소 미정 | S3 Vectors `team07-opp-vectors`/`postings-v1`, `global.cohere.embed-v4:0`, 1024차원, 코사인 | D-22 |
 | 같은 `Idempotency-Key` 재요청 | 본문이 다르면 409 `PRECONDITION_NOT_MET` | D-31 |
 | 저장 공고 상태를 `OppUserState`에 | `POST /saved`가 공통 함수 `ensure_workspace`를 불러 `OPP#SAVED#`와 `WORKSPACE#`를 한 트랜잭션으로 쓴다. 지원 상태는 `WORKSPACE#.status`에만 둔다 | D-36, db-schema §2.3 |
 | 알림 ID `{createdAt}#{해시}` | `{yyyyMMddTHHmmss}-{해시 8자}`. 주소에 `#`이 들어가면 요청이 깨진다 | db-schema §2.2 |

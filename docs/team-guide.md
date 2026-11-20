@@ -9,7 +9,7 @@
 | 리전 | `ap-northeast-2` |
 | 빠른 모델 | `global.anthropic.claude-haiku-5-5` (라우팅, 짧은 답변) |
 | 정확한 모델 | `global.anthropic.claude-sonnet-5-5` (분석, 첨삭) |
-| 임베딩 (KB용) | `cohere.embed-v4:0` (다국어), `amazon.titan-embed-text-v2:0` |
+| 임베딩 (KB용) | `global.cohere.embed-v4:0` (다국어), `amazon.titan-embed-text-v2:0` |
 
 바로 돌려 보기 (`aws login` 후):
 
@@ -65,7 +65,7 @@ aws s3 cp bedrock/documents/ s3://team07-kb-source-<계정ID>/docs/ --recursive 
 
 ## 4. 배포
 
-- 모델 ID는 코드에 넣지 않고 Lambda 환경 변수 `MODEL_ID`(기본 `global.anthropic.claude-haiku-5-5`), `EMBEDDING_MODEL_ID`(기본 `cohere.embed-v4:0`)로 받는다 (`infra/config.sh`)
+- 모델 ID는 코드에 넣지 않고 Lambda 환경 변수 `MODEL_ID`(기본 `global.anthropic.claude-haiku-5-5`), `EMBEDDING_MODEL_ID`(기본 `global.cohere.embed-v4:0`)로 받는다 (`infra/config.sh`)
 - 시연 때 Sonnet으로: `MODEL_ID=global.anthropic.claude-sonnet-5-5 infra/setup-api.sh` (코드 변경 없음). 시연이 끝나면 인자 없이 다시 실행해 Haiku로 되돌린다
 
 - 백엔드 Lambda: `infra/deploy.sh` (코드만 바뀌었을 때)

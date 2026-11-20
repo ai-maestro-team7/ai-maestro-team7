@@ -18,7 +18,7 @@ CATALOG_TABLE=${PREFIX}-catalog
 
 # Bedrock 모델 (docs/team-guide.md). 코드에는 환경변수로만 넣는다
 MODEL_ID=${MODEL_ID:-global.anthropic.claude-haiku-5-5}
-EMBEDDING_MODEL_ID=${EMBEDDING_MODEL_ID:-cohere.embed-v4:0}
+EMBEDDING_MODEL_ID=${EMBEDDING_MODEL_ID:-global.cohere.embed-v4:0}  # 서울 리전은 global. 프로필로만 호출 가능
 
 # B 알림 일정: EventBridge Scheduler가 이 역할로 Lambda를 부른다 (infra/setup-role.sh 가 만든다)
 SCHEDULER_ROLE_NAME=${PREFIX}-scheduler-role
