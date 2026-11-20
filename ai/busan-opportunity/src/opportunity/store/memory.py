@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from ..models.policy import Policy
-from ..models.posting import AltCandidates, CompanyRecord, PostingLatest, PostingSnapshot
+from ..models.posting import AltCandidates, CompanyRecord, PostingLatest, PostingName, PostingSnapshot
 from ..models.profile import BasicProfile, OppPrefs
 from ..models.user_state import ExplanationCache, Notification, PolicyAlert, SavedItem
 from ..ports import IdemResult, VectorHit
@@ -40,6 +40,11 @@ class MemoryCatalog:
         rows = [p for p in self.latest.values()
                 if not p.work_region.unknown and p.work_region.sido == sido and p.closes_at >= closes_from]
         return sorted(rows, key=lambda p: (p.closes_at, p.job_posting_id))[:limit]
+
+    def posting_names(self):
+        return [PostingName(job_posting_id=p.job_posting_id, organization=p.organization, title=p.title,
+                            job_name=p.job.name, closes_at=p.closes_at)
+                for p in sorted(self.latest.values(), key=lambda p: p.job_posting_id) if not p.is_expired]
 
     def query_policies(self, region_key):
         rows = [p for p in self.policies.values() if p.region_key() == region_key]
@@ -241,6 +246,9 @@ class MemoryVectors:
     def get(self, key):
         row = self.rows.get(key)
         return list(row[0]) if row else None
+
+    def similarities(self, vector, keys):
+        return {key: cosine(vector, self.rows[key][0]) for key in keys if key in self.rows}
 
     def delete(self, key):
         self.rows.pop(key, None)

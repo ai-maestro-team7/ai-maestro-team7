@@ -207,6 +207,19 @@ class VectorMeta(OppModel):
     title: str
 
 
+class PostingName(OppModel):
+    """검색어·회사 이름 검색용 이름 색인 한 줄 (B-D08). 진행 중 공고만 둔다.
+
+    `team07-catalog`의 `POSTNAMES` / `POSTING#{jobPostingId}`. LATEST를 쓸 때 같이 쓰고, 마감 처리하면 지운다.
+    """
+
+    job_posting_id: str
+    organization: str
+    title: str
+    job_name: str | None = None
+    closes_at: str
+
+
 def latest_from_snapshot(snap: PostingSnapshot, *, busan_sido: str, capital_sido: list[str],
                          is_expired: bool = False) -> PostingLatest:
     """스냅샷에서 목록용 아이템을 만든다. 수집·보강이 같은 규칙으로 쓰게 한 곳에 둔다."""

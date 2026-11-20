@@ -9,6 +9,7 @@
 | v1.0 | 초안 |
 | v1.1 | 면접 담당 요청, 멘토링 담당 피드백 반영 (Workspace, GSI에 userId, `*_LATEST#`, 문서 버전, TASK, 삭제 규칙, 평가 로그) |
 | v1.2 | B 피드백 반영: 공고·정책·기업은 `team07-catalog`(B 설계), B 사용자 데이터는 `career-mentor`의 `OPP#`, 공통 프로필은 `PROFILE#BASIC`로. 알림 ID 형식, 저장 공고 ↔ 워크스페이스 연결 규칙 추가 |
+| v1.6 | B: 공고 이름 색인 `POSTNAMES` / `POSTING#{jobPostingId}` 추가. 검색어·회사 이름 검색에 쓴다 (`ai/busan-opportunity/DECISIONS.md` B-D08) |
 | v1.5 | 기본 정보 화면: `PROFILE#BASIC`에 `schoolName`(대학 이름, 전문대 이상, 50자)·`certificates[]`(가진 자격증, 10개, 50자) 추가. `universityRegion`은 최종 학교 소재지로 쓴다 (대학원이면 학부 대학, 고졸이면 고등학교). 지역인재 판정과 자격 요건 비교에 쓴다 |
 | v1.4 | 채팅 Agent (D-38~D-40, `docs/개발계획서4.md` §8): `SESSION#`·`CHAT#{sessionId}#{messageId}` 필드 확정, `PROFILE#BASIC`에 `desiredSalaryMin`·`desiredCareerType` 추가. 면접 `documentId`는 `DOC_LATEST#`에 `extractedTextKey`가 없으면 `DOC#{id}#V#{n}`의 `textKey`를 읽는다 |
 | v1.3.1 | C 명세 변경 반영 (`transcriptKey`, `eyesOpen`, `baseline=None`) |
@@ -157,6 +158,7 @@ MVP는 CloudWatch 구조화 로그(EMF). 필드 `evaluationId`, `requestId`, `an
 |---|---|---|---|---|
 | 공고 스냅샷 | `POSTING#{jobPostingId}` | `SNAP#{snapshotId}` | — | **팀 필드:** `title`, `organization`, `companyId`, `jobDescription`, `requirements[]{requirementId, name, kind(REQUIRED_SKILL/PREFERRED_SKILL), weight, sourceQuote}`, `eligibilityRules[]{ruleId, type, value, sourceQuote}`(§3.2), `closesAt`, `officialUrl`, `sourceType`, `checkedAt`. **B 필드:** `source`, `company{name, bizNo, hqSido}`, `orgType`, `workRegion{sido, sigungu, label}`, `job{code(고용24), middle, major, name, ncsCodes[]}`, `employmentType`, `careerType`, `educationMin`, `salary{disclosed, min, max, unit}`, `rolling`, `remoteWork`, `selectionSteps`, `documents`, `badges[]`, `regionalTalent{status, basis}`, `extractStatus`, `extractedBy`, `contentHash` |
 | 공고 최신 | `POSTING#{jobPostingId}` | `LATEST` | `POSTING#{시도코드}` / `closesAt` | `snapshotId`, `title`, `organization`, `isExpired`, `isSample`, 목록용: `isBusan`, `isCapitalArea`, `workRegion`, `job`, `salary`, `remoteWork`, `badges[]` |
+| 공고 이름 색인 | `POSTNAMES` | `POSTING#{jobPostingId}` | — | `jobPostingId`, `organization`, `title`, `jobName`, `closesAt`. 진행 중 공고만 둔다. `LATEST`를 쓸 때 같이 쓰고 마감 처리하면 지운다 (B-D08) |
 | 부산 대안 후보 | `POSTING#{jobPostingId}` | `ALTS` | — | `candidates[{jobPostingId, similarity}]` (최대 10), `computedAt` |
 | 청년정책 | `POLICY#{policyId}` | `META` | `POLICY#{시도코드}` / `applyEnd` | `title`, `summary`, `amountMax`, `ageMin`, `ageMax`, `residenceRule`, `incomeRule`, `applyStart`, `applyEnd`, `url`, `source`, `kind`, `regions[]`, `category`, `stage`, `eligibility{…}`, `benefit{…}`, `application{…}`, `lastCycle`, `exclusiveWith[]`, `checklist[]`, `verified`, `verifiedBy`, `verifiedAt`, `youthcenterId` |
 | 기업 | `COMPANY#{companyId}` | `META` | `COMPANY#{시도코드}` / `name` | `name`, `bizNo`, `industry`, `size`, `highlights[]`, `source`, `asOf` |
@@ -174,6 +176,7 @@ MVP는 CloudWatch 구조화 로그(EMF). 필드 `evaluationId`, `requestId`, `an
 | 하고 싶은 것 | 방법 |
 |---|---|
 | 공고 여러 개 목록 | 후보 ID는 S3 Vectors → BatchGetItem `LATEST` |
+| 검색어·회사 이름으로 공고 찾기 | Query `PK = POSTNAMES` → 맞는 ID를 BatchGetItem `LATEST`. 벡터 후보에 더한다 (B-D08) |
 | 공고 상세 | GetItem `LATEST` → GetItem `SNAP#{snapshotId}` |
 | 부산 공고 마감 임박순 | GSI1 `POSTING#26`, `GSI1SK >= 오늘` |
 | 부산 대안 후보 | GetItem `ALTS` |

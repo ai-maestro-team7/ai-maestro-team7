@@ -26,7 +26,7 @@ from ..config import require_env
 from ..core import clock
 from ..models.errors import aws_service_error, invalid_input
 from ..models.policy import Policy
-from ..models.posting import AltCandidates, CompanyRecord, PostingLatest, PostingSnapshot
+from ..models.posting import AltCandidates, CompanyRecord, PostingLatest, PostingName, PostingSnapshot
 from ..models.profile import BasicProfile, OppPrefs
 from ..models.user_state import ExplanationCache, Notification, PolicyAlert, SavedItem
 from ..ports import IdemResult
@@ -231,6 +231,8 @@ class DynamoCatalog:
     """`team07-catalog`. 테이블 이름은 인자, 없으면 환경변수 `TABLE_CATALOG`."""
 
     META_PK, META_SK = "META#OPP", "INGEST"
+    NAMES_PK = "POSTNAMES"  # 진행 중 공고의 이름 색인 (B-D08). SK는 `POSTING#{jobPostingId}`
+    NAMES_CACHE_SECONDS = 60  # API Lambda 안에서 이름 색인을 다시 읽지 않고 쓰는 시간
 
     def __init__(self, resource=None, table_name: str | None = None, *,
                  now: Callable[[], datetime] = clock.now_kst, sleep: Callable[[float], None] = time.sleep,
@@ -239,6 +241,7 @@ class DynamoCatalog:
         self.t = _Table(self.resource, table_name or require_env("TABLE_CATALOG"), service="dynamodb", now=now)
         self.sleep = sleep
         self.max_retries = max_retries
+        self._names: tuple[float, list[PostingName]] | None = None
 
     # -- 키
     @staticmethod
@@ -294,6 +297,15 @@ class DynamoCatalog:
             rows.append(row)
         return sorted(rows, key=lambda p: (p.closes_at, p.job_posting_id))[:limit]
 
+    def posting_names(self):
+        """이름 색인 파티션 하나를 Query로 읽는다 (Scan 없이). 1분 동안은 읽은 것을 그대로 쓴다."""
+        if self._names and time.monotonic() - self._names[0] < self.NAMES_CACHE_SECONDS:
+            return self._names[1]
+        rows = [PostingName.model_validate(i) for i in self.t.query(
+            KeyConditionExpression="PK = :pk", ExpressionAttributeValues={":pk": self.NAMES_PK})]
+        self._names = (time.monotonic(), rows)
+        return rows
+
     def query_policies(self, region_key):
         rows = [Policy.model_validate(i) for i in self.t.query(
             IndexName=GSI1, KeyConditionExpression="GSI1PK = :pk",
@@ -328,6 +340,19 @@ class DynamoCatalog:
         sido = None if latest.work_region.unknown else latest.work_region.sido
         self.t.upsert(self._posting_pk(latest.job_posting_id), "LATEST", "PostingLatest", latest,
                       gsi=(f"POSTING#{sido}", latest.closes_at) if sido else None, drop_gsi=not sido)
+        self.put_posting_name(latest)
+
+    def put_posting_name(self, latest):
+        """이름 색인 한 줄을 LATEST에 맞춘다 (B-D08). 진행 중이면 쓰고, 마감 처리된 공고는 지운다.
+        `put_latest`가 부른다. 색인이 없던 기존 공고를 채울 때도 이것만 부르면 된다."""
+        self._names = None
+        sk = self._posting_pk(latest.job_posting_id)
+        if latest.is_expired:
+            self.t.delete(self.NAMES_PK, sk)
+            return
+        self.t.upsert(self.NAMES_PK, sk, "PostingName", PostingName(
+            job_posting_id=latest.job_posting_id, organization=latest.organization, title=latest.title,
+            job_name=latest.job.name, closes_at=latest.closes_at))
 
     def put_alts(self, alts):
         self.t.upsert(self._posting_pk(alts.job_posting_id), "ALTS", "AltCandidates", alts)
