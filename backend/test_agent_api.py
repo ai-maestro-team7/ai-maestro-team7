@@ -162,6 +162,11 @@ def main():
     check("원문·인용문·미보유 확인 역량은 문맥에서 뺀다",
           "이력서 원문 인용" not in context and "원문 경험 전체" not in context and "Java" not in context)
     check("확인 여부를 구분해 넘긴다", '"name":"SQL","confirmed":true' in context and '"name":"Tableau","confirmed":false' in context)
+    check("확인된 역량만 다음 검색 질의에 쓴다", agent_api.CareerDocsAdapter().resume_terms("demo1") == ["SQL"])
+    check("원문 근거·AI 추론·사용자 확인을 구분한다", agent_api.CareerDocsAdapter().career_summary("demo1")["skills"][0]["source"] == "USER"
+          and agent_api.CareerDocsAdapter().career_summary("demo1")["skills"][1]["source"] == "AI_INFERENCE")
+    check("프로필 요약에 인용문을 싣지 않는다", "이력서 원문 인용" not in json.dumps(
+          agent_api.CareerDocsAdapter().career_summary("demo1"), ensure_ascii=False))
     check("CHAT_MODEL_ID가 없으면 MODEL_ID", agent_api.model_id() == "test-model")
     os.environ["CHAT_MODEL_ID"] = "chat-model"
     check("CHAT_MODEL_ID가 있으면 그 값", agent_api.model_id() == "chat-model")
@@ -252,6 +257,36 @@ def main():
     # 6. 비동기 이벤트 입구 (같은 작업 두 번 → 한 번만)
     out = lambda_handler({"agentTask": {"userId": "demo1", "sessionId": sid, "messageId": mid}}, None)
     check("agentTask 이벤트: 끝난 턴은 SKIPPED", out["status"] == "SKIPPED")
+
+    # 7. 새 이력서가 실패했을 때 이전 프로필을 새 결과로 전달하지 않는다 (#196)
+    table.put_item(Item={"PK": "USER#demo1", "SK": "DOC_LATEST#doc-new", "documentId": "doc-new",
+                         "ownerUserId": "demo1", "documentType": "RESUME", "extractionStatus": "FAILED"})
+    runner.script = lambda tools: "이력서 처리가 실패했어요. 내용을 다시 확인해 주세요."
+    s, fresh = call("POST", "/api/v1/agent/chat", {"message": "새 이력서 확인", "attachments": [{"documentId": "doc-new"}]})
+    s, answer = call("GET", f"/api/v1/agent/chat/{fresh['sessionId']}/messages/{fresh['messageId']}")
+    context = runner.runs[-1]["message"]
+    check("실패한 새 이력서에 이전 프로필 내용 없음", '"careerProfile":{}' in context and '"status":"FAILED"' in context)
+    check("이력서 근거 확인 화면 행동", any(a["type"] == "REVIEW_RESUME" and a["documentId"] == "doc-new"
+          for a in answer["actions"]))
+    check("다른 사용자는 이력서를 채팅에 붙일 수 없다", call("POST", "/api/v1/agent/chat", {
+          "message": "이력서 확인", "attachments": [{"documentId": "doc-new"}]}, user="demo2")[0] == 404)
+
+    # A가 새 문서를 처리하고 사용자가 확인한 최신 프로필만 검색 질의에 들어간다
+    table.put_item(Item={"PK": "USER#demo1", "SK": "DOC_LATEST#doc-new", "documentId": "doc-new",
+                         "ownerUserId": "demo1", "documentType": "RESUME", "extractionStatus": "COMPLETED"})
+    table.put_item(Item={"PK": "USER#demo1", "SK": "PROFILE#p-1#V#0002", "profileId": "p-1",
+                         "profileVersion": 2, "ownerUserId": "demo1", "sourceDocumentIds": ["doc-new"],
+                         "skills": [{"name": "Python", "factStatus": "VERIFIED", "evidenceLevel": "EVIDENCED",
+                                     "evidenceIds": ["ev-new"]},
+                                    {"name": "AWS", "factStatus": "NEEDS_CONFIRMATION", "evidenceLevel": "PARTIAL"}],
+                         "evidence": [{"evidenceId": "ev-new", "sourceDocumentId": "doc-new",
+                                       "quotedText": "민감한 이력서 원문"}]})
+    table.put_item(Item={"PK": "USER#demo1", "SK": "PROFILE#LATEST", "latestProfileId": "p-1", "latestVersion": 2})
+    check("최신 확인 역량만 검색에 사용", agent_api.CareerDocsAdapter().resume_terms("demo1") == ["Python"])
+    s, fresh = call("POST", "/api/v1/agent/chat", {"message": "내용 확인", "attachments": [{"documentId": "doc-new"}]})
+    context = runner.runs[-1]["message"]
+    check("새 문서의 프로필만 READY로 연결", '"status":"READY"' in context and '"name":"Python"' in context)
+    check("새 문서 인용문은 모델에 전달하지 않음", "민감한 이력서 원문" not in context)
 
     print(f"\n{sum(results)}/{len(results)} 통과")
     raise SystemExit(0 if all(results) else 1)

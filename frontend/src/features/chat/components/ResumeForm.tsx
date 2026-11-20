@@ -63,7 +63,7 @@ export function ResumeForm({
       <p className="text-small text-grey-600">
         {state === "reading"
           ? "이력서에서 역량을 찾고 있어요. 1분쯤 걸려요."
-          : "내 서류함에 저장되고, 찾은 역량은 확인 전 상태로 공고 검색에만 써요."}
+          : "내 서류함에 저장돼요. 찾은 역량은 근거를 확인한 뒤 공고 검색에 쓸 수 있어요."}
       </p>
       <div className="flex gap-2">
         <Button size="M" onClick={submit} disabled={state === "reading" || !text.trim()}>

@@ -56,7 +56,8 @@ export type ChatAction =
   | ({ type: "START_INTERVIEW"; job: string; documentId: string; title?: string } & LinkedPosting)
   | ({ type: "REQUEST_COVER_LETTER"; job: string; minChars: number; maxChars: number } & LinkedPosting)
   /** 사용자가 채팅으로 저장을 승낙해 Agent가 저장했다 (D-40) */
-  | { type: "CONDITIONS_SAVED"; conditions: string[] };
+  | { type: "CONDITIONS_SAVED"; conditions: string[] }
+  | { type: "REVIEW_RESUME"; documentId: string };
 
 export type ChatError = { code: string; message: string; retryable: boolean };
 

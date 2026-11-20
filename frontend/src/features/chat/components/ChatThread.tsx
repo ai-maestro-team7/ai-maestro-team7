@@ -237,12 +237,14 @@ export function ChatThread({
 
   function onResumeReady(documentId: string) {
     setResumeOpen(false);
-    void send("이력서를 올렸어요. 이력서로 맞는 공고와 청년정책 찾아 줘", [{ documentId }]);
+    void send("이력서를 올렸어요. 추출한 내용과 원문 근거를 확인하고 싶어요", [{ documentId }]);
   }
 
   function onPdfReady(documentId: string, fileName: string, kind: "RESUME" | "COVER_LETTER") {
     const what = kind === "COVER_LETTER" ? "자기소개서" : "이력서";
-    void send(`${what} ‘${fileName}’을 올렸어요. 내 서류로 맞는 공고와 청년정책 찾아 줘`, [{ documentId }]);
+    void send(kind === "RESUME"
+      ? `이력서 ‘${fileName}’을 올렸어요. 추출한 내용과 원문 근거를 확인하고 싶어요`
+      : `${what} ‘${fileName}’을 올렸어요. 내 서류로 맞는 공고와 청년정책 찾아 줘`, [{ documentId }]);
   }
 
   const last = messages[messages.length - 1];

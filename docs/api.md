@@ -141,6 +141,10 @@ A의 REST 요청은 백엔드에서 확인한 사용자 ID를 `mentoring.api.res
 | 기본 프로필 | `PROFILE#BASIC` | `/api/v1/me/profile` | 나이, 거주지, 학교, 학력, 전공, 희망 직무, 취업 상태 (온보딩), 희망 최소 연봉·신입/경력 (D-40) |
 | 역량 프로필 | `PROFILE#LATEST` → `PROFILE#{id}#V#n` | `/api/v1/mentoring/profiles/me` | 이력서에서 뽑은 역량과 근거 (A) |
 
+역량 검토 화면은 인증된 `GET /api/v1/mentoring/profiles/me`에서 `sourceDocumentIds`와 각 항목의 `evidenceIds`·`evidence[].quotedText`를 읽는다. 채팅 응답과 모델 입력에는 인용문을 싣지 않는다. 검토 대상 문서 ID가 최신 프로필의 `sourceDocumentIds`에 없으면 그 프로필을 해당 문서의 결과로 보여 주지 않는다.
+
+`POST /api/v1/mentoring/profiles/{profileId}/confirm`은 기존 `baseVersion`, `decisions[]`(역량), `additions[]`(역량)에 `entryDecisions[]`를 선택적으로 더 받는다. 각 항목은 `{group: "PROJECT" | "EXPERIENCE" | "CERTIFICATE", itemId, action: "CONFIRM" | "RENAME" | "DELETE", name?}`다. `RENAME`은 `name`(1자 이상, 설정된 길이 이하)을 요구한다. 프로젝트·경험의 요약·기간과 근거 인용은 이 API에서 바꾸지 않는다. 사용자 확인은 새 프로필 버전을 만들고, 구 버전은 보존한다. 다른 사용자·없는 항목은 404/400, 오래된 `baseVersion`은 409다.
+
 ### 6.6 에이전트
 
 - 통합 Agent (D-38): Strands Agents를 `team07-api` 안에서 돌린다 (`ai/supervisor/` → `supervisor` 패키지, 입구 `/api/v1/agent/chat`). 도구는 B `agent_feed`·`agent_policies`·`ask_policies`(Bedrock Action Group 경로와 같은 함수)와 A 문서·프로필을 부른다. C 면접관은 Strands이고 Agent끼리 직접 부르지 않는다 (면접 화면 이동, `docs/개발계획서4.md` §10).

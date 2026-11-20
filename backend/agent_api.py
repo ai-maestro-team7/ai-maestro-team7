@@ -55,7 +55,11 @@ def entries(items, limit):
         name = clip(item.get("name"), 60)
         if not name:
             continue
-        entry = {"name": name, "summary": clip(item.get("summary"), 120), "period": clip(item.get("period"), 30)}
+        has_evidence = bool(item.get("evidenceIds"))
+        confirmed = item.get("factStatus") == "VERIFIED"
+        entry = {"name": name, "summary": clip(item.get("summary"), 120), "period": clip(item.get("period"), 30),
+                 "confirmed": confirmed, "hasEvidence": has_evidence,
+                 "source": "RESUME" if has_evidence else "USER" if confirmed else "AI_INFERENCE"}
         out.append({k: v for k, v in entry.items() if v})
     return out[:limit]
 
@@ -151,10 +155,11 @@ class CareerDocsAdapter:
         version = int(latest["latestVersion"])
         item = table().get_item(Key={"PK": pk(user_id),
                                      "SK": f"PROFILE#{latest['latestProfileId']}#V#{version:04d}"}).get("Item")
-        return to_plain(item) if item else {}
+        profile = to_plain(item) if item else {}
+        return profile if profile.get("ownerUserId", user_id) == user_id else {}
 
     def resume_terms(self, user_id):
-        return [s["name"] for s in self.career_summary(user_id).get("skills", [])][:MAX_RESUME_TERMS]
+        return [s["name"] for s in self.career_summary(user_id).get("skills", []) if s["confirmed"]][:MAX_RESUME_TERMS]
 
     def career_summary(self, user_id):
         """A 역량 프로필과 경험 블록의 요약만 (원문·인용문·근거 위치는 뺀다). 목록마다 앞에서부터 자른다."""
@@ -163,14 +168,20 @@ class CareerDocsAdapter:
         for skill in profile.get("skills") or []:
             name = clip(skill.get("name"), 50)
             if name and skill.get("evidenceLevel") not in NOT_SKILL and name not in [s["name"] for s in skills]:
-                skills.append({"name": name, "confirmed": skill.get("factStatus") == "VERIFIED",
-                               "evidence": EVIDENCE_WORDS.get(skill.get("evidenceLevel"), "확인 필요")})
+                confirmed = skill.get("factStatus") == "VERIFIED"
+                has_evidence = bool(skill.get("evidenceIds"))
+                skills.append({"name": name, "confirmed": confirmed,
+                               "evidence": EVIDENCE_WORDS.get(skill.get("evidenceLevel"), "확인 필요"),
+                               "hasEvidence": has_evidence,
+                               "source": "RESUME" if has_evidence else "USER" if confirmed else "AI_INFERENCE"})
         summary = {
+            "profileId": profile.get("profileId"),
+            "profileVersion": profile.get("profileVersion"),
+            "sourceDocumentIds": profile.get("sourceDocumentIds") or [],
             "skills": skills[:SUMMARY_LIMITS["skills"]],
             "projects": entries(profile.get("projects"), SUMMARY_LIMITS["projects"]),
             "experiences": entries(profile.get("experiences"), SUMMARY_LIMITS["experiences"]),
-            "certificates": [clip(c.get("name"), 50) for c in profile.get("certificates") or []
-                             if clip(c.get("name"), 50)][:SUMMARY_LIMITS["certificates"]],
+            "certificates": entries(profile.get("certificates"), SUMMARY_LIMITS["certificates"]),
             "needsConfirmation": [clip(n, 80) for n in profile.get("needsConfirmation") or []
                                   if clip(n, 80)][:SUMMARY_LIMITS["needsConfirmation"]],
             "stories": self._stories(user_id),

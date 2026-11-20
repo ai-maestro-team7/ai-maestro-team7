@@ -8,7 +8,7 @@ import pytest
 from fakes import NOW, ScriptedRunner, build_deps, cover_letter, invalid, reply
 from supervisor import service
 from supervisor.errors import SupervisorError
-from supervisor.models import ActionType, ChatAction, MessageStatus
+from supervisor.models import ActionType, ChatAction, DocumentInfo, MessageStatus
 
 
 def ask(deps, message="부산 데이터 분석 신입 공고 찾아줘", user="demo1", **extra):
@@ -290,6 +290,36 @@ def test_user_context_is_sent_as_data_with_experience():
     assert all("<user_context>" not in m.content for m in stored)  # 문맥은 저장하지 않는다
 
 
+@pytest.mark.parametrize("status, expected", [("FAILED", "FAILED"), ("ANALYZING", "PROCESSING")])
+def test_new_resume_does_not_inherit_old_profile(status, expected):
+    document = DocumentInfo(document_id="doc-new", document_type="RESUME", status=status)
+    summary = {"profileId": "profile-old", "sourceDocumentIds": ["doc-old"],
+               "skills": [{"name": "이전 이력서 역량", "confirmed": True}]}
+    deps = build_deps(ScriptedRunner(lambda tools: reply("새 이력서 내용을 확인 중이에요.")),
+                      documents=[document], terms=["이전 이력서 역량"], summary=summary)
+    _, result, message = ask(deps, "새 이력서를 올렸어요", attachments=[{"documentId": "doc-new"}])
+    assert result["status"] == "COMPLETED"
+    block = json.loads(deps.runner.runs[-1]["message"].split("<user_context>\n", 1)[1].split("\n</user_context>", 1)[0])
+    assert block["careerProfile"] == {}
+    assert block["resumeReview"] == {"documentId": "doc-new", "status": expected}
+    assert "이전 이력서 역량" not in deps.runner.runs[-1]["message"]
+    assert any(action["type"] == "REVIEW_RESUME" and action["documentId"] == "doc-new"
+               for action in message["actions"])
+
+
+def test_ready_resume_links_only_its_profile_without_quotes():
+    document = DocumentInfo(document_id="doc-new", document_type="RESUME", status="COMPLETED")
+    summary = {"profileId": "profile-new", "sourceDocumentIds": ["doc-new"],
+               "skills": [{"name": "SQL", "confirmed": False, "hasEvidence": True}]}
+    deps = build_deps(ScriptedRunner(lambda tools: reply("이력서 내용을 확인해 주세요.")),
+                      documents=[document], summary=summary)
+    _, _, message = ask(deps, "새 이력서 내용 확인", attachments=[{"documentId": "doc-new"}])
+    block = json.loads(deps.runner.runs[-1]["message"].split("<user_context>\n", 1)[1].split("\n</user_context>", 1)[0])
+    assert block["careerProfile"] == summary
+    assert block["resumeReview"]["status"] == "READY"
+    assert message["actions"][0] == {"type": "REVIEW_RESUME", "documentId": "doc-new", "conditions": []}
+
+
 def test_numbers_from_user_context_are_grounded():
     deps = build_deps(ScriptedRunner(lambda tools: reply("매출 데이터 4,200건을 분석한 '캡스톤 매출 분석' 경험이 이어져요.")),
                       summary=SUMMARY)
@@ -361,7 +391,7 @@ def test_prompt_v3_rules():
     for rule in ("공식 데이터에는 조건에 맞는 공고가 없어요", "teamDataNote", "save_search_conditions",
                  "`saved=true`일 때만", "묻지 않았는데 저장하지 않는다", "실시간으로 부르지 않는다"):
         assert rule in prompt
-    assert deps.config.prompt_version == "chat-v7"
+    assert deps.config.prompt_version == "chat-v8"
 
 
 def test_prompt_v6_rules():

@@ -235,6 +235,16 @@ export function getProfile(): Promise<ProfileResponse> {
   return request("/api/v1/mentoring/profiles/me");
 }
 
+export function confirmProfile(profile: ProfileResponse, change: {
+  decisions?: Array<{ skillId: string; action: "CONFIRM" | "RENAME" | "DELETE" | "NOT_HELD"; name?: string }>;
+  additions?: Array<{ name: string }>;
+  entryDecisions?: Array<{ group: "PROJECT" | "EXPERIENCE" | "CERTIFICATE"; itemId: string;
+                          action: "CONFIRM" | "RENAME" | "DELETE"; name?: string }>;
+}): Promise<ProfileResponse> {
+  return post(`/api/v1/mentoring/profiles/${encodeURIComponent(profile.profileId)}/confirm`,
+    { baseVersion: profile.profileVersion, ...change }, "profile-confirm");
+}
+
 export function createAnalysis(profile: ProfileResponse, targetNcsCode: string): Promise<CreateResourceResponse> {
   return post(
     "/api/v1/mentoring/analyses",

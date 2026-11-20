@@ -200,9 +200,12 @@ def run_turn(deps: Deps, task: dict) -> dict:
                                       "config_version": deps.config.config_version})
     if error is None and reply is not None and tools is not None:
         notice, data_as_of = compose.notice_and_as_of(tools.record)
+        resume_document = tools.attached_resume()
         final = base.model_copy(update={
             "status": MessageStatus.COMPLETED, "content": reply.reply, "follow_ups": reply.follow_ups,
-            "cards": compose.cards(tools.record), "actions": compose.actions(deps, tools.record),
+            "cards": compose.cards(tools.record),
+            "actions": compose.actions(deps, tools.record,
+                                       resume_document_id=resume_document.document_id if resume_document else None),
             "tool_calls": tools.record.calls, "notice": notice, "data_as_of": data_as_of})
     else:
         final = base.model_copy(update={"status": MessageStatus.FAILED, "error": error,
