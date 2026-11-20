@@ -10,6 +10,7 @@ from pydantic import Field
 
 from .base import OppModel
 from .enums import (
+    CareerType,
     CompareKey,
     ConditionResult,
     EligibilityStatus,
@@ -65,6 +66,7 @@ class PostingCard(OppModel):
     closes_at: str
     rolling: bool = False
     salary: Salary
+    career_type: CareerType = CareerType.UNKNOWN  # 신입/경력 (개발계획서4 §9)
     match_score: float
     match_level: MatchLevel
     rank_score: float | None = None

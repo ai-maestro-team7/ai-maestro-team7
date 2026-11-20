@@ -287,6 +287,80 @@ def test_profile_without_jobs_is_incomplete(deps, as_of):
     assert e.value.code == "PROFILE_INCOMPLETE" and e.value.status == 422
 
 
+# ---------------------------------------------------------------- 대화 조건 (개발계획서4 §9, B-S1)
+def _set_latest(deps, job_posting_id, **update):
+    latest = deps.catalog.get_latest(job_posting_id)
+    deps.catalog.put_latest(latest.model_copy(update=update))
+
+
+def test_job_name_searches_without_saved_jobs_and_is_not_saved(deps, as_of):
+    deps.users.profiles["empty"] = BasicProfile(major="통계학")
+    cards = feed(deps, as_of, "empty", job_name="데이터 분석").items
+    assert cards
+    assert deps.users.get_basic_profile("empty").desired_jobs == []  # 저장하지 않는다
+
+
+def test_job_name_same_as_saved_keeps_saved_codes(deps):
+    saved = deps.users.get_basic_profile("demo1")
+    same = ranking.with_job_name(saved, f"  {saved.desired_jobs[0].name} ")
+    assert same.desired_jobs == saved.desired_jobs[:1]
+    other = ranking.with_job_name(saved, "마케팅")
+    assert other.desired_jobs == [DesiredJob(name="마케팅")] and ranking.with_job_name(saved, None) is saved
+
+
+def test_min_salary_drops_only_disclosed_lower_salary(deps, as_of):
+    _set_latest(deps, w.BUSAN_DATA, salary=Salary(disclosed=True, min=2800, max=2900))
+    _set_latest(deps, w.SEOUL_DATA, salary=Salary(disclosed=False))
+    _set_latest(deps, w.BUSAN_DATA_PUBLIC, salary=Salary(disclosed=True, min=3200, max=None))
+    kept = ids(feed(deps, as_of, min_salary=3000))
+    assert w.BUSAN_DATA not in kept           # 공개 급여 상한 2,900 < 3,000
+    assert w.SEOUL_DATA in kept               # 비공개 급여는 남긴다 (미확인 ≠ 미달)
+    assert w.BUSAN_DATA_PUBLIC in kept        # 상한이 없으면 하한으로 본다
+    assert w.BUSAN_DATA in ids(feed(deps, as_of, min_salary=2900))
+
+
+def test_career_type_keeps_any_and_unknown(deps, as_of):
+    from opportunity.models.enums import CareerType
+    _set_latest(deps, w.BUSAN_DATA, career_type=CareerType.EXPERIENCED)
+    _set_latest(deps, w.SEOUL_DATA, career_type=CareerType.NEW)
+    _set_latest(deps, w.BUSAN_DATA_PUBLIC, career_type=CareerType.ANY)
+    new = set(ids(feed(deps, as_of, career_type="new")))
+    assert w.BUSAN_DATA not in new and {w.SEOUL_DATA, w.BUSAN_DATA_PUBLIC} <= new
+    experienced = set(ids(feed(deps, as_of, career_type="EXPERIENCED")))
+    assert w.SEOUL_DATA not in experienced and w.BUSAN_DATA in experienced
+    assert len(ids(feed(deps, as_of, career_type="ANY"))) == len(ids(feed(deps, as_of)))
+    card = next(c for c in feed(deps, as_of).items if c.job_posting_id == w.BUSAN_DATA)
+    assert card.career_type == CareerType.EXPERIENCED
+
+
+def test_organization_filter_ignores_spacing(deps, as_of):
+    org = deps.catalog.get_latest(w.BUSAN_DATA).organization
+    cards = feed(deps, as_of, organization=org.replace(" ", "").upper()).items
+    assert cards and all(c.organization == org for c in cards)
+
+
+def test_conditions_do_not_change_scores(deps, as_of):
+    """거르기만 하고 matchScore·rankScore는 그대로다."""
+    before = {c.job_posting_id: (c.match_score, c.rank_score) for c in feed(deps, as_of).items}
+    after = feed(deps, as_of, career_type="NEW", min_salary=0).items
+    assert after and all(before[c.job_posting_id] == (c.match_score, c.rank_score) for c in after)
+
+
+def test_bad_conditions_are_400(deps, as_of):
+    for kwargs in ({"min_salary": -1}, {"min_salary": True}, {"career_type": "INTERN"}):
+        with pytest.raises(OppError) as e:
+            feed(deps, as_of, **kwargs)
+        assert e.value.code == "INVALID_INPUT"
+
+
+def test_query_terms_go_only_to_embedding(deps, as_of, monkeypatch):
+    texts = []
+    inner = deps.embedder.embed
+    monkeypatch.setattr(deps.embedder, "embed", lambda text, kind: texts.append(text) or inner(text, kind=kind))
+    feed(deps, as_of, query_terms=["SQL", " ", "Tableau"])
+    assert texts and texts[-1].endswith("| SQL, Tableau")
+
+
 def test_ask_leave_reason_only_once_for_capital(deps, as_of):
     assert feed(deps, as_of, region="ALL").ask_leave_reason is False
     assert feed(deps, as_of, region="CAPITAL").ask_leave_reason is True

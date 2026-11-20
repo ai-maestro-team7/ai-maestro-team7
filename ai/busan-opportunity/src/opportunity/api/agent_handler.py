@@ -5,6 +5,8 @@ userId는 `sessionAttributes.userId`에서만 읽는다 (A 백엔드가 InvokeAg
 없고, 요청 파라미터에 userId가 섞여 와도 쓰지 않는다 (T-20).
 저장 경로 `POST /agent/saved`는 P1이라 아직 없다.
 
+`agent_feed`·`agent_policy_list`는 채팅 Agent(`supervisor`, D-38) 도구도 그대로 부른다. 두 입구가 같은 응답을 받는다.
+
 스키마 다시 만들기: `python -m opportunity.api.agent_handler` → `api/schema.json`
 """
 
@@ -22,7 +24,8 @@ from ..config import get_config
 from ..core import clock
 from ..core.alternatives import find_busan_alternatives
 from ..core.compare import compare_postings
-from ..core.copy_rules import MATCH_LEVEL_LABEL, MATCH_NOT_PROBABILITY, deadline_label, salary_label
+from ..core import regions
+from ..core.copy_rules import MATCH_LEVEL_LABEL, MATCH_NOT_PROBABILITY, career_label, deadline_label, salary_label
 from ..core.policies import match_policies
 from ..core.posting_detail import get_regional_talent
 from ..core.ranking import search_postings
@@ -40,7 +43,7 @@ from ..models.api import (
 )
 from ..models.base import OppModel
 from ..models.enums import PolicyStage
-from ..models.errors import OppError
+from ..models.errors import OppError, invalid_input
 from ..models.posting import Badge
 from . import errors
 
@@ -63,6 +66,7 @@ class AgentPosting(OppModel):
     closes_at: str
     deadline: str | None = None  # "마감 D-9", "상시 채용"
     salary: str                  # "연 3,400~3,800만 원", "공고에 없음"
+    career: str = "공고에 없음"  # "신입", "경력", "경력 무관", "공고에 없음"
     match_level: str             # "잘 맞아요" 같은 3단계 말. 숫자 점수는 주지 않는다
     eligibility: str | None = None
     badges: list[str] = Field(default_factory=list)
@@ -152,7 +156,7 @@ def _posting(card: PostingCard, as_of) -> AgentPosting:
         work_region=card.work_region.label, is_busan=card.is_busan, is_capital_area=card.is_capital_area,
         closes_at=card.closes_at, deadline=_deadline(card.closes_at, as_of),
         salary=salary_label(card.salary.disclosed, card.salary.min, card.salary.max),
-        match_level=MATCH_LEVEL_LABEL[card.match_level],
+        career=career_label(card.career_type), match_level=MATCH_LEVEL_LABEL[card.match_level],
         eligibility=str(card.eligibility.status) if card.eligibility else None,
         badges=_badges(card.badges), facts=card.facts, busan_alternatives_count=card.busan_alternatives_count,
         is_sample=card.is_sample)
@@ -174,6 +178,55 @@ def _policy(card: PolicyCard) -> AgentPolicy:
         benefit=card.benefit.text if card.benefit else None,
         selection=str(app.selection) if app.selection else None, apply_start=app.apply_start,
         apply_end=app.apply_end, expected=app.expected, source=card.source, as_of=card.as_of, url=card.url)
+
+
+# ---------------------------------------------------------------- 두 입구가 같이 쓰는 함수
+_REGION_WORDS = {"ALL": "ALL", "전국": "ALL", "BUSAN": "BUSAN", "CAPITAL": "CAPITAL", "수도권": "CAPITAL",
+                 "OVERSEAS": "OVERSEAS", "해외": "OVERSEAS"}
+_SIDO_BY_NAME = {name: code for code, name in regions.SIDO_NAMES.items()}
+_SIDO_ALIASES = {"서울시": "서울", "서울특별시": "서울", "부산시": "부산", "부산광역시": "부산", "경기도": "경기",
+                 "경상남도": "경남", "경상북도": "경북", "전라남도": "전남", "전라북도": "전북", "충청남도": "충남",
+                 "충청북도": "충북", "강원도": "강원", "제주도": "제주", "인천시": "인천", "대구시": "대구",
+                 "광주시": "광주", "대전시": "대전", "울산시": "울산", "세종시": "세종"}
+
+
+def resolve_region(value: str | None) -> str:
+    """Agent가 준 지역 말을 피드 region 값으로. ALL·BUSAN·CAPITAL·OVERSEAS, 시·도 코드, 시·도 이름("서울", "경남")을 받는다."""
+    text = (value or "ALL").strip()
+    upper = text.upper()
+    if upper in _REGION_WORDS or text in _REGION_WORDS:
+        region = _REGION_WORDS.get(upper) or _REGION_WORDS[text]
+        return region
+    if text in regions.SIDO_NAMES:
+        return text
+    name = _SIDO_ALIASES.get(text, text)
+    if name == "부산":
+        return "BUSAN"
+    if name in _SIDO_BY_NAME:
+        return _SIDO_BY_NAME[name]
+    raise invalid_input("region 값이 올바르지 않아요. 전국, 부산, 수도권, 해외 또는 시·도 이름을 주세요.", field="region")
+
+
+def agent_feed(deps: Deps, user_id: str, *, keyword: str | None = None, region: str | None = "ALL",
+               limit: int | None = None, job_name: str | None = None, query_terms: list[str] | None = None,
+               min_salary: int | None = None, career_type: str | None = None,
+               organization: str | None = None) -> AgentFeed:
+    """줄인 공고 목록 (최대 agent.maxPostings개). 대화 조건은 `search_postings`가 거른다 (개발계획서4 §9)."""
+    cap = deps.config.agent.max_postings
+    size = min(limit or cap, cap)
+    feed = search_postings(deps, user_id, region=resolve_region(region), keyword=keyword, limit=size,
+                           job_name=job_name, query_terms=query_terms, min_salary=min_salary,
+                           career_type=career_type, organization=organization)
+    as_of = _as_of(deps, user_id)
+    return AgentFeed(items=[_posting(card, as_of) for card in feed.items[:size]], ranking_basis=feed.ranking.basis,
+                     empty_message=feed.empty_message, data_as_of=feed.data_as_of, stale=feed.stale)
+
+
+def agent_policy_list(deps: Deps, user_id: str, *, stage: PolicyStage | str | None = None) -> AgentPolicies:
+    """정책 지갑을 단계 구분 없이 한 줄로 편다."""
+    wallet = match_policies(deps, user_id, stage=stage)
+    items = [_policy(card) for bucket in wallet.buckets.values() for card in bucket]
+    return AgentPolicies(items=items, totals=wallet.totals, data_as_of=wallet.data_as_of)
 
 
 # ---------------------------------------------------------------- 요청 도우미
@@ -204,15 +257,16 @@ def _max_postings() -> int:
                        "적합도는 3단계 말로만 준다.")
 def agent_search_postings(
     keyword: Annotated[str | None, Query(description="찾을 직무·회사 낱말. 없으면 희망 직무로 찾는다")] = None,
-    region: Annotated[Literal["ALL", "BUSAN"], Query(description="ALL(전국) 또는 BUSAN(부산 근무만)")] = "ALL",
+    region: Annotated[str, Query(description="ALL(전국), BUSAN(부산 근무만), CAPITAL(수도권) 또는 시·도 이름")] = "ALL",
     limit: Annotated[int | None, Query(description=f"돌려받을 공고 수. 최대 {MAX_POSTINGS_DOC}", ge=1)] = None,
+    jobName: Annotated[str | None, Query(description="이번 검색에만 쓸 희망 직무 이름. 저장하지 않는다")] = None,
+    minSalary: Annotated[int | None, Query(description="최소 연봉 (만 원/년). 급여 비공개 공고는 남긴다", ge=0)] = None,
+    careerType: Annotated[Literal["NEW", "EXPERIENCED", "ANY"] | None,
+                          Query(description="NEW(신입), EXPERIENCED(경력), ANY(무관)")] = None,
+    organization: Annotated[str | None, Query(description="기업·기관 이름")] = None,
 ) -> AgentFeed:
-    deps, user_id = _deps(), _user_id()
-    size = min(limit or _max_postings(), _max_postings())
-    feed = search_postings(deps, user_id, region=region, keyword=keyword, limit=size)
-    as_of = _as_of(deps, user_id)
-    return AgentFeed(items=[_posting(card, as_of) for card in feed.items[:size]], ranking_basis=feed.ranking.basis,
-                     empty_message=feed.empty_message, data_as_of=feed.data_as_of, stale=feed.stale)
+    return agent_feed(_deps(), _user_id(), keyword=keyword, region=region, limit=limit, job_name=jobName,
+                      min_salary=minSalary, career_type=careerType, organization=organization)
 
 
 @agent.get("/agent/postings/<jobPostingId>/alternatives",
@@ -250,9 +304,7 @@ def agent_compare(
 def agent_policies(
     stage: Annotated[PolicyStage | None, Query(description="PREPARE(취업 준비), EMPLOYED(취업 후), SETTLE(정착)")] = None,
 ) -> AgentPolicies:
-    wallet = match_policies(_deps(), _user_id(), stage=stage)
-    items = [_policy(card) for bucket in wallet.buckets.values() for card in bucket]
-    return AgentPolicies(items=items, totals=wallet.totals, data_as_of=wallet.data_as_of)
+    return agent_policy_list(_deps(), _user_id(), stage=stage)
 
 
 @agent.get("/agent/policies/search",
