@@ -20,7 +20,7 @@ type MorePages = { key: string; items: PostingCard[]; nextCursor?: string; pendi
 /**
  * 채용 공고 목록 (B-03 맞춤 피드): 지역 필터, 정렬 바꾸기, GNB 검색어(`?q=`), 더 보기.
  * 필터·정렬 줄과 안내 문구는 응답이 필요 없어 처음부터 그린다. 검색어를 읽는 아래쪽만 Suspense 안에 둔다.
- * 지역인재 전형 필터: 홈의 "지역인재 전형 공고 보기"는 `?talent=1`로 들어온다. 주소는 Feed(Suspense 안)가 읽어 알려 주고,
+ * 지역 혜택 필터: 홈의 "지역 혜택 공고 보기"는 `?talent=1`로 들어온다. 주소는 Feed(Suspense 안)가 읽어 알려 주고,
  * 사용자가 칩을 누르면 그 선택이 주소보다 우선한다.
  */
 export function JobList() {
@@ -41,7 +41,7 @@ export function JobList() {
           ))}
           <span aria-hidden className="mx-1 h-5 w-px self-center bg-grey-200" />
           <Chip selected={talentOnly} onClick={() => setTalentChoice(!talentOnly)}>
-            지역인재 전형
+            지역 혜택
           </Chip>
         </div>
         <button
@@ -196,8 +196,8 @@ function FeedResult({
       {notice && <p className="text-small text-grey-700">{notice}</p>}
       {talentOnly && (
         <p className="text-small text-grey-700">
-          이전 공공기관처럼 지역인재 전형이 있을 수 있는 공고예요. 학교 지역이 맞으면 &ldquo;지역인재 대상일 수 있음&rdquo;으로
-          표시해요. 자격은 공고문에서 확인해 주세요.
+          공고문의 지역 조건(비수도권·이전지역 인재, 지역 제한, 거주자 우대)이 내 학교 지역이나 사는 곳과 맞을 수 있는
+          공고예요. 학교 지역과 사는 곳은 프로필에서 바꿀 수 있어요. 자격은 공고문에서 확인해 주세요.
         </p>
       )}
       {items.length > 0 ? (
@@ -206,7 +206,7 @@ function FeedResult({
         <div className="flex w-full flex-col items-center gap-1 border-t border-b border-t-grey-800 border-b-grey-200 py-12 text-center">
           <p className="text-body font-bold text-grey-900">조건에 맞는 공고가 없어요</p>
           <p className="text-small text-grey-600">
-            {talentOnly ? "지역인재 전형이 있을 수 있는 공고가 지금은 없어요." : "지역이나 검색어를 바꿔 보세요."}
+            {talentOnly ? "학교 지역이나 사는 곳과 맞는 지역 조건 공고가 지금은 없어요." : "지역이나 검색어를 바꿔 보세요."}
           </p>
         </div>
       )}

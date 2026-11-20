@@ -86,7 +86,7 @@ function PostingView({ detail }: { detail: PostingDetailResponse }) {
   ].filter(Boolean);
   const regionalTalent =
     detail.regionalTalent && detail.regionalTalent.status !== "NOT_APPLICABLE"
-      ? (detail.regionalTalent.message ?? "지역인재 전형 대상일 수 있어요 · 공고문 확인")
+      ? (detail.regionalTalent.message ?? "지역 조건에 맞을 수 있어요 · 공고문 확인")
       : null;
 
   return (
