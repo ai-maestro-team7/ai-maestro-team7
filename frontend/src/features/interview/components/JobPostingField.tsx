@@ -125,7 +125,7 @@ export function JobPostingField({
         onChange={(event) => onChange({ ...draft, text: event.target.value })}
         placeholder="담당 업무, 자격 요건, 우대 사항을 붙여 넣거나 PDF에서 불러오세요"
         error={error}
-        counterSuffix={`/ ${RULES.postingMin}~${RULES.postingMax.toLocaleString()}자 · 비워 두면 공고 없이 진행`}
+        counterSuffix={`/ ${RULES.postingMax.toLocaleString()}자 · 비워 두면 공고 없이 진행`}
       />
       <div className="flex flex-wrap items-center gap-3">
         <input
