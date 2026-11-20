@@ -12,8 +12,10 @@ A(멘토링), B(부산 기회 추천), C(AI 모의면접) 명세의 공통 부�
 | `/api/v1/interview/*` | C 모의면접 | ✅ 배포 (면접 함수는 대역, `interview/` 패키지가 들어오면 교체) |
 | `/api/v1/mentoring/*` | A 멘토링 (`/profiles/me`는 **역량 프로필**) | 백엔드 연결 (`backend/mentoring_api.py`). A 패키지, AWS 의존성 팩터리 또는 필수 AWS 설정이 없으면 501 |
 | `/api/v1/opportunities/*` | B 부산 기회 추천 | 연결됨 (`backend/opportunities_api.py`). 배포는 백엔드 담당 확인 후 |
+| `/api/v1/agent/chat` (POST 202) · `/api/v1/agent/chat/{sessionId}` (GET) · `/api/v1/agent/chat/{sessionId}/messages/{messageId}` (GET) | 채팅 Agent (D-38, `docs/개발계획서4.md` §7) | 연결 (`backend/agent_api.py`). `supervisor` 패키지가 없으면 501 |
 | `/api/v1/me/profile` (GET, PUT) | 공통 **기본 프로필** (`PROFILE#BASIC`). PUT은 보낸 필드만 수정, `null`이면 삭제 | ✅ |
 | `/api/v1/me/workspaces` (GET `?status=`, POST) · `/api/v1/me/workspaces/{wsId}` (GET, PATCH) | 워크스페이스 목록·생성(중복이면 기존 것)·상세(연결된 분석·첨삭·학습·면접)·상태와 문서 버전 변경 | ✅ |
+| `/api/v1/me/reset` (POST) | 내 데이터 모두 지우기. 본문 없음. `USER#{userId}` 아래 아이템과 그 아이템이 가리키는 개인 문서·면접 음성·알림 일정을 지우고 `{deleted: {items, files, schedules}}`를 준다. 로그인 계정은 그대로다 (화면에서는 개발 모드에서만 보인다) | ✅ |
 | `/api/v1/auth/*`, `/api/v1/me` | 로그인 | ✅ |
 | `/api/v1/health` | 상태 확인 | ✅ |
 
@@ -49,7 +51,7 @@ A의 REST 요청은 백엔드에서 확인한 사용자 ID를 `mentoring.api.res
 - `X-User-Id` 헤더는 **배포 환경에서 꺼졌다** (로컬 테스트에서만 `ALLOW_DEV_USER_HEADER=1`).
 - 로그인 실패는 아이디가 없든 비밀번호가 틀리든 같은 `401 INVALID_CREDENTIALS` (아이디 존재 여부를 숨김).
 - 계정은 관리자만 만든다 (회원가입 없음). 계정 추가: `infra/seed_demo.py`에 추가 후 실행.
-- Bedrock Agent의 Action Group(B)은 `sessionAttributes.userId`만 쓴다 (A 백엔드가 InvokeAgent 때 토큰의 sub를 넣음).
+- 채팅 Agent(D-38) 도구에는 userId 인자가 없다. 백엔드가 토큰의 sub를 도구에 넣는다. B의 Bedrock Action Group 경로(남겨 둠)는 `sessionAttributes.userId`만 쓴다.
 
 **소셜 로그인 (Google·카카오, Cognito 외부 로그인 · 이슈 #98)** · OAuth 2.0 인가 코드 + PKCE
 
@@ -135,12 +137,14 @@ A의 REST 요청은 백엔드에서 확인한 사용자 ID를 `mentoring.api.res
 
 | 이름 | 저장 | API | 내용 |
 |---|---|---|---|
-| 기본 프로필 | `PROFILE#BASIC` | `/api/v1/me/profile` | 나이, 거주지, 학교, 학력, 전공, 희망 직무, 취업 상태 (온보딩) |
+| 기본 프로필 | `PROFILE#BASIC` | `/api/v1/me/profile` | 나이, 거주지, 학교, 학력, 전공, 희망 직무, 취업 상태 (온보딩), 희망 최소 연봉·신입/경력 (D-40) |
 | 역량 프로필 | `PROFILE#LATEST` → `PROFILE#{id}#V#n` | `/api/v1/mentoring/profiles/me` | 이력서에서 뽑은 역량과 근거 (A) |
 
 ### 6.6 에이전트
 
-- 통합 Agent: A의 Bedrock Agents, B는 Action Group `BusanOpportunity`로 붙는다. C 면접관은 Strands이고 Agent끼리 직접 부르지 않는다 (페이지 이동).
+- 통합 Agent (D-38): Strands Agents를 `team07-api` 안에서 돌린다 (`ai/supervisor/` → `supervisor` 패키지, 입구 `/api/v1/agent/chat`). 도구는 B `agent_feed`·`agent_policies`·`ask_policies`(Bedrock Action Group 경로와 같은 함수)와 A 문서·프로필을 부른다. C 면접관은 Strands이고 Agent끼리 직접 부르지 않는다 (면접 화면 이동, `docs/개발계획서4.md` §10).
+- 채팅 조건 저장 (D-40): Agent가 말로 묻고, 사용자가 채팅으로 승낙하면 저장 도구가(`me_api.update_profile`), [저장하기]를 누르면 화면이 `PUT /api/v1/me/profile`로 저장. 기본 프로필에 `desiredSalaryMin`(만 원/년), `desiredCareerType` 추가.
+- 채팅 공고 검색 순서 (`docs/개발계획서4.md` §9.1): 공식 데이터(공공 API 수집) → 없으면 그렇다고 말하고 팀 데이터. 시연 중 공공 API 실시간 호출은 없다.
 - 모델: `global.anthropic.claude-haiku-5-5`, `global.anthropic.claude-sonnet-5-5` (서울 리전에서 호출 확인). 모델 ID는 환경 변수·설정 파일로.
 
 ### 6.7 배포

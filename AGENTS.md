@@ -10,8 +10,9 @@ AI 코딩 에이전트(Claude Code 등)가 이 저장소에서 작업할 때 지
 - 방향: 부산에 남으라고 밀지 않는다. 부산에서도 맞는 기회를 발견하고 사용자가 스스로 고르게 돕는다.
 
 ## 저장소 현황
-- 최상위 폴더는 `ai/{mentoring, busan-opportunity, interview}`, `backend/`, `frontend/`, `infra/`, `examples/` (PR #1·#2, #9~#14).
-- 백엔드·인프라·공통 문서가 들어와 배포돼 있다: `README.md`, `.gitignore`, `.python-version`(3.13), `backend/`(단일 Lambda `team07-api`, 테스트 62개), `infra/`(AWS CLI 스크립트), `docs/api.md`(공통 API 규칙)·`docs/db-schema.md`(v1.3)·`docs/team-guide.md`. 테스트·배포 명령은 README. CI는 없다.
+- 최상위 폴더는 `ai/{mentoring, busan-opportunity, interview, supervisor}`, `backend/`, `frontend/`, `infra/`, `examples/` (PR #1·#2, #9~#14, #122).
+- 서비스 입구는 홈 채팅 Agent다 (D-39, `docs/개발계획서4.md`). 채팅 조건·이력서로 채용공고와 청년정책을 함께 찾고, 모의면접(지금 C 면접 그대로)을 체험으로 제안한다. 자소서가 없으면 채팅에서 받는다.
+- 백엔드·인프라·공통 문서가 들어와 배포돼 있다: `README.md`, `.gitignore`, `.python-version`(3.13), `backend/`(단일 Lambda `team07-api`, 테스트 62개), `infra/`(AWS CLI 스크립트), `docs/api.md`(공통 API 규칙)·`docs/db-schema.md`(v1.4)·`docs/team-guide.md`. 테스트·배포 명령은 README. CI는 없다.
 - 이전 뼈대(`4aa11cc`)는 정리해 PR #9~#14로 다시 들어왔다 (D-25).
 - 지식 패키지 ZIP, 강의·환경 안내, OpenAPI 발급 현황, C 기능 정리 페이지는 팀 노션 허브에만 있다. 코드에 걸리는 내용은 아래 "노션 허브 자료"에 옮겼다. A의 `openapi.yaml`은 아직 어디에도 없다. 없는 파일을 있다고 가정하지 않는다.
 - `docs/개발계획서2.md`(B)는 rev 55다. 그 뒤에 정해진 것(`docs/db-schema.md` v1.3, 결정 기록)은 아래 "B 작업 기준"을 따른다.
@@ -22,6 +23,7 @@ AI 코딩 에이전트(Claude Code 등)가 이 저장소에서 작업할 때 지
 | `docs/개발계획서1.md` | A: 이력서·Story Bank·적합도·첨삭·역량 격차·학습 경로·통합 Agent·AI 검증 |
 | `docs/개발계획서2.md` | B: 공고·정책 수집, 부산 우선 추천, 비교, 정책 지갑, 저장·알림, Action Group |
 | `docs/개발계획서3.md` | C: AI 모의면접 함수 명세 |
+| `docs/개발계획서4.md` | 채팅 Agent: 도구, 답 검사, 카드·행동, `/api/v1/agent/chat`, 대화 저장, 면접 인계 |
 | `docs/CONTRIBUTING.md` | 이슈·브랜치·커밋·PR·리뷰 규칙 |
 | `.kiro/steering/product.md` | 기능별 담당, MVP 범위, 제품 원칙, 문구 규칙, 용어 |
 | `.kiro/steering/tech.md` | AWS 서비스, Agent 구조, LLM·데이터 규칙, 점수, API 규약, 저장 자원, 보안, 기술 미확정 |
@@ -34,6 +36,7 @@ AI 코딩 에이전트(Claude Code 등)가 이 저장소에서 작업할 때 지
 | B 부산 기회 추천 | 공고·정책 수집·보강, 피드·대안·비교, 정책 지갑, 저장·알림, `BusanOpportunity` 툴 | 개발계획서2 |
 | C AI 모의면접 | 질문, 꼬리질문, 음성, 시선, 점수, 리포트 함수 | 개발계획서3 |
 | 백엔드·인프라 | API Gateway, Lambda, DB·S3, 인증, 공통 프로필, IAM | - |
+| 채팅 Agent (Supervisor) | 도구 연결, 답 검사, 대화 저장 (`ai/supervisor/`, `backend/agent_api.py`) | 개발계획서4 |
 
 - 다른 파트 기능을 중복 구현하지 않고 계약(API, 읽기 권한, 이벤트)으로 연결한다. 파트 경계를 넘는 변경은 계약 문서를 먼저 고치고 리뷰를 요청한다.
 - 위치: A `ai/mentoring/`, B `ai/busan-opportunity/`(패키지는 `src/opportunity/`, 규칙은 아래 "B 작업 기준". B 전용 `AGENTS.md`는 두지 않는다, D-28), C `ai/interview/`, 공통 백엔드·인프라 `backend/`, 프론트 `frontend/`.
@@ -64,7 +67,9 @@ AI 코딩 에이전트(Claude Code 등)가 이 저장소에서 작업할 때 지
 - 테스트는 외부 서비스 없이 돌게 mock·fixture를 쓴다. 각 명세의 테스트 시나리오(A UT·INT·EVAL, B T-01~T-22·페르소나, C 연결 시나리오)를 완료 기준으로 쓴다.
 
 ## AI·데이터 규칙
-- 통합 멘토링 Agent 하나에 기능별 도구를 붙인다. 기능마다 독립 Agent를 만들지 않는다.
+- 통합 멘토링 Agent 하나에 기능별 도구를 붙인다. 기능마다 독립 Agent를 만들지 않는다. Agent는 Strands로 `team07-api` 안에서 돈다 (D-38). 도구는 B `agent_feed`·`agent_policy_list`·`ask_policies`와 A 문서·프로필을 포트로 부른다.
+- 채팅 조건은 이번 검색에만 쓴다. 저장은 Agent가 말로 묻고, 사용자가 채팅으로 승낙하면 저장 도구가, 버튼을 누르면 화면이 `PUT /api/v1/me/profile`로 한다. 저장 값은 코드가 정한다 (D-40).
+- 채팅 공고 검색은 공식 데이터(공공 API로 모은 공고)를 먼저 찾고, 없으면 없다고 말한 뒤 팀 데이터(지금은 시연용)에서 찾는다. 팀 데이터라고 밝힌다 (개발계획서4 §9.1).
 - Agent 도구는 userId를 모델 파라미터로 받지 않고 백엔드가 넣은 세션 값만 쓴다.
 - 점수·금액·날짜는 코드가 계산하고 LLM은 도구가 준 사실만 설명한다. 같은 입력이면 같은 점수가 나와야 한다.
 - LLM 출력은 고정 JSON 스키마로 받아 Pydantic으로 검사한다. 실패하면 1회 재시도 후 실패 또는 확인 필요 상태로 남긴다.
@@ -129,7 +134,7 @@ C 기능 정리 페이지 (노션 "AI 모의면접 에이전트 기능")
 
 ## 결정 상태
 결정 기록은 `.kiro/specs/common-foundation/requirements.md` "결정 기록"이 기준이다 (2026-11-20 확정). 자세한 규칙은 `docs/api.md`, `docs/db-schema.md`.
-- 확정: 인증 Cognito JWT(로그인 `/api/v1/auth/login`, 데모 계정) · API `/api/v1/{part}`, 카멜, 오류 `error{code, message, requestId, retryable}` · DB `team07-career-mentor`·`catalog`·`reference`·`cache` · 공고 스냅샷 보존(`SNAP#`·`LATEST`) · 자격 판정 `backend/eligibility.py` 하나 · 공통 프로필 `PROFILE#BASIC` · 워크스페이스 BACKEND · 프론트 Next.js 정적 내보내기 (D-24) · Python 3.13 · AWS CLI 스크립트 · 단일 Lambda + `ai/interview` 패키징 · 비동기는 Lambda 자기 호출 · S3 Vectors + Cohere v4 · 데모 직무 데이터 분석 · 통합 Agent는 Bedrock Agents + Action Group (D-23)
+- 확정: 인증 Cognito JWT(로그인 `/api/v1/auth/login`, 데모 계정) · API `/api/v1/{part}`, 카멜, 오류 `error{code, message, requestId, retryable}` · DB `team07-career-mentor`·`catalog`·`reference`·`cache` · 공고 스냅샷 보존(`SNAP#`·`LATEST`) · 자격 판정 `backend/eligibility.py` 하나 · 공통 프로필 `PROFILE#BASIC` · 워크스페이스 BACKEND · 프론트 Next.js 정적 내보내기 (D-24) · Python 3.13 · AWS CLI 스크립트 · 단일 Lambda + `ai/interview` 패키징 · 비동기는 Lambda 자기 호출 · S3 Vectors + Cohere v4 · 데모 직무 데이터 분석 · 통합 Agent는 Strands (D-38, D-23 대체) · 홈은 채팅 입구 (D-39) · 채팅 조건 저장은 사용자에게 묻기 (D-40)
 - 미확정 (임의 결정 금지): MVP 우선순위와 진로 설문·캘린더·기업 관계 그래프 담당 (D-27, 팀 리더)
 
 ## B 작업 기준 (`ai/busan-opportunity/`)
@@ -220,4 +225,4 @@ B(부산 채용공고·청년정책 맞춤 추천) 코드를 짤 때는 이 절�
 - 부산 공공부문 일자리·인사혁신처 공공취업정보를 데이터 소스에 넣을지
 - 국토부 전월세 API 신청 여부 (안 하면 주거비 행 없이 간다)
 - (정리됨) 판정은 백엔드가 `backend/eligibility.py`의 `evaluate_eligibility`를 `Deps.eligibility`로 넣어 준다. B 패키징은 `infra/package.sh`에 들어갔다 (백엔드 담당)
-- (정리됨) 통합 Agent 프레임워크는 Bedrock Agents로 확정됐다 (D-23). `agent_handler.py`(`BedrockAgentResolver`, OpenAPI 스키마)를 그대로 쓴다.
+- (정리됨) 통합 Agent는 Strands로 바뀌었다 (D-38). `agent_handler.py`의 `agent_feed`·`agent_policy_list`를 채팅 Agent 도구와 Bedrock Action Group 경로가 같이 부른다. 공고 검색은 대화 조건 `job_name`·`min_salary`·`career_type`·`organization`·`query_terms`를 받는다 (개발계획서4 §9).

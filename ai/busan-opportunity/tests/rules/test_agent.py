@@ -132,6 +132,28 @@ def test_postings_are_capped_and_compact(deps, fake_feed, seen):
     assert "matchScore" not in text and "rankScore" not in text and "jobDescription" not in text
 
 
+def test_postings_pass_chat_conditions(deps, fake_feed, seen):
+    """대화 조건 (개발계획서4 §9, B-S2). 시·도 이름은 코드로 바꿔 넘긴다."""
+    status, body = call(deps, PATHS["postings"], {"region": "서울", "jobName": "데이터 분석", "minSalary": "3000",
+                                                  "careerType": "NEW", "organization": "가상"})
+    assert status == 200
+    assert seen["region"] == "11" and seen["job_name"] == "데이터 분석" and seen["min_salary"] == 3000
+    assert seen["career_type"] == "NEW" and seen["organization"] == "가상"
+    assert body["items"][0]["career"] == "공고에 없음"
+
+
+@pytest.mark.parametrize("word, region", [("부산", "BUSAN"), ("부산광역시", "BUSAN"), ("전국", "ALL"), ("수도권", "CAPITAL"),
+                                          ("경남", "48"), ("경기도", "41"), ("26", "26"), ("busan", "BUSAN"), (None, "ALL")])
+def test_resolve_region_words(word, region):
+    assert agent_handler.resolve_region(word) == region
+
+
+def test_agent_feed_is_shared_with_chat_agent(deps, fake_feed, seen):
+    feed = agent_handler.agent_feed(deps, "demo2", region="부산", limit=50, query_terms=["SQL"])
+    assert seen["user_id"] == "demo2" and seen["region"] == "BUSAN" and seen["query_terms"] == ["SQL"]
+    assert len(feed.items) == deps.config.agent.max_postings
+
+
 def test_badge_without_source_is_dropped(deps, monkeypatch):
     monkeypatch.setattr(agent_handler, "search_postings", lambda d, u, **k: FeedResponse(
         items=[card(deps, w.BUSAN_BADGE_NO_SOURCE)], ranking=Ranking(sort=Sort.MATCH, basis="잘 맞는 순서로 보여드려요")))
@@ -278,3 +300,16 @@ def test_schema_file_is_up_to_date():
     assert set(on_disk["paths"]) == set(PATHS.values())
     assert all(op.get("description") for path in on_disk["paths"].values() for op in path.values())
     assert "/agent/saved" not in on_disk["paths"]  # P1
+
+
+def test_agent_company_lookup_is_compact(deps):
+    rows = agent_handler.agent_company_lookup(deps, "가상")
+    assert len(rows) <= 3
+    for row in rows:
+        assert row["source"] and row["asOf"] and None not in row.values()
+        assert "openPostings" not in row  # 채용 여부는 주지 않는다
+
+
+def test_agent_feed_passes_scope(deps, fake_feed, seen):
+    agent_handler.agent_feed(deps, "demo1", scope="OFFICIAL")
+    assert seen["scope"] == "OFFICIAL"

@@ -63,6 +63,21 @@ def main():
     s, b = call("GET", "/api/v1/me/profile", user="u-2")
     check("다른 사용자 프로필은 안 보임", s == 404)
 
+    # ---- 출신 학교·자격증 (지역인재 판정, 자격 요건 비교)
+    s, b = call("PUT", "/api/v1/me/profile", {"educationLevel": "BACHELOR", "universityRegion": "26", "schoolName": " 가상대학교 ",
+                                             "certificates": ["ADsP", " 정보처리기사 "]})
+    check("학교 이름·지역·자격증 저장 (앞뒤 공백은 지움)", s == 200 and b["universityRegion"] == "26"
+          and b["schoolName"] == "가상대학교" and b["certificates"] == ["ADsP", "정보처리기사"])
+    s, b = call("PUT", "/api/v1/me/profile", {"certificates": [f"자격{i}" for i in range(11)]})
+    check("자격증 11개 → 400 (최대 10개)", s == 400 and "certificates" in b["error"]["message"])
+    s, b = call("PUT", "/api/v1/me/profile", {"certificates": ["ADsP", "adsp"]})
+    check("같은 자격증 두 번 → 400", s == 400)
+    s, b = call("PUT", "/api/v1/me/profile", {"schoolName": "가" * 51})
+    check("학교 이름 51자 → 400", s == 400 and "schoolName" in b["error"]["message"])
+    s, b = call("PUT", "/api/v1/me/profile", {"educationLevel": "HIGH_SCHOOL", "schoolName": None, "certificates": None})
+    check("고졸로 바꾸며 학교 이름·자격증 지움 (지역은 고등학교 소재지로 남김)", s == 200 and "schoolName" not in b
+          and "certificates" not in b and b["universityRegion"] == "26")
+
     # ---- 워크스페이스
     s, b = call("POST", "/api/v1/me/workspaces", {"jobPostingId": "wk24-K0001", "snapshotId": "20261120-ab12cd34"})
     check("공고로 워크스페이스 생성 → 201, ws-{jobPostingId}", s == 201 and b["workspaceId"] == "ws-wk24-K0001" and b["status"] == "INTEREST")
@@ -115,6 +130,49 @@ def main():
         {"Put": {"TableName": "test-cm", "Item": {k: ser.serialize(v) for k, v in saved.items()}}}])
     item, created = ws.ensure_workspace("u-3", job_posting_id="alio-000001")
     check("B 트랜잭션으로 만든 워크스페이스를 ensure가 그대로 돌려줌", created is False and item["status"] == "PLANNED")
+
+    # ---- 내 데이터 모두 지우기 (개발 모드의 "유저 정보 모두 초기화")
+    import me_api
+    from common import hash_user_id
+
+    class Recorder:
+        def __init__(self):
+            self.calls = []
+
+        def delete_object(self, **kw):
+            self.calls.append((kw["Bucket"], kw["Key"]))
+
+        def delete_schedule(self, **kw):
+            self.calls.append(kw["Name"])
+
+    fake_s3, fake_scheduler = Recorder(), Recorder()
+    me_api._s3, me_api._scheduler = fake_s3, fake_scheduler
+    os.environ.update(CAREER_DOCS_BUCKET="docs-bucket", UPLOAD_BUCKET="upload-bucket")
+    table = boto3.resource("dynamodb").Table("test-cm")
+    mine, theirs = f"users/{hash_user_id('u-reset')}/documents/d1/v1/original.pdf", f"users/{hash_user_id('u-keep')}/documents/d9/v1/original.pdf"
+    for user, key in (("u-reset", mine), ("u-keep", theirs)):
+        table.put_item(Item={"PK": f"USER#{user}", "SK": "PROFILE#BASIC", "ownerUserId": user, "major": "통계학"})
+        table.put_item(Item={"PK": f"USER#{user}", "SK": "DOC#d1#V#0001", "originalKey": key, "textKey": key.replace("original.pdf", "extracted.txt")})
+        table.put_item(Item={"PK": f"USER#{user}", "SK": "OPP#SAVED#wk24-1", "scheduleNames": [f"team07-opp-target-deadline-{user}"]})
+        table.put_item(Item={"PK": f"USER#{user}", "SK": "INTERVIEW#iv-1", "nextQuestion": {"audioKey": f"uploads/interview/iv-{user}/questions/q1.mp3"}})
+    # 남의 파일 키가 내 아이템에 적혀 있어도 지우지 않는다
+    table.put_item(Item={"PK": "USER#u-reset", "SK": "DOC#d2#V#0001", "originalKey": theirs})
+
+    s, b = call("POST", "/api/v1/me/reset", user="u-reset")
+    check("초기화: 내 아이템·파일·일정 개수를 돌려준다", s == 200 and b["deleted"] == {"items": 5, "files": 3, "schedules": 1})
+    left = table.query(KeyConditionExpression="PK = :p", ExpressionAttributeValues={":p": "USER#u-reset"})["Items"]
+    check("초기화: 내 파티션이 비었다", left == [])
+    kept = table.query(KeyConditionExpression="PK = :p", ExpressionAttributeValues={":p": "USER#u-keep"})["Items"]
+    check("초기화: 다른 사용자 아이템은 그대로다", len(kept) == 4)
+    check("초기화: 내 접두사 파일만 지운다", ("docs-bucket", mine) in fake_s3.calls and all(theirs not in call for call in fake_s3.calls))
+    check("초기화: 내 면접 음성과 내 일정만 지운다", ("upload-bucket", "uploads/interview/iv-u-reset/questions/q1.mp3") in fake_s3.calls
+          and fake_scheduler.calls == ["team07-opp-target-deadline-u-reset"])
+    s, b = call("GET", "/api/v1/me/profile", user="u-reset")
+    check("초기화 뒤에는 프로필이 없는 새 사용자 상태", s == 404 and b["error"]["code"] == "PROFILE_NOT_FOUND")
+    s, b = call("POST", "/api/v1/me/reset", user="u-reset")
+    check("초기화: 다시 불러도 안전하다", s == 200 and b["deleted"]["items"] == 0)
+    s, b = call("POST", "/api/v1/me/reset", user=None)
+    check("초기화: 토큰이 없으면 401", s == 401)
 
     print(f"\n{sum(results)}/{len(results)} 통과")
     raise SystemExit(0 if all(results) else 1)

@@ -8,7 +8,7 @@
 2. [`docs/api.md`](docs/api.md): 팀 공통 API 규칙과 파트 간 결정 사항
 3. [`docs/db-schema.md`](docs/db-schema.md): DB 스키마 v1.3
 4. [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md): 이슈·브랜치·커밋·PR 규칙
-5. 기획·파트 명세: [`docs/프로젝트_제안서.md`](docs/프로젝트_제안서.md), `docs/개발계획서1~3.md` · AI 에이전트 규칙: [`AGENTS.md`](AGENTS.md), `.kiro/steering/`
+5. 기획·파트 명세: [`docs/프로젝트_제안서.md`](docs/프로젝트_제안서.md), `docs/개발계획서1~3.md`, 채팅 Agent [`docs/개발계획서4.md`](docs/개발계획서4.md) · AI 에이전트 규칙: [`AGENTS.md`](AGENTS.md), `.kiro/steering/`
 
 ## 폴더
 
@@ -16,6 +16,7 @@
 |---|---|
 | `backend/` | API Lambda: 라우터 `app.py`, 로그인 `auth_api.py`, 프로필·워크스페이스 `me_api.py`·`workspace.py`, 자격 판정 `eligibility.py`, 모의면접 `interview_api.py`, 테스트 `test_*.py` |
 | `ai/mentoring/`, `ai/busan-opportunity/`, `ai/interview/` | 파트별 AI 코드 (A·B·C). 배포 때 `ai/interview/` → `interview`, `ai/busan-opportunity/src/opportunity/` → `opportunity` 패키지로 백엔드와 함께 묶인다 |
+| `ai/supervisor/` | 채팅 Agent (Strands, D-38). 배포 때 `supervisor` 패키지, 입구 `backend/agent_api.py` (`/api/v1/agent/*`) |
 | `contracts/` | 파트 간 데이터 계약 패키지 `team07_contracts` (스키마·예시 데이터·검사, D-18). 배포 묶음에도 들어간다 |
 | `tools/` | 개발 도구 목록 |
 | `frontend/` | 화면 |
@@ -33,6 +34,10 @@ uv run --no-project --python 3.13 python test_eligibility.py
 uv run --no-project --python 3.13 --with boto3 --with "moto[dynamodb]" python test_me.py
 uv run --no-project --python 3.13 --with boto3 --with "moto[dynamodb,s3]" python test_interview.py
 uv run --no-project --python 3.13 --with boto3 --with "moto[dynamodb,scheduler]" --with-requirements ../ai/busan-opportunity/requirements.txt python test_opportunities.py
+uv run --no-project --python 3.13 --with boto3 --with "moto[dynamodb]" --with-requirements ../ai/busan-opportunity/requirements.txt --with-requirements ../ai/supervisor/requirements.txt --with-requirements ../ai/mentoring/requirements.txt --with-requirements ../contracts/requirements.txt python test_agent_api.py
+
+# 채팅 Agent 패키지
+cd ../ai/supervisor && uv run --no-project --python 3.13 --with-requirements requirements-dev.txt python -m pytest
 
 # 코드 배포 (Lambda만)
 infra/deploy.sh

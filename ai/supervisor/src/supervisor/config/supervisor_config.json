@@ -1,0 +1,38 @@
+{
+  "configVersion": "1.3",
+  "promptVersion": "chat-v4",
+  "maxTokens": 3000,
+  "maxTurns": 8,
+  "maxToolCalls": 8,
+  "historyMessages": 10,
+  "messageMaxChars": 1000,
+  "maxAttachments": 3,
+  "maxMessagesPerSession": 60,
+  "maxPolicies": 5,
+  "staleSeconds": 180,
+  "titleMaxChars": 30,
+  "reply": {
+    "maxChars": 1200,
+    "maxFollowUps": 3,
+    "followUpMaxChars": 40,
+    "freeNumberMax": 10
+  },
+  "coverLetter": {
+    "minChars": 50,
+    "maxChars": 5000
+  },
+  "interviewJobMaxChars": 50,
+  "teamData": {
+    "fallback": true,
+    "label": "팀이 넣어 둔 시연용 데이터"
+  },
+  "maxCompanies": 3,
+  "recentPostings": 5,
+  "savableProfileFields": ["desiredJobs", "desiredRegion", "desiredSalaryMin", "desiredCareerType"],
+  "bannedPhrases": ["떠나면", "손해", "잃", "놓치면", "후회", "임박", "합격에 유리", "이득", "합격 확률", "합격률", "붙을 확률"],
+  "allowedPhrases": ["실제 합격 확률이 아닙니다", "실제 합격 확률이 아니에요", "합격 확률이 아닙니다", "합격 확률이 아니에요"],
+  "thinkingByModel": [
+    {"family": "claude-haiku-5-5", "thinking": {"type": "disabled"}},
+    {"family": "claude-sonnet-5-5", "thinking": {"type": "between_tools"}}
+  ]
+}

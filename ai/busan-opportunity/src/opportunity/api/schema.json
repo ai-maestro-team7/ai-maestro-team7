@@ -118,16 +118,12 @@
             "in": "query"
           },
           {
-            "description": "ALL(전국) 또는 BUSAN(부산 근무만)",
+            "description": "ALL(전국), BUSAN(부산 근무만), CAPITAL(수도권) 또는 시·도 이름",
             "required": false,
             "schema": {
               "type": "string",
-              "enum": [
-                "ALL",
-                "BUSAN"
-              ],
               "title": "Region",
-              "description": "ALL(전국) 또는 BUSAN(부산 근무만)",
+              "description": "ALL(전국), BUSAN(부산 근무만), CAPITAL(수도권) 또는 시·도 이름",
               "default": "ALL"
             },
             "name": "region",
@@ -148,6 +144,76 @@
               "nullable": true
             },
             "name": "limit",
+            "in": "query"
+          },
+          {
+            "description": "이번 검색에만 쓸 희망 직무 이름. 저장하지 않는다",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                }
+              ],
+              "title": "Jobname",
+              "description": "이번 검색에만 쓸 희망 직무 이름. 저장하지 않는다",
+              "nullable": true
+            },
+            "name": "jobName",
+            "in": "query"
+          },
+          {
+            "description": "최소 연봉 (만 원/년). 급여 비공개 공고는 남긴다",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0.0
+                }
+              ],
+              "title": "Minsalary",
+              "description": "최소 연봉 (만 원/년). 급여 비공개 공고는 남긴다",
+              "nullable": true
+            },
+            "name": "minSalary",
+            "in": "query"
+          },
+          {
+            "description": "NEW(신입), EXPERIENCED(경력), ANY(무관)",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "NEW",
+                    "EXPERIENCED",
+                    "ANY"
+                  ]
+                }
+              ],
+              "title": "Careertype",
+              "description": "NEW(신입), EXPERIENCED(경력), ANY(무관)",
+              "nullable": true
+            },
+            "name": "careerType",
+            "in": "query"
+          },
+          {
+            "description": "기업·기관 이름",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                }
+              ],
+              "title": "Organization",
+              "description": "기업·기관 이름",
+              "nullable": true
+            },
+            "name": "organization",
             "in": "query"
           }
         ],
@@ -715,6 +781,11 @@
           "salary": {
             "type": "string",
             "title": "Salary"
+          },
+          "career": {
+            "type": "string",
+            "title": "Career",
+            "default": "공고에 없음"
           },
           "matchLevel": {
             "type": "string",

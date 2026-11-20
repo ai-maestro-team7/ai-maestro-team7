@@ -1,4 +1,5 @@
 import { ApiError, exchangeSocialCode, getMyProfile, startSocialLogin } from "@/lib/api";
+import { readDevModeFlag } from "./devMode";
 import { safeNextPath } from "./lib";
 import { createCodeChallenge, createCodeVerifier, createState } from "./pkce";
 
@@ -59,7 +60,8 @@ async function finishSocialLogin({ code, state, error }: SocialCallbackParams): 
   if (!pending || !state || state !== pending.state) throw new SocialCallbackError("invalidState");
   if (!code) throw new SocialCallbackError("failed");
   try {
-    await exchangeSocialCode(code, socialRedirectUri(), pending.codeVerifier);
+    // 개발 모드는 로그인 화면에서 켤 때 localStorage에 적어 두어서, 제공자 화면을 다녀온 지금도 읽힌다
+    await exchangeSocialCode(code, socialRedirectUri(), pending.codeVerifier, readDevModeFlag());
   } catch (e) {
     throw new SocialCallbackError(e instanceof ApiError && e.status === 401 ? "rejected" : "failed");
   }

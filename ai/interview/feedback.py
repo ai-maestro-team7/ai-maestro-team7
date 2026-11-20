@@ -7,9 +7,7 @@
 """
 
 import logging
-import re
 import time
-from collections import Counter
 from collections.abc import Callable
 from typing import Any
 
@@ -19,18 +17,20 @@ from . import llm as llm_module
 from . import prompting, settings
 from .bundles import Bundle
 from .models import ContentEvaluation, DeliveryMetrics, QuestionType, ScoreResult, _LLMOutputModel
+# 자소서 검색과 툴 호출 횟수는 꼬리질문 판단 에이전트(#109)와 같이 쓰려고 tools.py로 옮겼다.
+# 기존 이름(feedback.ToolUsage, feedback.PASSAGE_MAX_CHARS 등)은 그대로 쓸 수 있게 다시 내보낸다
+from .tools import KEYWORD_MAX_CHARS, PASSAGE_MAX_CHARS, RESUME_PASSAGE_LIMIT, ToolUsage, search_resume
+
+__all__ = ["FeedbackBundle", "FeedbackContext", "FeedbackItem", "FeedbackOutput", "KEYWORD_MAX_CHARS",
+           "PASSAGE_MAX_CHARS", "RESUME_PASSAGE_LIMIT", "ToolUsage", "build_feedback_context",
+           "make_feedback_tools", "write_feedback"]
 
 logger = logging.getLogger("interview")
 
 STAGE = "write_feedback"
 
-RESUME_PASSAGE_LIMIT = 3
-PASSAGE_MAX_CHARS = 200
-KEYWORD_MAX_CHARS = 30
 TEXT_MIN, TEXT_MAX = 5, 200
 FEEDBACK_LIST_MAX = 2  # 강점·보완은 질문마다 최대 2개
-
-_SENTENCE_SPLIT = re.compile(r"(?<=[.!?。])\s+|\n+")
 
 
 # ---------------------------------------------------------------- 툴이 보는 데이터 (고정)
@@ -82,41 +82,6 @@ def build_feedback_context(bundles: list[Bundle], content: dict[str, ContentEval
 
 
 # ---------------------------------------------------------------- 툴 (조회만)
-
-
-class ToolUsage:
-    """툴 호출 횟수. 상한은 에이전트 실행(시도)마다 새로 센다. 넘으면 툴이 '지금까지 정보로 답하라'를 돌려준다.
-
-    수동 확인에서 상한을 두 시도가 같이 써서 재시도가 시작하자마자 TOOL_LIMIT을 받았다 (#92). start_attempt로 나눈다.
-    """
-
-    def __init__(self, limit: int):
-        self.limit = limit
-        self.calls: Counter[str] = Counter()      # 이번 시도
-        self.all_calls: Counter[str] = Counter()  # 모든 시도 합 (로그용)
-        self.attempts = 0
-
-    def start_attempt(self) -> None:
-        self.calls = Counter()
-        self.attempts += 1
-
-    @property
-    def total(self) -> int:
-        return sum(self.calls.values())
-
-    def take(self, name: str) -> dict | None:
-        self.calls[name] += 1
-        self.all_calls[name] += 1
-        if self.total > self.limit:
-            return {"error": "TOOL_LIMIT", "message": "도구 호출 한도에 닿았습니다. 지금까지 받은 정보로 답을 쓰세요."}
-        return None
-
-    def summary(self) -> str:
-        return ",".join(f"{name}:{n}" for name, n in sorted(self.all_calls.items())) or "none"
-
-
-def _normalize(text: str) -> str:
-    return " ".join(text.split())
 
 
 def make_feedback_tools(context: FeedbackContext, usage: ToolUsage) -> list[Callable[..., Any]]:
@@ -184,14 +149,7 @@ def make_feedback_tools(context: FeedbackContext, usage: ToolUsage) -> list[Call
         """
         if (limited := usage.take("find_resume_passages")) is not None:
             return limited
-        word = _normalize(keyword or "")
-        if not word:
-            return {"error": "EMPTY_KEYWORD"}
-        if len(word) > KEYWORD_MAX_CHARS:
-            return {"error": "KEYWORD_TOO_LONG", "maxChars": KEYWORD_MAX_CHARS}
-        sentences = [_normalize(s) for s in _SENTENCE_SPLIT.split(context.resume_text) if s.strip()]
-        hits = [s[:PASSAGE_MAX_CHARS] for s in sentences if word.lower() in s.lower()]
-        return {"keyword": word, "passages": hits[:RESUME_PASSAGE_LIMIT], "found": len(hits)}
+        return search_resume(context.resume_text, keyword)
 
     return [get_confirmed_scores, get_delivery_metrics, get_answer_text, find_resume_passages]
 

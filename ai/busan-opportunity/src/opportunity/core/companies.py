@@ -132,6 +132,20 @@ def _card(company: CompanyRecord, overlap: list[str]) -> CompanyCard:
     )
 
 
+def find_companies(deps: Deps, name: str, *, limit: int = 3) -> list[CompanyCard]:
+    """회사 이름으로 우리 기업 데이터(COMPANY#, 부산 청끌·강소·이전기관 시드)를 찾는다 (개발계획서4 §9.1).
+
+    이름의 법인 표기·공백·기호를 지우고 포함 여부로 본다. 출처·기준일이 있는 기록만 있다 (CompanyRecord 검사).
+    채용 여부는 만들지 않는다. 공고는 search_postings로 따로 찾는다.
+    """
+    needle = name_key(name or "")
+    if len(needle) < MIN_WORD_LEN:
+        return []
+    rows = [c for c in deps.catalog.list_companies(deps.config.data.busan_sido) if needle in name_key(c.name)]
+    rows.sort(key=lambda c: (name_key(c.name) != needle, name_key(c.name), c.company_id))
+    return [_card(c, []) for c in rows[:max(0, limit)]]
+
+
 def list_busan_companies(deps: Deps, user_id: str, *, category: CheonggeulType | str | None = None,
                          limit: int | None = None,
                          as_of: str | date | datetime | None = None) -> CompaniesResponse:

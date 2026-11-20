@@ -18,12 +18,17 @@ type MorePages = { key: string; items: PostingCard[]; nextCursor?: string; pendi
 
 /** 채용 공고 목록 (B-03 맞춤 피드): 지역 필터, 정렬 바꾸기, GNB 검색어(`?q=`), 더 보기. */
 export function JobList() {
-  const query = useSearchParams().get("q") ?? "";
+  const params = useSearchParams();
+  const query = params.get("q") ?? "";
   const username = useUsername();
   const [region, setRegion] = useState<JobRegion>("ALL");
   const [sort, setSort] = useState<JobSort>("BUSAN_FIRST");
-  const key = `${username}|${sort}|${region}|${query}`;
-  const [state, reload] = useApi<FeedResponse>(key, () => fetchFeed({ sort, region, keyword: query }));
+  // 홈의 "지역인재 전형 공고 보기"는 ?talent=1 로 들어온다
+  const [talentOnly, setTalentOnly] = useState(params.get("talent") === "1");
+  const key = `${username}|${sort}|${region}|${query}|${talentOnly}`;
+  const [state, reload] = useApi<FeedResponse>(key, () =>
+    fetchFeed({ sort, region, keyword: query, regionalTalent: talentOnly }),
+  );
   const [more, setMore] = useState<MorePages | null>(null);
   const extra = more?.key === key ? more : null;
 
@@ -33,7 +38,7 @@ export function JobList() {
     if (!cursor) return;
     setMore({ key, items: before, nextCursor: cursor, pending: true, failed: false });
     try {
-      const page = await fetchFeed({ sort, region, keyword: query, cursor });
+      const page = await fetchFeed({ sort, region, keyword: query, cursor, regionalTalent: talentOnly });
       setMore({ key, items: [...before, ...page.items], nextCursor: page.nextCursor, pending: false, failed: false });
     } catch {
       setMore({ key, items: before, nextCursor: cursor, pending: false, failed: true });
@@ -49,6 +54,10 @@ export function JobList() {
               {filter.label}
             </Chip>
           ))}
+          <span aria-hidden className="mx-1 h-5 w-px self-center bg-grey-200" />
+          <Chip selected={talentOnly} onClick={() => setTalentOnly((value) => !value)}>
+            지역인재 전형
+          </Chip>
         </div>
         <button
           type="button"
@@ -69,6 +78,7 @@ export function JobList() {
           items={[...state.data.items, ...(extra?.items ?? [])]}
           query={query}
           sort={sort}
+          talentOnly={talentOnly}
           hasMore={Boolean(extra ? extra.nextCursor : state.data.nextCursor)}
           pending={extra?.pending ?? false}
           failed={extra?.failed ?? false}
@@ -84,6 +94,7 @@ function FeedResult({
   items,
   query,
   sort,
+  talentOnly,
   hasMore,
   pending,
   failed,
@@ -93,6 +104,7 @@ function FeedResult({
   items: PostingCard[];
   query: string;
   sort: JobSort;
+  talentOnly: boolean;
   hasMore: boolean;
   pending: boolean;
   failed: boolean;
@@ -114,18 +126,26 @@ function FeedResult({
         </p>
         <p className="flex gap-2">
           {sort === "BUSAN_FIRST" && <span className="text-grey-600">{feed.ranking.basis}</span>}
-          <Link href="/diagnosis" className="font-medium text-blue-500">
+          <Link href="/profile/?next=%2Fjobs%2F" className="font-medium text-blue-500">
             프로필 수정
           </Link>
         </p>
       </div>
       {notice && <p className="text-small text-grey-700">{notice}</p>}
+      {talentOnly && (
+        <p className="text-small text-grey-700">
+          이전 공공기관처럼 지역인재 전형이 있을 수 있는 공고예요. 학교 지역이 맞으면 &ldquo;지역인재 대상일 수 있음&rdquo;으로
+          표시해요. 자격은 공고문에서 확인해 주세요.
+        </p>
+      )}
       {items.length > 0 ? (
         <JobTable jobs={items} asOf={asOfDate(feed.dataAsOf)} />
       ) : (
         <div className="flex w-full flex-col items-center gap-1 border-t border-b border-t-grey-800 border-b-grey-200 py-12 text-center">
           <p className="text-body font-bold text-grey-900">조건에 맞는 공고가 없어요</p>
-          <p className="text-small text-grey-600">지역이나 검색어를 바꿔 보세요.</p>
+          <p className="text-small text-grey-600">
+            {talentOnly ? "지역인재 전형이 있을 수 있는 공고가 지금은 없어요." : "지역이나 검색어를 바꿔 보세요."}
+          </p>
         </div>
       )}
       {hasMore && (

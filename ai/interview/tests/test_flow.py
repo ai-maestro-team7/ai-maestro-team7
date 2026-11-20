@@ -6,7 +6,7 @@ import pytest
 import interview
 from conftest import sample_json, sample_text
 from fakes import FakeLLM
-from interview.errors import AI_OUTPUT_INVALID, AWS_SERVICE_ERROR, INVALID_INPUT, InterviewError
+from interview.errors import AWS_SERVICE_ERROR, INVALID_INPUT, InterviewError
 from interview.models import Session
 
 RESUME = sample_text("resume_data_analysis.txt")
@@ -43,7 +43,7 @@ def test_start_initial_session():
     assert session["answers"] == [] and session["baseline"] is None
     assert session["scoringVersion"] == "v2.0"
     assert session["modelId"] == "test-model"
-    assert session["promptVersion"] == "A-v2/B-v1"
+    assert session["promptVersion"] == "A-v2/B-v2"
     assert [q["questionId"] for q in session["questions"]] == ["q1", "q2", "q3"]
     assert result["nextQuestion"] == {"questionId": "q1", "answerId": "a-q1-1",
                                       "text": session["questions"][0]["question"], "isFollowUp": False}
@@ -173,7 +173,8 @@ def test_answer_record_fields():
                  "longPausePerMin": None, "longPauseReason": "TOO_SHORT"}
     assert record == {"answerId": "a-q1-1", "questionId": "q1", "isFollowUp": False,
                       "question": initial_session()["questions"][0]["question"], "answerText": NORMAL_TEXT,
-                      "evaluable": True, "reason": None, "timeLimitReached": True, "delivery": too_short}
+                      "evaluable": True, "reason": None, "timeLimitReached": True, "delivery": too_short,
+                      "followUpCheck": "SUFFICIENT"}
     assert "words" not in json.dumps(out["session"])  # 단어별 시간은 Session에 넣지 않는다 (voice 결정 5)
 
 
@@ -289,16 +290,83 @@ def test_bad_session_shape_rejected(bad):
     assert exc.value.code == INVALID_INPUT
 
 
-def test_follow_up_invalid_output_raises_and_session_unchanged():
+# ---------------------------------------------------------------- 꼬리질문 판단 결과·실패 대체 (#109)
+
+NOT_JSON = sample_text("llm/not_json.txt")
+TOO_LONG = json.dumps({"needFollowUp": True, "reason": "ABSTRACT", "followUpQuestions": ["가" * 151]},
+                      ensure_ascii=False)
+
+
+def test_follow_up_check_recorded_on_base_answers_only():
+    session = initial_session()
+    out, _ = step(session, answer("a-q1-1", ABSTRACT_TEXT), [NEEDED])
+    out, _ = step(out["session"], answer("a-q1-2"))                       # 꼬리 답변: 판단 없음
+    out, _ = step(out["session"], answer("a-q2-1", ""))                   # 평가 불가: 판단 없음
+    out, _ = step(out["session"], answer("a-q3-1"), [SUFFICIENT])
+    checks = [(a["answerId"], a["followUpCheck"]) for a in out["session"]["answers"]]
+    assert checks == [("a-q1-1", "ABSTRACT"), ("a-q1-2", None), ("a-q2-1", None), ("a-q3-1", "SUFFICIENT")]
+    assert out["lastAnswer"] == {"answerId": "a-q3-1", "evaluable": True, "reason": None}  # lastAnswer는 그대로
+    Session.model_validate(out["session"])
+
+
+@pytest.mark.parametrize("bad", [[NOT_JSON, NOT_JSON], [TOO_LONG, TOO_LONG], [NOT_JSON, TOO_LONG]])
+def test_judge_failure_moves_on_without_follow_up(bad, caplog):
+    # 판단 출력이 2번 실패하면(형식 오류, 150자 넘는 후보만 있음) 예외 없이 꼬리질문 없이 다음 기본 질문으로 (#109)
     session = initial_session()
     before = copy.deepcopy(session)
-    not_json = sample_text("llm/not_json.txt")
-    fake = FakeLLM([not_json, not_json])
+    with caplog.at_level("INFO", logger="interview"):
+        out, fake = step(session, answer("a-q1-1", ABSTRACT_TEXT), bad)
+    assert len(fake.calls) == 2
+    assert out["action"] == "NEXT_QUESTION" and out["nextQuestion"]["questionId"] == "q2"
+    assert out["session"]["followUpUsed"] is False and out["session"]["currentIndex"] == 1
+    assert [a["questionId"] for a in out["session"]["answers"]] == ["q1"]  # 꼬리질문 없음
+    assert out["session"]["answers"][0]["followUpCheck"] == "JUDGE_FAILED"
+    assert out["lastAnswer"] == {"answerId": "a-q1-1", "evaluable": True, "reason": None}
+    assert "stage=judge_follow_up fallback=NO_FOLLOW_UP" in caplog.text
+    assert "followUpCheck=JUDGE_FAILED" in caplog.text
+    assert session == before
+
+
+def test_judge_failure_on_last_question_goes_to_report():
+    session = initial_session()
+    out, _ = step(session, answer("a-q1-1"), [SUFFICIENT])
+    out, _ = step(out["session"], answer("a-q2-1"), [SUFFICIENT])
+    out, _ = step(out["session"], answer("a-q3-1", ABSTRACT_TEXT), [NOT_JSON, NOT_JSON])
+    assert out["action"] == "REPORT" and out["nextQuestion"] is None
+    assert out["session"]["answers"][-1]["followUpCheck"] == "JUDGE_FAILED"
+
+
+def test_judge_failure_then_retry_success_uses_follow_up():
+    out, fake = step(initial_session(), answer("a-q1-1", ABSTRACT_TEXT), [NOT_JSON, NEEDED])
+    assert out["action"] == "FOLLOW_UP" and out["session"]["answers"][0]["followUpCheck"] == "ABSTRACT"
+
+
+def test_bedrock_failure_still_raises_and_session_unchanged():
+    # Bedrock 호출 실패는 대체하지 않는다 (AWS_SERVICE_ERROR, 백엔드가 세션을 FAILED로)
+    session = initial_session()
+    before = copy.deepcopy(session)
+    fake = FakeLLM([RuntimeError("bedrock down")])
     with pytest.raises(InterviewError) as exc:
         interview.process_answer(session, answer("a-q1-1"), llm=fake)
-    assert exc.value.code == AI_OUTPUT_INVALID and exc.value.retryable is True
-    assert len(fake.calls) == 2
+    assert exc.value.code == AWS_SERVICE_ERROR and exc.value.retryable is True
     assert session == before
+
+
+def test_long_candidate_dropped_and_next_used():
+    first_long = json.dumps({"needFollowUp": True, "reason": "ABSTRACT",
+                             "followUpQuestions": ["가" * 151, "그때 본인이 맡은 역할은 무엇이었나요?"]}, ensure_ascii=False)
+    out, _ = step(initial_session(), answer("a-q1-1", ABSTRACT_TEXT), [first_long])
+    assert out["action"] == "FOLLOW_UP" and out["nextQuestion"]["text"] == "그때 본인이 맡은 역할은 무엇이었나요?"
+
+
+def test_session_without_follow_up_check_still_accepted():
+    # #109 전에 저장된 Session(답변 기록에 followUpCheck 키 없음)도 이어서 진행한다
+    out, _ = step(initial_session(), answer("a-q1-1"), [SUFFICIENT])
+    old = out["session"]
+    del old["answers"][0]["followUpCheck"]
+    out, _ = step(old, answer("a-q2-1"), [SUFFICIENT])
+    assert out["session"]["answers"][0]["followUpCheck"] is None
+    assert out["session"]["answers"][1]["followUpCheck"] == "SUFFICIENT"
 
 
 def test_input_session_not_mutated():
@@ -313,10 +381,15 @@ def test_follow_up_prompt_uses_question_and_answer():
     session = initial_session()
     fake = FakeLLM([SUFFICIENT])
     interview.process_answer(session, answer("a-q1-1", ABSTRACT_TEXT), llm=fake)
-    user = fake.calls[0]["user"]
+    call = fake.calls[0]
+    user = call["user"]
     assert "<question>\n" + session["questions"][0]["question"] + "\n</question>" in user
     assert "<answer>\n" + ABSTRACT_TEXT + "\n</answer>" in user
     assert "<job>\n데이터 분석\n</job>" in user
+    assert "<question_type>\n" + session["questions"][0]["questionType"] + "\n</question_type>" in user
+    # 꼬리질문 판단은 툴 3개를 쓰는 에이전트로 부른다 (#109)
+    assert call["tools"] == ["find_resume_passages", "get_previous_answers", "get_remaining_questions"]
+    assert call["limits"] == {"turns": 4, "total_tokens": 12000} and call["max_tokens"] == 1024
 
 
 # ---------------------------------------------------------------- 전달력 (2차)

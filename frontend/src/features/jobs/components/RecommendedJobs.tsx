@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { ApiErrorNotice } from "@/features/auth/components/ApiFallback";
 import { useUsername } from "@/features/auth/useUsername";
 import { useApi } from "@/lib/useApi";
@@ -21,9 +22,14 @@ export function RecommendedJobs() {
   if (state.status === "error") return <ApiErrorNotice error={state.error} onRetry={reload} />;
   return (
     <>
-      <p className="text-small text-grey-600">
-        {SORT_LABELS.BUSAN_FIRST} · {state.data.ranking.basis}
-      </p>
+      <div className="flex w-full flex-wrap items-center justify-between gap-2 text-small">
+        <p className="text-grey-600">
+          {SORT_LABELS.BUSAN_FIRST} · {state.data.ranking.basis}
+        </p>
+        <Link href="/jobs/?talent=1" className="font-medium text-blue-500">
+          지역인재 전형 공고 보기
+        </Link>
+      </div>
       <JobTable jobs={state.data.items.slice(0, HOME_COUNT)} asOf={asOfDate(state.data.dataAsOf)} />
     </>
   );
