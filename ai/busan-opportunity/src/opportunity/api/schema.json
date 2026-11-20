@@ -274,6 +274,48 @@
           }
         }
       }
+    },
+    "/agent/policies/search": {
+      "get": {
+        "summary": "GET /agent/policies/search",
+        "description": "청년정책의 내용·자격·신청 방법을 묻는 질문에 쓴다. 원문 근거와 함께 답한다. answered=false면 answer 없이 notice와 relatedPolicies만 준다. 자격은 relatedPolicies의 status를 따른다.",
+        "operationId": "agent_search_policies_agent_policies_search_get",
+        "parameters": [
+          {
+            "description": "정책에 관한 사용자 질문 (예: 부산 청년 월세 지원 신청 방법)",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Question",
+              "description": "정책에 관한 사용자 질문 (예: 부산 청년 월세 지원 신청 방법)"
+            },
+            "name": "question",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AskResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -730,6 +772,124 @@
         ],
         "title": "AgentPosting"
       },
+      "AskResponse": {
+        "properties": {
+          "question": {
+            "type": "string",
+            "title": "Question"
+          },
+          "answered": {
+            "type": "boolean",
+            "title": "Answered"
+          },
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Answer",
+            "nullable": true
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/AskSource"
+            },
+            "type": "array",
+            "title": "Sources"
+          },
+          "relatedPolicies": {
+            "items": {
+              "$ref": "#/components/schemas/PolicyBrief"
+            },
+            "type": "array",
+            "title": "Relatedpolicies"
+          },
+          "manualChecks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Manualchecks"
+          },
+          "notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Notice",
+            "nullable": true
+          },
+          "dataAsOf": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Dataasof",
+            "nullable": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "question",
+          "answered"
+        ],
+        "title": "AskResponse",
+        "description": "정책·공고 원문을 근거로 한 답. 근거를 못 찾았거나 검증에 실패하면 answered=false이고 answer는 없다."
+      },
+      "AskSource": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Quote",
+            "nullable": true
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Url",
+            "nullable": true
+          },
+          "asOf": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Asof",
+            "nullable": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "id",
+          "title"
+        ],
+        "title": "AskSource",
+        "description": "답의 근거. quote는 원문에 실제로 있는 문장이어야 한다."
+      },
       "CompareKey": {
         "type": "string",
         "enum": [
@@ -890,6 +1050,62 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "PolicyBrief": {
+        "properties": {
+          "policyId": {
+            "type": "string",
+            "title": "Policyid"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "bucket": {
+            "$ref": "#/components/schemas/PolicyBucket"
+          },
+          "status": {
+            "$ref": "#/components/schemas/PolicyEligibilityStatus"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Summary",
+            "nullable": true
+          }
+        },
+        "type": "object",
+        "required": [
+          "policyId",
+          "title",
+          "bucket",
+          "status"
+        ],
+        "title": "PolicyBrief"
+      },
+      "PolicyBucket": {
+        "type": "string",
+        "enum": [
+          "OPEN_NOW",
+          "NEXT_CYCLE",
+          "AFTER_EMPLOYMENT",
+          "SETTLEMENT",
+          "CLOSED"
+        ],
+        "title": "PolicyBucket"
+      },
+      "PolicyEligibilityStatus": {
+        "type": "string",
+        "enum": [
+          "ELIGIBLE",
+          "CHECK_NEEDED",
+          "NOT_ELIGIBLE",
+          "AFTER_EMPLOYMENT"
+        ],
+        "title": "PolicyEligibilityStatus"
       },
       "PolicyStage": {
         "type": "string",
