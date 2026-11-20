@@ -37,6 +37,7 @@ from ..ports import VersionConflict
 from .documents import set_document_status
 from .logs import log_event, user_hash
 from .metrics import emit_metric
+from .taxonomy import Taxonomy, load_taxonomy, taxonomy_for_prompt
 
 REVIEW_EVIDENCE_MISMATCH = "EVIDENCE_MISMATCH"
 _FOUND = {"EXACT", "RELOCATED"}
@@ -80,12 +81,15 @@ def run_profile_extraction(deps, task: Task) -> ExtractionOutcome:
         raise MentoringError(500, "INTERNAL_ERROR", "개인정보 가리기 결과가 올바르지 않아요.", False)
 
     cfg = deps.config.extraction
+    taxonomy = load_taxonomy(deps, uid)
+    taxonomy_view = taxonomy_for_prompt(taxonomy)
     problems: list[str] | None = None
     schema_failures = fact_retries = calls = 0
     while True:
         calls += 1
         try:
-            raw = deps.llm.invoke(PROFILE_EXTRACT_SYSTEM, build_profile_extract_user(masked.masked_text, problems),
+            raw = deps.llm.invoke(PROFILE_EXTRACT_SYSTEM,
+                                  build_profile_extract_user(masked.masked_text, problems, taxonomy_view),
                                   max_tokens=cfg.max_tokens)
         except MentoringError:
             raise
@@ -101,7 +105,7 @@ def run_profile_extraction(deps, task: Task) -> ExtractionOutcome:
                                      "분석 결과 형식이 올바르지 않아요. 잠시 후 다시 시도해 주세요.", True)
             problems = ["출력이 정해진 JSON 형식과 맞지 않았다"]
             continue
-        assembled = assemble(deps, source, version, masked.spans, output)
+        assembled = assemble(deps, source, version, masked.spans, output, taxonomy)
         if assembled.unsupported_items and fact_retries < cfg.fact_retries:
             fact_retries += 1
             _log_validation(deps, task, "UNSUPPORTED_FACTS", calls)
@@ -172,8 +176,11 @@ def _page(start: int, page_starts: list[int]) -> int:
     return max(1, bisect.bisect_right(page_starts, start))
 
 
-def assemble(deps, source: str, version: DocumentVersion, mask_spans: list, output: ExtractionOutput) -> Assembled:
+def assemble(deps, source: str, version: DocumentVersion, mask_spans: list, output: ExtractionOutput,
+             taxonomy: Taxonomy | None = None) -> Assembled:
     result = Assembled()
+    unit_codes = taxonomy.unit_codes if taxonomy else set()
+    basic_ids = taxonomy.basic_ids if taxonomy else set()
     evidence_ids_by_span: dict[tuple[int, int], str] = {}
     compact_source = _compact(source)
 
@@ -235,13 +242,18 @@ def assemble(deps, source: str, version: DocumentVersion, mask_spans: list, outp
         if existing is not None:
             existing.evidence_ids.extend(i for i in ids if i not in existing.evidence_ids)
             continue
-        code = item.ncs_unit_code
-        if code and (deps.reference is None or deps.reference.get_competency_unit(code) is None):
+        code = (item.ncs_unit_code or "").strip() or None
+        if code and taxonomy is not None and taxonomy.units:
+            code = code if code in unit_codes else None  # 넘긴 후보 목록에 있는 코드만 (#104)
+        elif code and (deps.reference is None or deps.reference.get_competency_unit(code) is None):
             code = None  # 기준 데이터에 없는 코드는 넣지 않는다 (Requirement 6 기준 10)
+        basic_id = (item.basic_skill_id or "").strip() or None
+        if basic_id not in basic_ids:
+            basic_id = None
         skill = Skill(skill_id=f"skill-{len(result.skills) + 1}", name=name,
                       normalized_name=(item.normalized_name or "").strip() or None, ncs_unit_code=code,
-                      evidence_level=item.evidence_level, fact_status=FactStatus.NEEDS_CONFIRMATION,
-                      evidence_ids=ids)
+                      basic_skill_id=basic_id, evidence_level=item.evidence_level,
+                      fact_status=FactStatus.NEEDS_CONFIRMATION, evidence_ids=ids)
         result.skills.append(skill)
         skills_by_name[name.lower()] = skill
 

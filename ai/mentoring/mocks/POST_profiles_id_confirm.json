@@ -151,7 +151,7 @@
         "프로젝트에서 본인이 직접 만든 시각화 범위"
       ],
       "modelId": "mock-llm",
-      "promptVersion": "profile-extract-v1",
+      "promptVersion": "profile-extract-v2",
       "createdAt": "2026-11-21T10:00:00+09:00"
     }
   }

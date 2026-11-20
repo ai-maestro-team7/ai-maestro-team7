@@ -23,7 +23,8 @@ class Skill(MentoringModel):
     skill_id: str
     name: str
     normalized_name: str | None = None
-    ncs_unit_code: str | None = None  # 기준 데이터(team07-reference)에 있는 코드만
+    ncs_unit_code: str | None = None  # 희망 직무의 NCS 능력단위 목록에서 고른 코드만 (team07-reference)
+    basic_skill_id: str | None = None  # NCS 직업기초능력 34개 목록에서 고른 ID만 (예: "003" 의사소통능력 > 경청능력)
     evidence_level: EvidenceLevel
     fact_status: FactStatus
     evidence_ids: list[str] = Field(default_factory=list)
