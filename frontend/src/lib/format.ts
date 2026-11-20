@@ -17,3 +17,10 @@ export function formatDday(isoDate: string, asOf: string): string {
 export function formatDate(isoDate: string): string {
   return isoDate.replaceAll("-", ".");
 }
+
+/** 서버 시각 `2026-11-20T14:25:00+09:00` → `2026.11.20 14:25` (한국 시간으로 내려오는 값을 그대로 자른다, D-29) */
+export function formatDateTime(isoDateTime: string): string {
+  const match = /^(\d{4}-\d{2}-\d{2})(?:T(\d{2}:\d{2}))?/.exec(isoDateTime);
+  if (!match) return isoDateTime;
+  return match[2] ? `${formatDate(match[1])} ${match[2]}` : formatDate(match[1]);
+}

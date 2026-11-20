@@ -1,5 +1,5 @@
 import { formatDday, formatMonthDay } from "@/lib/format";
-import type { JobPosting, JobSort, JobTypeFilter, MatchLevel } from "./types";
+import type { CareerType, EmploymentType, JobRegion, JobSort, MatchLevel, OrgType, Salary } from "./types";
 
 /** 적합도 문구 (docs/api.md §6.3). 점수 숫자는 보여주지 않는다. */
 export const MATCH_LABELS: Record<MatchLevel, string> = {
@@ -9,35 +9,88 @@ export const MATCH_LABELS: Record<MatchLevel, string> = {
 };
 
 export const SORT_LABELS: Record<JobSort, string> = {
-  RECOMMENDED: "추천순(부산 우선)",
+  BUSAN_FIRST: "추천순(부산 우선)",
   DEADLINE: "마감순",
 };
 
-export const JOB_TYPE_FILTERS: JobTypeFilter[] = ["전체", "정규직", "계약직", "인턴"];
+export const REGION_FILTERS: { value: JobRegion; label: string }[] = [
+  { value: "ALL", label: "전체" },
+  { value: "BUSAN", label: "부산" },
+  { value: "CAPITAL", label: "수도권" },
+  { value: "OVERSEAS", label: "해외" },
+];
 
-export function filterJobs(jobs: JobPosting[], type: JobTypeFilter, query: string): JobPosting[] {
-  const q = query.trim().toLowerCase();
-  return jobs.filter((job) => {
-    if (type !== "전체" && job.employmentType !== type) return false;
-    if (!q) return true;
-    return [job.company, job.title, ...job.skills].some((text) => text.toLowerCase().includes(q));
-  });
-}
+export const ORG_TYPE_LABELS: Record<OrgType, string> = {
+  PRIVATE: "민간",
+  PUBLIC_INSTITUTION: "공공기관",
+  LOCAL_PUBLIC: "지방공공기관",
+};
 
-/** 마감순에서 상시 공고(deadline null)는 맨 뒤에 둔다. */
-export function sortJobs(jobs: JobPosting[], sort: JobSort): JobPosting[] {
-  const sorted = [...jobs];
-  if (sort === "RECOMMENDED") return sorted.sort((a, b) => a.recommendRank - b.recommendRank);
-  return sorted.sort((a, b) => {
-    if (a.deadline === b.deadline) return a.recommendRank - b.recommendRank;
-    if (a.deadline === null) return 1;
-    if (b.deadline === null) return -1;
-    return a.deadline.localeCompare(b.deadline);
-  });
+export const EMPLOYMENT_LABELS: Record<EmploymentType, string> = {
+  FULL_TIME: "정규직",
+  CONTRACT: "계약직",
+  PART_TIME: "시간제",
+  INTERN: "인턴",
+  UNKNOWN: "고용 형태 확인 필요",
+};
+
+export const CAREER_LABELS: Record<CareerType, string> = {
+  NEW: "신입",
+  EXPERIENCED: "경력",
+  ANY: "신입·경력",
+  UNKNOWN: "경력 조건 확인 필요",
+};
+
+const MONEY_UNITS: Record<Salary["unit"], string> = {
+  MANWON_YEAR: "만 원/년",
+  MANWON_MONTH: "만 원/월",
+  MANWON: "만 원",
+  WON: "원",
+};
+
+/** 서버 기준 시각(`dataAsOf`)의 날짜. 없으면 오늘(한국 시간). D-day는 이 날짜로 센다. */
+export function asOfDate(dataAsOf?: string): string {
+  if (dataAsOf && /^\d{4}-\d{2}-\d{2}/.test(dataAsOf)) return dataAsOf.slice(0, 10);
+  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
 /** 표의 마감 칸 두 줄 (예: "12.05" / "D-15", 상시면 "채용 시 마감" / "상시") */
-export function deadlineLines(job: JobPosting, asOf: string): { main: string; sub: string } {
-  if (!job.deadline) return { main: "채용 시 마감", sub: "상시" };
-  return { main: formatMonthDay(job.deadline), sub: formatDday(job.deadline, asOf) };
+export function deadlineLines(closesAt: string, rolling: boolean, asOf: string): { main: string; sub: string } {
+  if (rolling) return { main: "채용 시 마감", sub: "상시" };
+  return { main: formatMonthDay(closesAt), sub: formatDday(closesAt, asOf) };
+}
+
+/** 급여는 공고에 적힌 값만 보여준다 (API 값, LLM이 만들지 않음). */
+export function salaryText(salary?: Salary): string {
+  if (!salary?.disclosed || (salary.min === undefined && salary.max === undefined)) return "공고 원문 확인";
+  const unit = MONEY_UNITS[salary.unit];
+  const fmt = (n: number) => n.toLocaleString("ko-KR");
+  if (salary.min !== undefined && salary.max !== undefined && salary.min !== salary.max) {
+    return `${fmt(salary.min)}~${fmt(salary.max)}${unit}`;
+  }
+  return `${fmt((salary.min ?? salary.max) as number)}${unit}`;
+}
+
+/** 로고 자리 첫 글자. 앞의 "(주)", "(재)", "주식회사" 같은 말은 건너뛴다. */
+export function orgInitial(organization: string): string {
+  const name = organization
+    .replace(/^\s*[(（][^)）]*[)）]\s*/, "")
+    .replace(/^(주식회사|株式会社|재단법인|사단법인)\s*/, "")
+    .trim();
+  return (name || organization).charAt(0);
+}
+
+/** 표에 보이는 짧은 근거. 마감 사실은 마감 칸에 따로 있으니 뺀다. */
+export function matchReason(facts: string[]): string {
+  return facts.find((fact) => !fact.startsWith("마감")) ?? "";
+}
+
+/** 정적 내보내기라 공고 ID는 주소 쿼리로 넘긴다 (빌드 때 ID를 알 수 없음). */
+export function jobDetailHref(jobPostingId: string): string {
+  return `/jobs/detail/?id=${encodeURIComponent(jobPostingId)}`;
+}
+
+/** C 모의면접 `job` 칸은 1~50자 (B rev 55 §10.1) */
+export function interviewHref(title: string): string {
+  return `/interview?job=${encodeURIComponent(title.slice(0, 50))}`;
 }
