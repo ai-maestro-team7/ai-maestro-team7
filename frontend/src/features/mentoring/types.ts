@@ -20,6 +20,8 @@ export type DocumentResponse = {
   documentId: string;
   extractionStatus: string;
   taskStatus?: AsyncStatus;
+  /** 추출한 글자 수. 추출 전에는 없다 */
+  charCount?: number;
 };
 
 export type ProfileResponse = {
