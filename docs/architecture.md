@@ -383,7 +383,7 @@ Supervisor 지침 = 공통 원칙 + 라우터 + `02`·`05` 설명 규칙 + B 연
 
 | 항목 | 상태 | 이 문서의 가정 |
 | --- | --- | --- |
-| 통합 Agent 프레임워크 | D-23 OPEN (A 소유) | Bedrock Agents + Action Group. api.md §6.6과 B §5.9(`BedrockAgentResolver`, `x-requireConfirmation`)가 이 방식을 적고 있다. Bedrock Agents가 아니면 B는 `agent_handler.py`만 그 도구 형식에 맞추고 비즈니스 함수는 그대로 둔다 (AGENTS.md "B 작업 기준") |
+| 통합 Agent 프레임워크 | D-23 CONFIRMED (2026-11-20, A) | Bedrock Agents + Action Group. api.md §6.6과 B §5.9(`BedrockAgentResolver`, `x-requireConfirmation`)가 이 방식을 적고 있다. Bedrock Agents가 아니면 B는 `agent_handler.py`만 그 도구 형식에 맞추고 비즈니스 함수는 그대로 둔다 (AGENTS.md "B 작업 기준") |
 | Supervisor 형태 | 결정 기록에 없음 | 단일 Agent + Action Group (제안서 7.3). Bedrock 다중 Agent 협업으로 바꾸면 B·C가 각자 Agent를 운영해야 하고 명세를 고쳐야 한다 |
 | Action Group이 부를 Lambda | 결정 기록에 없음 (D-17은 단일 `team07-api`로 확정) | `team07-api`에 Bedrock Agent 이벤트 분기를 넣을지, Agent용 Lambda를 따로 둘지 B·A·BACKEND가 정한다 (§5.2) |
 | MVP 우선순위·담당 없는 기능 | D-27 OPEN | 진로 설문, 캘린더, 기업 관계 그래프는 이 구조에 넣지 않았다 |

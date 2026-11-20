@@ -124,7 +124,7 @@ inclusion: always
 | 번호 | 결정 | 결정 기록 |
 |---|---|---|
 | 1 | Cognito JWT `sub`, 아이디·비밀번호 로그인, 데모 계정 `demo1`~`demo3` | D-07 CONFIRMED |
-| 2 | 미정 (A 소유) | D-23 OPEN |
+| 2 | Bedrock Agents 단일 Agent + Action Group (A `CareerMentoring`, B `BusanOpportunity`) | D-23 CONFIRMED |
 | 3 | `docs/api.md` | D-01~D-05 CONFIRMED |
 | 4 | `career-mentor`·`catalog`·`reference`·`cache` | D-13 CONFIRMED |
 | 5 | catalog `SNAP#`·`LATEST` 스냅샷, 요건 `requirements[]{kind REQUIRED_SKILL/PREFERRED_SKILL, sourceQuote}` | D-09·D-10 CONFIRMED |
