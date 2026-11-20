@@ -8,7 +8,7 @@ import pytest
 from fakes import NOW, ScriptedRunner, build_deps, cover_letter, invalid, reply
 from supervisor import service
 from supervisor.errors import SupervisorError
-from supervisor.models import ActionType, MessageStatus
+from supervisor.models import ActionType, ChatAction, MessageStatus
 
 
 def ask(deps, message="부산 데이터 분석 신입 공고 찾아줘", user="demo1", **extra):
@@ -336,69 +336,25 @@ def test_prompt_v3_rules():
     for rule in ("공식 데이터에는 조건에 맞는 공고가 없어요", "teamDataNote", "save_search_conditions",
                  "`saved=true`일 때만", "묻지 않았는데 저장하지 않는다", "실시간으로 부르지 않는다"):
         assert rule in prompt
-    assert deps.config.prompt_version == "chat-v4"
+    assert deps.config.prompt_version == "chat-v5"
 
 
-# ---------------------------------------------------------------- A 이력서·직무 진단 (user-flow ⑤, 개발계획서1 F-02)
-def test_this_posting_from_previous_answer_starts_diagnosis():
-    def show(tools):
-        tools["search_job_postings"](job_name="데이터 분석")
-        return reply("공고 1개를 찾았어요.", ["이 공고와 내 이력서 비교해 보기"])
-
-    def diagnose(tools):
-        out = tools["start_resume_diagnosis"](job_posting_id="demo-busan-data")
-        return reply("진단을 시작했어요. 1분쯤 걸려요." if out.get("started") else out["error"]["message"])
-
-    deps = build_deps(ScriptedRunner(show, diagnose), summary=SUMMARY)
-    started, _, _ = ask(deps)
-    deps.clock["now"] = NOW + timedelta(seconds=20)
-    again = service.start_turn(deps, "demo1", {"sessionId": started["sessionId"], "message": "이 공고와 내 이력서 비교해 보기"})
-    service.run_turn(deps, deps.dispatcher.events[-1]["agentTask"])
-    # 바로 앞 답의 공고가 문맥에 들어간다
-    block = json.loads(deps.runner.runs[-1]["message"].split("<user_context>\n", 1)[1].split("\n</user_context>", 1)[0])
-    assert block["recentPostings"][0]["jobPostingId"] == "demo-busan-data"
-    message = service.get_message(deps, "demo1", started["sessionId"], again["messageId"])
-    assert message["actions"] == [{"type": "OPEN_DIAGNOSIS", "job": "데이터 분석 신입", "documentId": "doc-r1",
-                                   "conditions": [], "analysisId": "analysis-0001", "profileId": "profile-1",
-                                   "profileVersion": 2, "jobPostingId": "demo-busan-data"}]
-    user, posting, ncs, key = deps.mentoring.calls[-1]
-    assert (user, posting, ncs) == ("demo1", "demo-busan-data", None) and again["messageId"] in key
-
-
-def test_diagnosis_rejects_made_up_posting_and_uses_desired_job():
-    deps = build_deps(None)
-    from supervisor.tools import TurnTools
-
-    tools = {f.__name__: f for f in TurnTools(deps, "demo1", turn_key="m-1").functions()}
-    assert tools["start_resume_diagnosis"](job_posting_id="wk24-made-up")["error"]["code"] == "UNKNOWN_POSTING"
-    out = tools["start_resume_diagnosis"]()
-    assert out["started"] is True and deps.mentoring.calls[-1][1:3] == (None, "20010105")
-
-
-def test_diagnosis_errors_are_facts():
-    from fakes import FakeError, FakeMentoring
-    from supervisor.tools import TurnTools
-
-    deps = build_deps(None, profiles={"demo1": {"desiredJobs": [{"name": "마케팅"}]}})  # NCS 코드 없는 직무
-    tools = {f.__name__: f for f in TurnTools(deps, "demo1").functions()}
-    assert tools["start_resume_diagnosis"]()["error"]["code"] == "NEED_TARGET"
-    deps = build_deps(None)
-    deps.mentoring = FakeMentoring(FakeError("PROFILE_NOT_FOUND", "역량 프로필이 없어요. 이력서를 먼저 올려 주세요."))
-    tools = {f.__name__: f for f in TurnTools(deps, "demo1").functions()}
-    assert tools["start_resume_diagnosis"]()["error"]["code"] == "PROFILE_NOT_FOUND"
-    deps.mentoring = None
-    tools = {f.__name__: f for f in TurnTools(deps, "demo1").functions()}
-    assert tools["start_resume_diagnosis"]()["error"]["code"] == "NOT_IMPLEMENTED"
-
-
-def test_prompt_v4_rules():
+def test_prompt_v5_rules():
     deps = build_deps(ScriptedRunner(lambda tools: reply()))
     ask(deps)
     prompt = deps.runner.runs[-1]["system_prompt"]
-    for rule in ("recentPostings", "start_resume_diagnosis", "진단 점수를 네가 말하지 않는다",
-                 "면접을 원하지 않는다고 했으면 다시 권하지 않는다", "이 공고로 모의면접 체험해 볼래요",
-                 "여러 기능을 한 번에 이어 실행하지 않는다"):
+    for rule in ("recentPostings", "면접을 원하지 않는다고 했으면 다시 권하지 않는다", "이 공고로 모의면접 체험해 볼래요",
+                 "여러 기능을 한 번에 이어 실행하지 않는다", "이 서비스에서 하지 않는다"):
         assert rule in prompt
+    # 진단·첨삭 화면과 진단 도구를 지웠다 (#155). 지침이 없는 도구나 화면을 가리키지 않는다
+    for gone in ("start_resume_diagnosis", "진단 결과 보기", "이 공고와 내 이력서 비교해 보기"):
+        assert gone not in prompt
+
+
+def test_old_diagnosis_action_still_reads():
+    """진단 도구를 지우기 전에 저장된 대화의 OPEN_DIAGNOSIS 행동도 읽을 수 있다 (새로 만들지는 않는다)."""
+    action = ChatAction.model_validate({"type": "OPEN_DIAGNOSIS", "job": "데이터 분석", "analysisId": "a-1"})
+    assert action.type == "OPEN_DIAGNOSIS" and action.analysis_id == "a-1"
 
 
 def test_missing_claimed_message_releases_session_lock(monkeypatch):

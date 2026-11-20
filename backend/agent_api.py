@@ -208,32 +208,6 @@ class ProfileAdapter:
         return {k: v for k, v in to_plain(item).items() if k not in ("PK", "SK", "ownerUserId", "entityType")}
 
 
-class MentoringAdapter:
-    """A 직무 적합도 분석 (`mentoring.fit.analysis.create_analysis`). 화면 `/diagnosis`와 같은 함수를 부른다."""
-
-    def _deps(self):
-        import mentoring_api
-
-        factory = mentoring_api.aws_factory()
-        if factory is None:
-            raise TeamError(501, "NOT_IMPLEMENTED", "이력서 진단이 아직 연결되지 않았어요.")
-        return mentoring_api.deps(factory)
-
-    def start_job_fit(self, user_id, *, job_posting_id, target_ncs_code, idempotency_key):
-        from mentoring.core.profiles import get_latest_profile
-        from mentoring.fit.analysis import create_analysis
-        from mentoring.fit.records import AnalysisRequest
-
-        deps = self._deps()
-        profile = get_latest_profile(deps, user_id)  # 없으면 MentoringError 404 (도구가 사실로 돌려준다)
-        request = AnalysisRequest.model_validate({"profileId": profile.profile_id, "profileVersion": profile.profile_version,
-                                                  "jobPostingId": job_posting_id, "targetNcsCode": target_ncs_code})
-        body = create_analysis(deps, user_id, request, idempotency_key)
-        return {"analysisId": body["analysisId"], "status": body.get("status", "PENDING"),
-                "profileId": profile.profile_id, "profileVersion": profile.profile_version,
-                "documentId": (profile.source_document_ids or [""])[-1]}
-
-
 class SelfInvokeDispatcher:
     """SQS 대신 Lambda 비동기 자기 호출 (D-19). Lambda 밖이나 RUN_TASKS_INLINE=1이면 바로 실행."""
 
@@ -277,7 +251,7 @@ def deps():
     if _deps is None:
         _deps = Deps(store=DynamoChatStore(table()), opportunities=OpportunityAdapter(), docs=CareerDocsAdapter(),
                      profiles=ProfileAdapter(), runner=build_runner(), dispatcher=SelfInvokeDispatcher(),
-                     model_id=model_id(), hash_user_id=lambda u: hash_user_id(u)[:16], mentoring=MentoringAdapter())
+                     model_id=model_id(), hash_user_id=lambda u: hash_user_id(u)[:16])
     return _deps
 
 
