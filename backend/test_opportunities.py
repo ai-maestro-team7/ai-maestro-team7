@@ -92,6 +92,12 @@ def main():
     s, body = call("GET", f"{base}/postings", user=None)
     check("사용자 정보가 없으면 401", s == 401 and body["error"]["code"] == "UNAUTHORIZED")
 
+    s, body = call("GET", f"{base}/public/postings", user=None, query={"limit": "5"})
+    check("공개 공고 목록은 로그인 없이 200 (B-D10)",
+          s == 200 and 0 < len(body["items"]) <= 5 and body["total"] >= len(body["items"]) and "matchScore" not in body["items"][0])
+    s, body = call("GET", f"{base}/public/postings", user=None, query={"orgType": "COMPANY"})
+    check("공개 공고 목록의 모르는 분류는 400", s == 400 and body["error"]["code"] == "INVALID_INPUT")
+
     s, body = call("GET", f"{base}/postings")
     check("희망 직무가 없으면 422 PROFILE_INCOMPLETE", s == 422 and body["error"]["code"] == "PROFILE_INCOMPLETE")
 

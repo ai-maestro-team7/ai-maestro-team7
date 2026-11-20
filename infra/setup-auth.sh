@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 로그인(아이디·비밀번호) — Cognito 사용자 풀 + 앱 클라이언트 + API JWT 검사. 여러 번 실행해도 안전하다.
-#  - 토큰 없이 부르는 경로: POST /api/v1/auth/login, POST /api/v1/auth/refresh, GET /api/v1/health
+#  - 토큰 없이 부르는 경로: POST /api/v1/auth/login, POST /api/v1/auth/refresh, GET /api/v1/health,
+#    GET /api/v1/opportunities/public/postings (로그인 없이 보는 채용 공고 목록, B-D10)
 #  - 그 밖의 모든 경로($default): Authorization: Bearer {accessToken} 필수
 # 순서: setup-api.sh 다음에 실행
 set -euo pipefail
@@ -61,7 +62,8 @@ else
 fi
 
 TARGET=$(aws apigatewayv2 get-routes --api-id "$API_ID" --query "Items[?RouteKey=='\$default'].Target | [0]" --output text)
-for KEY in "POST /api/v1/auth/login" "POST /api/v1/auth/refresh" "GET /api/v1/health"; do
+for KEY in "POST /api/v1/auth/login" "POST /api/v1/auth/refresh" "GET /api/v1/health" \
+           "GET /api/v1/opportunities/public/postings"; do
   RID=$(aws apigatewayv2 get-routes --api-id "$API_ID" --query "Items[?RouteKey=='$KEY'].RouteId | [0]" --output text)
   if [[ $RID == None || -z $RID ]]; then
     aws apigatewayv2 create-route --api-id "$API_ID" --route-key "$KEY" --target "$TARGET" --authorization-type NONE >/dev/null

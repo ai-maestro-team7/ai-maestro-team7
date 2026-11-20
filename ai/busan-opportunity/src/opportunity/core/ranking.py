@@ -20,6 +20,7 @@ from ..models.enums import (
     CheonggeulType,
     EmploymentType,
     MatchLevel,
+    OrgType,
     RegionalTalentStatus,
     RemoteWork,
     Sort,
@@ -37,6 +38,12 @@ REGION_ALL, REGION_BUSAN, REGION_CAPITAL, REGION_OVERSEAS = "ALL", "BUSAN", "CAP
 # 데이터 범위 (개발계획서4 §9.1). OFFICIAL = 공공 API로 모은 공고, TEAM = 팀이 넣어 둔 공고(지금은 시연용 DEMO)
 SCOPE_ALL, SCOPE_OFFICIAL, SCOPE_TEAM = "ALL", "OFFICIAL", "TEAM"
 SCOPES = (SCOPE_ALL, SCOPE_OFFICIAL, SCOPE_TEAM)
+# 기관 구분 (B-D10): 공기업 = 공공기관 + 지방공공기관(도시공사·시설공단 등), 사기업 = 민간 기업 (해외 민간 포함)
+SECTOR_ALL, SECTOR_PUBLIC, SECTOR_PRIVATE = "ALL", "PUBLIC", "PRIVATE"
+SECTOR_ORG_TYPES = {
+    SECTOR_PUBLIC: frozenset({OrgType.PUBLIC_INSTITUTION, OrgType.LOCAL_PUBLIC}),
+    SECTOR_PRIVATE: frozenset({OrgType.PRIVATE}),
+}
 NAME_MATCH_LIMIT = 300  # 이름 색인에서 더하는 후보 상한 (B-D08). 넘으면 기관·회사 이름이 맞는 공고부터 넣는다
 
 # 직무 일치의 근거. 사실 문구를 고를 때 쓴다 (facts.job_fact)
@@ -352,6 +359,21 @@ def is_team_data(posting: PostingLatest) -> bool:
     return posting.is_sample
 
 
+def check_sector(sector: str | None) -> str | None:
+    """기관 구분 값. 비었거나 ALL이면 None(거르지 않음). 모르는 값이면 400."""
+    value = (sector or "").strip().upper()
+    if not value or value == SECTOR_ALL:
+        return None
+    if value not in SECTOR_ORG_TYPES:
+        raise invalid_input("sector 값이 올바르지 않아요.", field="sector",
+                            allowed=[SECTOR_ALL, *SECTOR_ORG_TYPES])
+    return value
+
+
+def sector_ok(org_type: OrgType, sector: str | None) -> bool:
+    return sector is None or org_type in SECTOR_ORG_TYPES[sector]
+
+
 def _scope_ok(posting: PostingLatest, scope: str) -> bool:
     if scope == SCOPE_OFFICIAL:
         return not is_team_data(posting)
@@ -506,7 +528,7 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
                     limit: int = 20, as_of: str | date | datetime | None = None, job_name: str | None = None,
                     query_terms: Sequence[str] | None = None, min_salary: int | None = None,
                     career_type: str | CareerType | None = None, organization: str | None = None,
-                    scope: str | None = None, regional_talent: bool = False) -> FeedResponse:
+                    scope: str | None = None, regional_talent: bool = False, sector: str | None = None) -> FeedResponse:
     """전국 공고를 찾아 정렬한다. 후보는 벡터 질의 두 번(부산, 전국)으로 모으고, 지역을 골랐으면 그 지역 질의를 더한다.
     검색어나 회사 조건이 있으면 이름 색인에서 찾은 공고도 더한다 (B-D08). 이 경로에 LLM은 없다.
 
@@ -520,6 +542,7 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
     regional_talent=True면 공고문의 지역 조건(비수도권·이전지역·권역 인재, 지역 제한, 거주자 우대)이 사용자의 학교
     소재지나 거주지와 맞을 수 있는(LIKELY) 공고만 남긴다. 순서와 점수는 그대로다. 벡터 상위 후보 밖의 공고도 빠지지
     않게 지역 조건 색인(`INDEX#REGIONAL`)에서 후보를 더한다 (`_add_regional_candidates`).
+    sector는 기관 구분이다: PUBLIC(공기업: 공공기관·지방공공기관), PRIVATE(사기업), ALL(기본). 거르기만 한다 (B-D10).
     """
     cfg = deps.config
     region = (region or REGION_ALL).strip().upper()
@@ -527,6 +550,7 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
     if limit < 1:
         raise invalid_input("limit은 1 이상이어야 해요.", field="limit")
     career = _check_conditions(min_salary, career_type)
+    sector = check_sector(sector)
     scope = (scope or SCOPE_ALL).strip().upper()
     if scope not in SCOPES:
         raise invalid_input("scope 값이 올바르지 않아요.", field="scope", allowed=list(SCOPES))
@@ -569,7 +593,7 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
         if not (is_open(posting, ctx.as_of) and _in_region(posting, region, sidos)
                 and _job_code_ok(posting, job_codes) and _keyword_ok(posting, keyword)
                 and _organization_ok(posting, organization) and _salary_ok(posting, min_salary)
-                and _career_ok(posting, career) and _scope_ok(posting, scope)
+                and _career_ok(posting, career) and _scope_ok(posting, scope) and sector_ok(posting.org_type, sector)
                 and (not regional_talent
                      or facts.card_regional_talent(cfg, ctx.profile, posting) == RegionalTalentStatus.LIKELY)):
             continue

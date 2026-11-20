@@ -24,6 +24,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 
 from ..config import require_env
 from ..core import clock
+from ..core.name_index import name_row
 from ..models.errors import aws_service_error, invalid_input
 from ..models.policy import Policy
 from ..models.posting import (
@@ -358,9 +359,7 @@ class DynamoCatalog:
         if latest.is_expired:
             self.t.delete(self.NAMES_PK, sk)
             return
-        self.t.upsert(self.NAMES_PK, sk, "PostingName", PostingName(
-            job_posting_id=latest.job_posting_id, organization=latest.organization, title=latest.title,
-            job_name=latest.job.name, closes_at=latest.closes_at))
+        self.t.upsert(self.NAMES_PK, sk, "PostingName", name_row(latest))
 
     def put_regional_index(self, latest):
         entry = RegionalIndexEntry(job_posting_id=latest.job_posting_id, closes_at=latest.closes_at)

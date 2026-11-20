@@ -44,6 +44,7 @@ A의 REST 요청은 백엔드에서 확인한 사용자 ID를 `mentoring.api.res
 | `POST /api/v1/auth/refresh` `{refreshToken}` | 없이 | 새 `accessToken` (갱신 토큰 30일) |
 | `GET /api/v1/me` | 필요 | `{userId, username}` |
 | `GET /api/v1/health` | 없이 | 상태 확인 |
+| `GET /api/v1/opportunities/public/postings` | 없이 | 로그인 없이 보는 채용 공고 목록 (B-D10, 쿼리는 `ai/busan-opportunity/API.md`) |
 | **그 밖의 모든 경로** | **필요** | `Authorization: Bearer {accessToken}`. 없거나 틀리면 API Gateway가 401 |
 
 - 데모 계정 비밀번호는 **AWS 콘솔 → Secrets Manager → `team07/demo-accounts`**에서 본다. 저장소·채팅에 적지 않는다.

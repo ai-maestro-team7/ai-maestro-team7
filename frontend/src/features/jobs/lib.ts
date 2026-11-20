@@ -1,5 +1,16 @@
 import { formatDday, formatMonthDay } from "@/lib/format";
-import type { CareerType, EmploymentType, JobRegion, JobSort, MatchLevel, OrgType, Salary } from "./types";
+import type {
+  CareerFilter,
+  CareerType,
+  EmploymentFilter,
+  EmploymentType,
+  JobRegion,
+  JobSector,
+  JobSort,
+  MatchLevel,
+  OrgType,
+  Salary,
+} from "./types";
 
 /** 적합도 문구 (docs/api.md §6.3). 점수 숫자는 보여주지 않는다. */
 export const MATCH_LABELS: Record<MatchLevel, string> = {
@@ -26,8 +37,28 @@ export const REGION_FILTERS: { value: JobRegion; label: string }[] = [
   { value: "OVERSEAS", label: "해외" },
 ];
 
+/** 공기업·사기업 분류. 공기업은 공공기관과 지방공공기관(도시공사·시설공단 등)이다 */
+export const SECTOR_FILTERS: { value: JobSector; label: string }[] = [
+  { value: "ALL", label: "전체" },
+  { value: "PUBLIC", label: "공기업" },
+  { value: "PRIVATE", label: "사기업" },
+];
+
+export const CAREER_FILTERS: { value: CareerFilter; label: string }[] = [
+  { value: "ALL", label: "전체" },
+  { value: "NEW", label: "신입" },
+  { value: "EXPERIENCED", label: "경력" },
+];
+
+export const EMPLOYMENT_FILTERS: { value: EmploymentFilter; label: string }[] = [
+  { value: "ALL", label: "전체" },
+  { value: "FULL_TIME", label: "정규직" },
+  { value: "CONTRACT", label: "계약직" },
+  { value: "INTERN", label: "인턴" },
+];
+
 export const ORG_TYPE_LABELS: Record<OrgType, string> = {
-  PRIVATE: "민간",
+  PRIVATE: "사기업",
   PUBLIC_INSTITUTION: "공공기관",
   LOCAL_PUBLIC: "지방공공기관",
 };
