@@ -87,11 +87,11 @@
     - 시작(`profile` 있음·없음), 한 바퀴(q1 꼬리질문 포함 → `REPORT`), 무응답, 변환 실패, 꼬리질문 2개 이상, 꼬리질문 답변 뒤 판단 없음, 평가 불가 기본 질문 뒤 판단 없음, 끝난 면접, `answerId` 불일치, 꼬리질문 판단 형식 오류 시 `AI_OUTPUT_INVALID`, 입력 Session 불변
     - _Requirements: 8.6, 9.1~9.12, 10.3, 14.2, 14.3_
 
-- [ ] 9. 백엔드 흐름 재현과 로그
-  - [ ] 9.1 `tests/test_backend_flow.py`를 쓴다
+- [x] 9. 백엔드 흐름 재현과 로그
+  - [x] 9.1 `tests/test_backend_flow.py`를 쓴다
     - `start_interview` → `synthesize_question` → `start_transcription`(가짜 S3) → `get_transcription_result` 결과로 `process_answer` 반복 → `compute_baseline` → `generate_report`. 단계마다 `json.dumps`/`json.loads` 왕복
     - _Requirements: 1.5, 3.6, 11.1, 14.2_
-  - [ ] 9.2 `tests/test_logging.py`를 쓴다. `caplog`으로 샘플 자소서·답변·질문 문장·`profile` 항목이 로그에 없는지, `print`를 쓰지 않는지(AST) 확인한다
+  - [x] 9.2 `tests/test_logging.py`를 쓴다. `caplog`으로 샘플 자소서·답변·질문 문장·`profile` 항목이 로그에 없는지, `print`를 쓰지 않는지(AST) 확인한다
     - _Requirements: 12.1, 12.2, 12.3, 14.5_
 
 - [ ] 10. 실제 Bedrock 확인
