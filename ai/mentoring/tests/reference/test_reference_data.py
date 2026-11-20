@@ -155,6 +155,9 @@ def test_csv_and_dynamo_lookup_return_same_results(structured: Path) -> None:
         "2001010501_00v1"
     ) == csv_lookup.list_qualification_links("2001010501_00v1")
     assert dynamo_lookup.list_basic_skills() == csv_lookup.list_basic_skills()
+    assert dynamo_lookup.get_qualification("VIRTUAL-Q1") == csv_lookup.get_qualification("VIRTUAL-Q1")
+    assert csv_lookup.get_qualification("VIRTUAL-Q1").name == "가상 데이터 자격"
+    assert dynamo_lookup.get_qualification("NONE") is None and csv_lookup.get_qualification("NONE") is None
 
 
 @mock_aws

@@ -32,6 +32,15 @@ class QualificationLink(ReferenceModel):
     training_hours: int | None = Field(default=None, ge=0)
 
 
+class Qualification(ReferenceModel):
+    """자격 정보 `QUAL#{qualCode}` / `META` (db-schema §4). 실재 확인과 공식 출처에 쓴다 (개발계획서1 F-05 처리 4단계)."""
+    qualification_code: str = Field(min_length=1)
+    name: str = Field(min_length=1)
+    exam_agency: str | None = None
+    source_url: str | None = None
+    collected_at: str | None = None
+
+
 class BasicSkill(ReferenceModel):
     skill_id: str = Field(min_length=1)
     name: str = Field(min_length=1)
