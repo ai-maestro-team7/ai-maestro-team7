@@ -8,11 +8,11 @@
   - [x] 0.1 requirements·design·tasks (결정 1~8)
   - 커밋: `docs: 꼬리질문 판단 에이전트 스펙 추가`
 
-- [ ] 1. 공통 모듈 분리 (동작 변경 없음)
-  - [ ] 1.1 `tools.py` `search_resume`, `ToolUsage` (design §3). `feedback.py`가 불러 쓴다
-  - [ ] 1.2 `test_tools.py`, 기존 `test_feedback.py` 그대로 통과
+- [x] 1. 공통 모듈 분리 (동작 변경 없음)
+  - [x] 1.1 `tools.py` `search_resume`, `ToolUsage` (design §3). `feedback.py`가 불러 쓰고 기존 이름을 다시 내보낸다
+  - [x] 1.2 `test_tools.py`, 기존 `test_feedback.py`·`test_llm.py` 그대로 통과
     - _Requirements: 1.1, 1.7, 7.4_
-  - 커밋: `refactor: 자소서 문장 찾기와 툴 호출 횟수 세기를 공통 모듈로 분리`
+  - 커밋: `refactor: 자소서 문장 찾기와 툴 호출 횟수 세기를 공통 모듈로 분리` (590 passed 5 skipped)
 
 - [ ] 2. 길이 제한·대체 경로·판단 결과 기록 (아직 한 번 호출 방식)
   - [ ] 2.1 `settings.FOLLOW_UP_QUESTION_MAX` 150, `models.FollowUpOutput` 후보 버리기 (design §6)
