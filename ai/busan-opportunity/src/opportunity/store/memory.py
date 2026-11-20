@@ -8,7 +8,8 @@ from collections.abc import Sequence
 from datetime import datetime
 
 from ..models.policy import Policy
-from ..models.posting import AltCandidates, CompanyRecord, PostingLatest, PostingName, PostingSnapshot
+from ..core.name_index import name_row
+from ..models.posting import AltCandidates, CompanyRecord, PostingLatest, PostingSnapshot
 from ..models.profile import BasicProfile, OppPrefs
 from ..models.user_state import ExplanationCache, Notification, PolicyAlert, SavedItem
 from ..ports import IdemResult, VectorHit
@@ -43,9 +44,7 @@ class MemoryCatalog:
         return sorted(rows, key=lambda p: (p.closes_at, p.job_posting_id))[:limit]
 
     def posting_names(self):
-        return [PostingName(job_posting_id=p.job_posting_id, organization=p.organization, title=p.title,
-                            job_name=p.job.name, closes_at=p.closes_at)
-                for p in sorted(self.latest.values(), key=lambda p: p.job_posting_id) if not p.is_expired]
+        return [name_row(p) for p in sorted(self.latest.values(), key=lambda p: p.job_posting_id) if not p.is_expired]
 
     def query_policies(self, region_key):
         rows = [p for p in self.policies.values() if p.region_key() == region_key]

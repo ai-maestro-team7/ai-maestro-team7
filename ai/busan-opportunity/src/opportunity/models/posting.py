@@ -233,9 +233,10 @@ class VectorMeta(OppModel):
 
 
 class PostingName(OppModel):
-    """검색어·회사 이름 검색용 이름 색인 한 줄 (B-D08). 진행 중 공고만 둔다.
+    """공고 이름 색인 한 줄 (B-D08). 진행 중 공고만 둔다. 만드는 곳은 `core/name_index.name_row` 하나다.
 
     `team07-catalog`의 `POSTNAMES` / `POSTING#{jobPostingId}`. LATEST를 쓸 때 같이 쓰고, 마감 처리하면 지운다.
+    검색어·회사 이름 검색과, 로그인 없이 보는 공고 목록의 분류(B-D10)에 쓴다.
     """
 
     job_posting_id: str
@@ -243,6 +244,12 @@ class PostingName(OppModel):
     title: str
     job_name: str | None = None
     closes_at: str
+    # 분류 (B-D10). 이 칸이 생기기 전에 쓴 줄은 기본값이라 다시 채워야 한다
+    org_type: OrgType = OrgType.PRIVATE
+    sido: str | None = None  # 해외·근무지 미상이면 없음
+    is_overseas: bool = False
+    career_type: CareerType = CareerType.UNKNOWN
+    employment_type: EmploymentType = EmploymentType.UNKNOWN
 
 
 def latest_from_snapshot(snap: PostingSnapshot, *, busan_sido: str, capital_sido: list[str],

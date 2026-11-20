@@ -49,7 +49,7 @@ function BasisRow({ basis }: { basis: string }) {
       <p className="text-grey-600">
         {SORT_LABELS.BUSAN_FIRST} · {basis}
       </p>
-      <Link href="/jobs/?talent=1" className="font-medium text-blue-500">
+      <Link href="/jobs/recommended/?talent=1" className="font-medium text-blue-500">
         지역 혜택 공고 보기
       </Link>
     </div>

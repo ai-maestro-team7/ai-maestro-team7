@@ -47,6 +47,15 @@ LOWER_BOUND_CARD = {
     "salary": {"disclosed": True, "min": 3200, "unit": "MANWON_YEAR"}, "matchScore": 0.61, "matchLevel": "FAIR",
     "eligibility": ELIGIBLE, "badges": [], "facts": ["희망 직무와 같은 직종", "급여는 하한만 공고에 적혀 있음", "마감 D-17"],
     "commuteMinutes": 28, "isSample": True}
+PERSONAL_KEYS = {"matchScore", "matchLevel", "rankScore", "eligibility", "facts", "commuteMinutes", "distanceKm",
+                 "busanAlternativesCount", "regionalTalent", "isCapitalArea"}
+
+
+def public_card(card: dict, **extra) -> dict:
+    """맞춤 카드에서 개인 값을 뺀 공개 목록 카드."""
+    return {**{k: v for k, v in card.items() if k not in PERSONAL_KEYS}, **extra}
+
+
 ALT_PUBLIC = {
     "jobPostingId": "alio-DEMO0001", "title": "2026년 신입직원 채용 (데이터)", "organization": "가상금융공사",
     "workRegion": {"sido": "26", "sigungu": "26290", "label": "부산 남구"}, "closesAt": "2026-11-30", "similarity": 0.81,
@@ -114,6 +123,13 @@ MOCKS = {
         "items": [BUSAN_CARD, SEOUL_CARD, LOWER_BOUND_CARD, OVERSEAS_CARD],
         "ranking": {"sort": "BUSAN_FIRST", "basis": "비슷하게 맞는 공고 중 부산 근무 공고를 먼저 보여드려요", "busanBoost": 0.06},
         "dataAsOf": AS_OF, "stale": False, "askLeaveReason": False}),
+    # 로그인 없이 보는 목록 (B-D10): 마감 임박순, 개인 값(적합도·자격·근거·부산 대안 수) 없음
+    "GET_public_postings": (m.PublicPostingList, {
+        "items": [public_card(SEOUL_CARD, careerType="NEW", employmentType="FULL_TIME"),
+                  public_card(BUSAN_CARD, careerType="NEW", employmentType="FULL_TIME"),
+                  public_card(LOWER_BOUND_CARD, careerType="NEW", employmentType="FULL_TIME"),
+                  public_card(OVERSEAS_CARD, isOverseas=True, careerType="ANY", employmentType="INTERN")],
+        "total": 4, "dataAsOf": AS_OF, "stale": False}),
     "GET_postings_id": (m.PostingDetailResponse, {
         "posting": SNAPSHOT, "isBusan": False, "isCapitalArea": True, "closed": False, "isSample": True, "matchLevel": "GOOD",
         "eligibility": ELIGIBLE, "badges": [], "relatedPolicies": [], "alternativesPreview": [ALT_PRIVATE, ALT_PUBLIC],

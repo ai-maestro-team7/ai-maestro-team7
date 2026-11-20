@@ -21,6 +21,7 @@ from ..core.compare import compare_postings
 from ..core.policies import get_policy, match_policies
 from ..core.posting_detail import get_posting
 from ..core.preferences import get_preferences, set_preferences
+from ..core.public_postings import list_public_postings
 from ..core.ranking import search_postings
 from ..core.saved import add_target_posting, list_saved, remove_saved
 from ..deps import Deps
@@ -35,6 +36,7 @@ from ..notify.scheduler import subscribe_policy_alert
 from . import errors
 
 PREFIX = "/api/v1/opportunities"
+PUBLIC_PATHS = {f"{PREFIX}/public/postings"}  # 로그인 없이 부르는 경로 (B-D10). API Gateway에서도 공개 경로다
 CLIENT_EVENTS = {TrackEvent.ALT_CLICKED, TrackEvent.COMPARE_OPENED, TrackEvent.COST_TOGGLE_ON,
                  TrackEvent.BUSAN_FIRST_OFF, TrackEvent.POLICY_LINK_CLICKED}  # 서버가 남기는 이벤트는 받지 않는다
 
@@ -57,6 +59,18 @@ class FeedQuery(OppModel):
     cursor: str | None = None
     limit: int | None = Field(default=None, ge=1)
     regional_talent: bool | None = None  # true면 지역인재 전형이 있을 수 있는 공고만
+    sector: str | None = None  # ALL·PUBLIC(공기업: 공공기관·지방공공기관)·PRIVATE(사기업) (B-D10)
+
+
+class PublicPostingsQuery(OppModel):
+    keyword: str | None = Field(default=None, max_length=50)
+    region: str = "ALL"
+    sector: str | None = None      # ALL·PUBLIC(공기업: 공공기관·지방공공기관)·PRIVATE(사기업)
+    org_type: str | None = None    # ALL·PUBLIC_INSTITUTION·LOCAL_PUBLIC·PRIVATE
+    career: str | None = None      # ALL·NEW·EXPERIENCED (신입·경력 무관 공고는 둘 다에 보인다)
+    employment: str | None = None  # ALL·FULL_TIME·CONTRACT·PART_TIME·INTERN
+    cursor: str | None = None
+    limit: int | None = Field(default=None, ge=1)
 
 
 class AlternativesQuery(OppModel):
@@ -90,7 +104,11 @@ def _deps() -> Deps:
 
 
 def _user_id() -> str:
-    return app.context["user_id"]
+    """토큰의 sub. 공개 경로로 들어온 요청에는 없으므로, 사용자 경로에서 비어 있으면 401로 막는다."""
+    user_id = app.context.get("user_id")
+    if not user_id:
+        raise OppError(401, "UNAUTHORIZED", "로그인이 필요해요.")
+    return user_id
 
 
 def _request_id() -> str:
@@ -139,13 +157,24 @@ def _drop_none(**kwargs) -> dict:
 
 
 # ---------------------------------------------------------------- 공고
+@app.get(f"{PREFIX}/public/postings")
+def rest_public_postings():
+    """로그인 없이 보는 공고 목록 (B-D10). 사용자 ID를 읽지 않는다."""
+    q = _query(PublicPostingsQuery)
+    return list_public_postings(_deps(), **_drop_none(keyword=q.keyword, region=q.region, sector=q.sector,
+                                                      org_type=q.org_type,
+                                                      career=q.career, employment=q.employment, cursor=q.cursor,
+                                                      limit=q.limit)).to_api()
+
+
 @app.get(f"{PREFIX}/postings")
 def rest_search_postings():
     q = _query(FeedQuery)
     job_codes = [c.strip() for c in q.job_codes.split(",") if c.strip()] if q.job_codes else None
     return search_postings(_deps(), _user_id(), **_drop_none(region=q.region, sort=q.sort, job_codes=job_codes,
                                                              keyword=q.keyword, cursor=q.cursor,
-                                                             limit=q.limit, regional_talent=q.regional_talent)).to_api()
+                                                             limit=q.limit, regional_talent=q.regional_talent,
+                                                             sector=q.sector)).to_api()
 
 
 @app.get(f"{PREFIX}/postings/<job_posting_id>")
@@ -310,8 +339,19 @@ def _on_not_found(error: NotFoundError):
 
 
 # ---------------------------------------------------------------- 입구
-def handle(event: dict, deps: Deps, user_id: str, context: Any = None) -> dict:
-    """백엔드 Lambda가 부르는 입구. user_id는 토큰의 sub이고, 요청 안의 userId는 보지 않는다."""
+def handle_public(event: dict, deps: Deps, context: Any = None) -> dict:
+    """토큰 없이 들어온 요청의 입구. 공개 경로(`PUBLIC_PATHS`)만 받고 나머지는 401이다."""
+    path = (event.get("rawPath") or "").rstrip("/")
+    if path not in PUBLIC_PATHS:
+        request_id = (event.get("requestContext") or {}).get("requestId") or errors.new_request_id()
+        status, body = errors.from_opp_error(OppError(401, "UNAUTHORIZED", "로그인이 필요해요."), request_id)
+        return {"statusCode": status, "headers": {"Content-Type": "application/json"}, "body": _dumps(body)}
+    return handle(event, deps, None, context)
+
+
+def handle(event: dict, deps: Deps, user_id: str | None, context: Any = None) -> dict:
+    """백엔드 Lambda가 부르는 입구. user_id는 토큰의 sub이고, 요청 안의 userId는 보지 않는다.
+    공개 경로는 `handle_public`이 user_id 없이 부른다. 그때 사용자 경로는 `_user_id()`가 401로 막는다."""
     started = time.perf_counter()
     app.append_context(deps=deps, user_id=user_id)
     response = app.resolve(event, context)
