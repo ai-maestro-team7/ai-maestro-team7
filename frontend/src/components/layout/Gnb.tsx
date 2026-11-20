@@ -4,16 +4,24 @@ import { Bookmark, Search } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { type FormEvent, useState } from "react";
-import { demoUser } from "@/features/user/data";
+import { loginHref } from "@/features/auth/lib";
+import { useUsername } from "@/features/auth/useUsername";
 import { cn } from "@/lib/cn";
+import { clearSession } from "@/lib/session";
 import { activeNavHref, NAV_ITEMS } from "./navigation";
 
 /** 상단 공통 메뉴 (Figma GNB 27:1616). 높이 64px 윗줄 + 48px 탭 줄. */
 export function Gnb() {
   const pathname = usePathname();
   const router = useRouter();
+  const username = useUsername();
   const [query, setQuery] = useState("");
   const activeHref = activeNavHref(pathname);
+
+  function handleLogout() {
+    clearSession();
+    router.push("/");
+  }
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -56,8 +64,18 @@ export function Gnb() {
             저장한 공고
           </span>
           <span aria-hidden className="hidden h-3 w-px bg-grey-300 md:block" />
-          <span className="font-medium text-grey-900">{demoUser.displayName} 님</span>
-          <span className="text-grey-500">시연 모드</span>
+          {username ? (
+            <>
+              <span className="font-medium text-grey-900">{username} 님</span>
+              <button type="button" onClick={handleLogout} className="text-grey-600 hover:text-grey-900">
+                로그아웃
+              </button>
+            </>
+          ) : (
+            <Link href={loginHref(pathname)} className="font-medium text-blue-500">
+              로그인
+            </Link>
+          )}
         </div>
       </div>
       <nav aria-label="주 메뉴" className="mx-auto w-full max-w-content px-5 xl:px-0">

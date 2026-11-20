@@ -2,7 +2,11 @@
 # 프론트 화면 배포 자원 (S3 + CloudFront). 여러 번 실행해도 안전하다. 사람이 한 번 실행한다.
 #  - 버킷 team07-web-<계정ID>: 퍼블릭 액세스 차단, CloudFront(OAC)만 읽을 수 있다
 #  - CloudFront 함수 team07-web-index: `/jobs/` → `/jobs/index.html` (frontend/ 는 trailingSlash 정적 내보내기)
-#  - 배포 team07-web (Comment로 찾는다): HTTPS로 넘김, 없는 경로는 /404.html
+#  - 배포 team07-web (Comment로 찾는다): HTTPS로 넘김, 없는 화면 경로는 /404.html
+#  - 같은 배포의 `/api/*` 는 API Gateway(team07-http-api)로 넘긴다. 화면과 API가 같은 주소라 CORS가 필요 없고
+#    API 주소를 프론트 코드·저장소에 적지 않는다. 캐시하지 않고 Host를 뺀 요청 헤더(Authorization 포함)를 그대로 넘긴다
+#  - 오류 페이지는 403만 /404.html 로 바꾼다. S3(OAC, ListBucket 없음)는 없는 파일에 403을 주고,
+#    API의 404 JSON 오류(POSTING_NOT_FOUND 등)는 그대로 화면에 가야 해서 404는 바꾸지 않는다
 #  - 역할 team07-github-deploy 에 웹 버킷 쓰기·이 배포 캐시 무효화 권한을 따로 붙인다 (team07-github-deploy-web-policy)
 # 끝나면 GitHub Secrets WEB_BUCKET, WEB_DISTRIBUTION_ID 에 넣을 값을 출력한다 (.github/workflows/frontend-deploy.yml).
 set -euo pipefail
@@ -15,8 +19,19 @@ DIST_COMMENT=${PREFIX}-web
 DEPLOY_ROLE=${PREFIX}-github-deploy
 # AWS 관리형 캐시 정책 CachingOptimized (원본 Cache-Control을 따른다)
 CACHE_POLICY_ID=658327ea-f89d-4fab-a63d-7e88639e58f6
+# `/api/*`: 관리형 CachingDisabled + 원본 요청 정책 AllViewerExceptHostHeader (API Gateway는 자기 Host가 필요하다)
+API_CACHE_POLICY_ID=4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+API_ORIGIN_REQUEST_POLICY_ID=b689b0a8-53d0-40ab-baf2-68738e2966ac
 TMP=$(mktemp -d)
 trap 'rm -r "$TMP"' EXIT
+
+# 0. API 원본 (infra/setup-api.sh 가 만든 HTTP API). 주소는 출력하지 않는다
+API_ID=$(aws apigatewayv2 get-apis --query "Items[?Name=='$API_NAME'].ApiId | [0]" --output text)
+if [ "$API_ID" = "None" ] || [ -z "$API_ID" ]; then
+  echo "! HTTP API $API_NAME 이 없어요. infra/setup-api.sh 를 먼저 실행하세요." >&2
+  exit 1
+fi
+API_DOMAIN=${API_ID}.execute-api.${AWS_REGION}.amazonaws.com
 
 # 1. 버킷
 if aws s3api head-bucket --bucket "$WEB_BUCKET" >/dev/null 2>&1; then
@@ -76,12 +91,38 @@ if [ "$DIST_ID" = "None" ] || [ -z "$DIST_ID" ]; then
     "IsIPV6Enabled": true,
     "PriceClass": "PriceClass_200",
     "Origins": {
-      "Quantity": 1,
+      "Quantity": 2,
       "Items": [{
         "Id": "web-s3",
         "DomainName": "$WEB_BUCKET.s3.$AWS_REGION.amazonaws.com",
         "OriginAccessControlId": "$OAC_ID",
         "S3OriginConfig": { "OriginAccessIdentity": "" }
+      }, {
+        "Id": "api",
+        "DomainName": "$API_DOMAIN",
+        "CustomOriginConfig": {
+          "HTTPPort": 80,
+          "HTTPSPort": 443,
+          "OriginProtocolPolicy": "https-only",
+          "OriginSslProtocols": { "Quantity": 1, "Items": ["TLSv1.2"] },
+          "OriginReadTimeout": 30,
+          "OriginKeepaliveTimeout": 5
+        }
+      }]
+    },
+    "CacheBehaviors": {
+      "Quantity": 1,
+      "Items": [{
+        "PathPattern": "/api/*",
+        "TargetOriginId": "api",
+        "ViewerProtocolPolicy": "https-only",
+        "CachePolicyId": "$API_CACHE_POLICY_ID",
+        "OriginRequestPolicyId": "$API_ORIGIN_REQUEST_POLICY_ID",
+        "Compress": false,
+        "AllowedMethods": {
+          "Quantity": 7, "Items": ["GET", "HEAD", "OPTIONS", "PUT", "PATCH", "POST", "DELETE"],
+          "CachedMethods": { "Quantity": 2, "Items": ["GET", "HEAD"] }
+        }
       }]
     },
     "DefaultCacheBehavior": {
@@ -99,10 +140,9 @@ if [ "$DIST_ID" = "None" ] || [ -z "$DIST_ID" ]; then
       }
     },
     "CustomErrorResponses": {
-      "Quantity": 2,
+      "Quantity": 1,
       "Items": [
-        { "ErrorCode": 403, "ResponsePagePath": "/404.html", "ResponseCode": "404", "ErrorCachingMinTTL": 10 },
-        { "ErrorCode": 404, "ResponsePagePath": "/404.html", "ResponseCode": "404", "ErrorCachingMinTTL": 10 }
+        { "ErrorCode": 403, "ResponsePagePath": "/404.html", "ResponseCode": "404", "ErrorCachingMinTTL": 10 }
       ]
     }
   },
@@ -114,6 +154,11 @@ JSON
   echo "+ CloudFront 배포 $DIST_COMMENT (전파에 몇 분 걸림)"
 else
   echo "= CloudFront 배포 $DIST_COMMENT (이미 있음, 설정은 바꾸지 않음)"
+  HAS_API=$(aws cloudfront get-distribution-config --id "$DIST_ID" \
+    --query "length(DistributionConfig.CacheBehaviors.Items[?PathPattern=='/api/*'] || \`[]\`)" --output text)
+  if [ "$HAS_API" = "0" ]; then
+    echo "! 이 배포에는 /api/* 동작이 없어요. 화면이 API를 부르지 못하니 콘솔에서 추가하거나 배포를 지우고 다시 실행하세요."
+  fi
 fi
 DIST_ARN=arn:aws:cloudfront::${ACCOUNT_ID}:distribution/${DIST_ID}
 
@@ -150,4 +195,4 @@ echo "화면 주소: https://$DOMAIN"
 echo "GitHub Secrets 등록 (공개 저장소라 값은 채팅·문서에 남기지 않는다):"
 echo "  gh secret set WEB_BUCKET --body \"$WEB_BUCKET\""
 echo "  gh secret set WEB_DISTRIBUTION_ID --body \"$DIST_ID\""
-echo "API CORS를 이 주소로 좁히려면: ALLOWED_ORIGIN=https://$DOMAIN infra/setup-api.sh"
+echo "API: https://$DOMAIN/api/v1/... (같은 주소라 CORS 불필요. CORS * 는 로컬 개발 localhost:3000 에서만 쓴다)"
