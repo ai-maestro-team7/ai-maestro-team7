@@ -25,6 +25,8 @@ RESUME_MIN, RESUME_MAX = 50, 5000
 
 # LLM이 만든 질문 문장 길이 (design §8 제안 값)
 QUESTION_MIN, QUESTION_MAX = 5, 300
+# 꼬리질문 후보 길이 상한 (공백 포함, follow-up 결정 7). 프롬프트는 "100자 안팎", 넘는 후보는 버린다
+FOLLOW_UP_QUESTION_MAX = 150
 
 # 면접 고정 규칙 (C §4.2)
 BASE_QUESTION_COUNT = 3

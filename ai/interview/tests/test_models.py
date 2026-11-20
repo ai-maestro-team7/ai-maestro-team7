@@ -276,6 +276,64 @@ def test_follow_up_output_rules():
         FollowUpOutput.model_validate({"needFollowUp": True, "reason": "MAYBE", "followUpQuestions": ["질문입니다?"]})
 
 
+def _follow_up(*questions, need=True):
+    return FollowUpOutput.model_validate({"needFollowUp": need, "reason": "ABSTRACT" if need else "SUFFICIENT",
+                                          "followUpQuestions": list(questions)})
+
+
+@pytest.mark.parametrize("length, kept", [(4, False), (5, True), (149, True), (150, True), (151, False)])
+def test_follow_up_candidate_length_boundary(length, kept):
+    # 공백 포함 5~150자만 남긴다 (#109, settings.FOLLOW_UP_QUESTION_MAX)
+    out = _follow_up("가" * length, "그때 맡은 역할은 무엇이었나요?")
+    assert (out.follow_up_questions[0] == "가" * length) is kept
+    assert out.dropped_candidates == (0 if kept else 1)
+
+
+def test_follow_up_long_first_candidate_dropped_second_used():
+    out = _follow_up("가" * 151, "  그때 맡은 역할은 무엇이었나요?  ")
+    assert out.follow_up_questions == ["그때 맡은 역할은 무엇이었나요?"] and out.dropped_candidates == 1
+
+
+def test_follow_up_length_counts_spaces_after_strip():
+    assert _follow_up("  " + "가 " * 75 + "  ").follow_up_questions == [("가 " * 75).strip()]  # 149자
+    with pytest.raises(ValidationError):
+        _follow_up("가 " * 75 + "가")  # 151자
+
+
+def test_follow_up_all_candidates_too_long_is_invalid():
+    with pytest.raises(ValidationError):
+        _follow_up("가" * 151, "나" * 200)
+
+
+def test_follow_up_not_needed_ignores_long_candidates():
+    out = _follow_up("가" * 400, need=False)
+    assert out.follow_up_questions == [] and out.dropped_candidates == 1
+
+
+@pytest.mark.parametrize("check", ["ABSTRACT", "INCONSISTENT", "SUFFICIENT", "JUDGE_FAILED", None])
+def test_answer_record_follow_up_check_values(check):
+    assert AnswerRecord.model_validate(dict(RECORD, followUpCheck=check)).follow_up_check == check
+
+
+def test_answer_record_follow_up_check_missing_is_none():
+    assert AnswerRecord.model_validate(RECORD).follow_up_check is None  # #109 전 Session
+
+
+@pytest.mark.parametrize("change", [
+    {"isFollowUp": True, "questionId": "q1-f", "answerId": "a-q1-2"},           # 꼬리 답변은 판단하지 않는다
+    {"evaluable": False, "reason": "NO_ANSWER", "answerText": ""},             # 평가 불가 답변도
+])
+def test_answer_record_follow_up_check_only_on_evaluable_base(change):
+    with pytest.raises(ValidationError):
+        AnswerRecord.model_validate(dict(RECORD, followUpCheck="SUFFICIENT", **change))
+    AnswerRecord.model_validate(dict(RECORD, followUpCheck=None, **change))
+
+
+def test_answer_record_follow_up_check_unknown_value_rejected():
+    with pytest.raises(ValidationError):
+        AnswerRecord.model_validate(dict(RECORD, followUpCheck="MAYBE"))
+
+
 # ---------------------------------------------------------------- parse_input
 
 

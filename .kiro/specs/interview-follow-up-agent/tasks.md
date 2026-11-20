@@ -14,13 +14,15 @@
     - _Requirements: 1.1, 1.7, 7.4_
   - 커밋: `refactor: 자소서 문장 찾기와 툴 호출 횟수 세기를 공통 모듈로 분리` (590 passed 5 skipped)
 
-- [ ] 2. 길이 제한·대체 경로·판단 결과 기록 (아직 한 번 호출 방식)
-  - [ ] 2.1 `settings.FOLLOW_UP_QUESTION_MAX` 150, `models.FollowUpOutput` 후보 버리기 (design §6)
-  - [ ] 2.2 `models.AnswerRecord.follow_up_check`, `flow.process_answer` 판단을 기록 추가 전으로, `followUpCheck` 기록 (design §5)
-  - [ ] 2.3 `follow_up.judge_follow_up` `AI_OUTPUT_INVALID` → JUDGE_FAILED 대체 (design §4.3)
-  - [ ] 2.4 `test_models.py`·`test_flow.py`·`test_samples.py`·`test_backend_flow.py` 수정, 대체 경로 테스트
+- [x] 2. 길이 제한·대체 경로·판단 결과 기록 (아직 한 번 호출 방식)
+  - [x] 2.1 `settings.FOLLOW_UP_QUESTION_MAX` 150, `models.FollowUpOutput` 후보 버리기 (design §6)
+  - [x] 2.2 `models.AnswerRecord.follow_up_check`, `flow.process_answer` 판단을 기록 추가 전으로, `followUpCheck` 기록 (design §5)
+  - [x] 2.3 `follow_up.judge_follow_up` `AI_OUTPUT_INVALID` → JUDGE_FAILED 대체 (design §4.3)
+  - [x] 2.4 `test_models.py`·`test_flow.py`·`test_backend_flow.py`·`test_logging.py` 수정, 대체 경로 테스트
+    - `test_samples.py`는 바꿀 곳 없음 (`follow_up_multiple.json` 후보 3개 모두 150자 이하)
+    - 기존 `test_follow_up_invalid_output_raises_and_session_unchanged`는 대체 경로 테스트로 바꿨다 (예외 → NEXT_QUESTION)
     - _Requirements: 4.1~4.4, 5.1~5.5, 6.1~6.3, 7.1~7.3_
-  - 커밋: `feat: 꼬리질문 길이 제한과 판단 실패 시 꼬리질문 없이 진행`
+  - 커밋: `feat: 꼬리질문 길이 제한과 판단 실패 시 꼬리질문 없이 진행` (617 passed 5 skipped)
 
 - [ ] 3. 판단 에이전트
   - [ ] 3.1 `llm.py` `run_with_tools(max_tokens)`, `call_json_with_tools(max_tokens)`, `settings` 상한·`follow_up_max_tokens()` (design §4.4·§8)
