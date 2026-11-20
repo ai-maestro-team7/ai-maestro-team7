@@ -106,7 +106,7 @@ AI 모의면접 함수의 3차 단계다 (이슈 #92). 면접이 끝나면 답�
 #### Acceptance Criteria
 1. THE 함수 SHALL 백엔드 호출 형태 `generate_report(session, frames)` 그대로 C §5.4 `report`를 돌려준다.
 2. THE 순서 SHALL Session 검사 → 묶음 만들기 → C-1(평가 가능한 묶음마다) → 점수 계산 → C-2 → 조립이다.
-3. THE `report` SHALL `job`, `interviewType`, `evaluatedBaseQuestions`, `totalScore`, `grade`, `weightBasis`, `areas{content, delivery, attitude: {score, notMeasuredReason}}`, `questions[]`, `scoringVersion`, `modelId`, `promptVersion`, `notice`를 담는다. `interviewDate`는 백엔드가 넣는다.
+3. THE `report` SHALL `job`, `interviewType`, `evaluatedBaseQuestions`, `totalScore`, `grade`, `weightBasis`, `areas{content, delivery, attitude: {score, notMeasuredReason}}`, `notMeasuredMessages`(미측정 이유 문장), `questions[]`, `scoringVersion`, `modelId`, `promptVersion`, `notice`를 담는다. `interviewDate`는 백엔드가 넣는다.
    - `questions[]` 항목: `questionId`, `question`, `followUp{question, answerText}` 또는 null, `answerText`, `evaluable`, `reason`, `contentScore`, `strengths`, `improvements`, `direction`, `metrics{speechRate, longPausePerMin, frontalRatio, timeLimitReached}`, `comment`
    - `frontalRatio`는 3차에서 늘 null
    - `notice`: "면접 점수는 실제 합격 확률이 아니에요. 연습용 참고 지표예요."
