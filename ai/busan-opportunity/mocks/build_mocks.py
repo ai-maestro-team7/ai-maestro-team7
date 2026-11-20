@@ -12,6 +12,7 @@ HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE.parent / "src"))
 
 from opportunity import models as m  # noqa: E402
+from opportunity.core import copy_rules  # noqa: E402
 
 AS_OF = "2026-11-21T04:52:00+09:00"
 CG = {"type": "CHEONGKKEUL", "label": "청끌기업 · 급여", "source": "부산광역시", "asOf": "2026-06-30", "cheonggeulType": "SALARY"}
@@ -25,13 +26,27 @@ BUSAN_CARD = {
     "workRegion": {"sido": "26", "sigungu": "26350", "label": "부산 해운대구"}, "isBusan": True, "isCapitalArea": False,
     "job": JOB, "closesAt": "2026-12-05", "rolling": False,
     "salary": {"disclosed": True, "min": 3400, "max": 3800, "unit": "MANWON_YEAR"}, "matchScore": 0.74, "matchLevel": "GOOD",
-    "eligibility": ELIGIBLE, "badges": [CG], "facts": ["희망 직무와 같은 직종", "필수 조건 2개 중 2개 충족", "마감 D-14"], "isSample": True}
+    "eligibility": ELIGIBLE, "badges": [CG], "facts": ["희망 직무와 같은 직종", "필수 조건 2개 중 2개 충족", "마감 D-14"],
+    "commuteMinutes": 35, "isSample": True}
 SEOUL_CARD = {
     "jobPostingId": "wk24-DEMO0002", "title": "Data Analyst", "organization": "(주)가상테크", "orgType": "PRIVATE",
     "workRegion": {"sido": "11", "sigungu": "11680", "label": "서울 강남구"}, "isBusan": False, "isCapitalArea": True,
     "job": JOB, "closesAt": "2026-11-30", "rolling": False,
     "salary": {"disclosed": True, "min": 4000, "max": 4400, "unit": "MANWON_YEAR"}, "matchScore": 0.79, "matchLevel": "GOOD",
     "eligibility": ELIGIBLE, "badges": [], "facts": ["희망 직무와 같은 직종", "마감 D-9"], "busanAlternativesCount": 2, "isSample": True}
+OVERSEAS_CARD = {
+    "jobPostingId": "wj-DEMO0001", "title": "해외 데이터 분석 인턴", "organization": "가상글로벌(주)", "orgType": "PRIVATE",
+    "workRegion": {"label": copy_rules.OVERSEAS_LABEL.format(country="베트남"), "overseas": True, "country": "베트남"},
+    "isBusan": False, "isCapitalArea": False, "job": JOB, "closesAt": "2026-12-12", "rolling": False,
+    "salary": {"disclosed": False, "unit": "MANWON_YEAR"}, "matchScore": 0.52, "matchLevel": "FAIR",
+    "facts": ["희망 직무와 같은 직종", "해외 근무 · 베트남", "마감 D-21"], "isSample": True}
+LOWER_BOUND_CARD = {
+    "jobPostingId": "klid-DEMO0001", "title": "2026년 정규직 신입 채용 (데이터·통계)", "organization": "가상시설공단", "orgType": "LOCAL_PUBLIC",
+    "workRegion": {"sido": "26", "sigungu": "26500", "label": "부산 수영구"}, "isBusan": True, "isCapitalArea": False,
+    "job": JOB, "closesAt": "2026-12-08", "rolling": False,
+    "salary": {"disclosed": True, "min": 3200, "unit": "MANWON_YEAR"}, "matchScore": 0.61, "matchLevel": "FAIR",
+    "eligibility": ELIGIBLE, "badges": [], "facts": ["희망 직무와 같은 직종", "급여는 하한만 공고에 적혀 있음", "마감 D-17"],
+    "commuteMinutes": 28, "isSample": True}
 ALT_PUBLIC = {
     "jobPostingId": "alio-DEMO0001", "title": "2026년 신입직원 채용 (데이터)", "organization": "가상금융공사",
     "workRegion": {"sido": "26", "sigungu": "26290", "label": "부산 남구"}, "closesAt": "2026-11-30", "similarity": 0.81,
@@ -56,6 +71,29 @@ SNAPSHOT = {
     "orgType": "PRIVATE", "workRegion": {"sido": "11", "sigungu": "11680", "label": "서울 강남구"}, "job": JOB,
     "employmentType": "FULL_TIME", "careerType": "NEW", "salary": {"disclosed": True, "min": 4000, "max": 4400, "unit": "MANWON_YEAR"},
     "remoteWork": "NONE", "extractStatus": "DONE", "contentHash": "demo"}
+BUSAN_SNAPSHOT = {
+    "jobPostingId": "wk24-DEMO0001", "snapshotId": "20261121-e5f6a7b8", "title": "데이터 분석 신입", "organization": "(주)가상데이터",
+    "jobDescription": "고객 데이터를 SQL로 추출해 지표를 만들고 월간 리포트를 쓴다",
+    "requirements": [
+        {"requirementId": "req-1", "name": "SQL", "kind": "REQUIRED_SKILL", "weight": 1.0, "sourceQuote": "필수: SQL"},
+        {"requirementId": "req-2", "name": "엑셀", "kind": "REQUIRED_SKILL", "weight": 1.0, "sourceQuote": "필수: 엑셀 활용"}],
+    "eligibilityRules": [{"ruleId": "rule-edu", "type": "EDUCATION", "value": "COLLEGE", "sourceQuote": "학력: 초대졸 이상"}],
+    "closesAt": "2026-12-05", "officialUrl": "https://example.invalid/postings/wk24-DEMO0001", "sourceType": "DEMO",
+    "checkedAt": "2026-11-21T04:40:00+09:00", "source": "WORK24", "company": {"name": "(주)가상데이터", "hqSido": "26"},
+    "orgType": "PRIVATE", "workRegion": {"sido": "26", "sigungu": "26350", "label": "부산 해운대구"}, "job": JOB,
+    "employmentType": "FULL_TIME", "careerType": "NEW", "salary": {"disclosed": True, "min": 3400, "max": 3800, "unit": "MANWON_YEAR"},
+    "remoteWork": "NONE", "extractStatus": "DONE", "contentHash": "demo"}
+LOCAL_LIFE = {
+    "commuteMinutes": 35, "commuteLabel": copy_rules.COMMUTE_LABEL.format(minutes=35), "commuteSource": "ODsay 대중교통 경로(구청 사이)",
+    "festivals": [
+        {"festivalId": "fest-DEMO01", "title": "가상 해운대 바다축제", "gugun": "해운대구", "place": "해운대해수욕장", "period": "2027-05-01 ~ 2027-05-03",
+         "traffic": "도시철도 2호선 해운대역", "url": "https://example.invalid/festival/1", "source": "부산광역시 축제정보", "asOf": "2026-11-20"},
+        {"festivalId": "fest-DEMO02", "title": "가상 센텀 빛축제", "gugun": "해운대구", "place": "센텀시티", "period": "2026-12-20 ~ 2027-01-05",
+         "source": "부산광역시 축제정보", "asOf": "2026-11-20"}],
+    "transit": [
+        {"label": "도시철도", "value": "2호선 해운대구 안 12개 역", "source": "부산교통공사", "asOf": "2026-06-30"},
+        {"label": "버스", "value": "노선 48개 (해운대구 경유)", "source": "부산시 버스정보", "asOf": "2026-06-30"},
+        {"label": "동해선", "value": "벡스코역 정차", "source": "한국철도공사", "asOf": "2026-06-30"}]}
 JOY = {
     "policyId": "seed-busan-joy-double", "title": "부산청년 기쁨두배통장", "summary": "월 10만 원 저축 시 시가 같은 금액 지원",
     "category": "ASSET", "stage": "EMPLOYED", "bucket": "AFTER_EMPLOYMENT",
@@ -73,13 +111,19 @@ DIDIMDOL = {
 
 MOCKS = {
     "GET_postings": (m.FeedResponse, {
-        "items": [BUSAN_CARD, SEOUL_CARD],
+        "items": [BUSAN_CARD, SEOUL_CARD, LOWER_BOUND_CARD, OVERSEAS_CARD],
         "ranking": {"sort": "BUSAN_FIRST", "basis": "비슷하게 맞는 공고 중 부산 근무 공고를 먼저 보여드려요", "busanBoost": 0.06},
         "dataAsOf": AS_OF, "stale": False, "askLeaveReason": False}),
     "GET_postings_id": (m.PostingDetailResponse, {
         "posting": SNAPSHOT, "isBusan": False, "isCapitalArea": True, "closed": False, "isSample": True, "matchLevel": "GOOD",
         "eligibility": ELIGIBLE, "badges": [], "relatedPolicies": [], "alternativesPreview": [ALT_PRIVATE, ALT_PUBLIC],
         "facts": ["희망 직무와 같은 직종", "마감 D-9"], "dataAsOf": AS_OF}),
+    "GET_postings_id_busan": (m.PostingDetailResponse, {
+        "posting": BUSAN_SNAPSHOT, "isBusan": True, "isCapitalArea": False, "closed": False, "isSample": True, "matchLevel": "GOOD",
+        "eligibility": ELIGIBLE, "badges": [CG],
+        "relatedPolicies": [{"policyId": "seed-busan-didimdol-plus", "title": "디딤돌카드+", "bucket": "NEXT_CYCLE", "status": "ELIGIBLE",
+                             "summary": "월 30만 원, 최대 6개월"}],
+        "alternativesPreview": [], "localLife": LOCAL_LIFE, "facts": ["희망 직무와 같은 직종", "마감 D-14"], "dataAsOf": AS_OF}),
     "GET_postings_id_explanation": (m.ExplanationResponse, {
         "jobPostingId": "wk24-DEMO0002", "sentences": ["희망하신 데이터 분석 직무와 같은 직종의 공고예요.", "마감까지 9일 남았어요."],
         "facts": ["희망 직무와 같은 직종", "마감 D-9"], "cached": False}),
@@ -97,6 +141,36 @@ MOCKS = {
             {"key": "VERIFIED", "label": "시·정부 인증", "base": "-", "alt": "-"}],
         "costAdjusted": {"available": False, "reason": "SALARY_NOT_COMPARABLE"}, "familyHousingOption": True,
         "familyHousingApplied": False, "suggestMore": True, "dataAsOf": AS_OF}),
+    "POST_postings_id_ask": (m.AskResponse, {
+        "question": "필수 조건이 뭐예요?", "answered": True,
+        "answer": "필수 조건은 SQL과 엑셀 활용이에요. 학력은 초대졸 이상이에요.",
+        "sources": [{"kind": "POSTING", "id": "wk24-DEMO0001", "title": "데이터 분석 신입", "quote": "필수: SQL",
+                     "url": "https://example.invalid/postings/wk24-DEMO0001", "asOf": "2026-11-21"}],
+        "dataAsOf": AS_OF}),
+    "POST_postings_id_ask_unanswered": (m.AskResponse, {
+        "question": "야근이 많나요?", "answered": False, "notice": copy_rules.ASK_NOT_FOUND, "dataAsOf": AS_OF}),
+    "POST_policies_ask": (m.AskResponse, {
+        "question": "면접 볼 때 정장 빌려주는 곳 있어요?", "answered": True,
+        "answer": "부산 면접정장 대여서비스(드림옷장)가 있어요. 신청 조건은 정책 원문에서 한 번 더 확인해 주세요.",
+        "sources": [{"kind": "POLICY", "id": "seed-busan-dreamcloset", "title": "부산 면접정장 대여서비스(드림옷장)",
+                     "quote": "면접용 정장을 무료로 대여", "url": "https://example.invalid/busan-policy/dreamcloset", "asOf": "2026-11-20"}],
+        "relatedPolicies": [{"policyId": "seed-busan-dreamcloset", "title": "부산 면접정장 대여서비스(드림옷장)", "bucket": "OPEN_NOW",
+                             "status": "ELIGIBLE", "summary": "면접용 정장 무료 대여"}],
+        "manualChecks": ["대여 가능 기간과 예약 방법은 신청 페이지에서 확인"], "dataAsOf": AS_OF}),
+    "POST_policies_ask_unanswered": (m.AskResponse, {
+        "question": "전세 대출 이자는 얼마예요?", "answered": False, "notice": copy_rules.ASK_NOT_FOUND, "dataAsOf": AS_OF}),
+    "POST_policies_id_ask": (m.AskResponse, {
+        "question": "언제 신청해요?", "answered": True,
+        "answer": "작년에는 8월 10일부터 21일까지 받았어요. 올해 일정은 공지가 나오면 확인해 주세요.",
+        "sources": [{"kind": "POLICY", "id": "seed-busan-joy-double", "title": "부산청년 기쁨두배통장",
+                     "quote": "8.10~8.21 신청", "url": "https://example.invalid/busan-policy", "asOf": "2026-11-20"}],
+        "manualChecks": ["올해 모집 공고에서 일정 확인"], "dataAsOf": AS_OF}),
+    "GET_companies": (m.CompaniesResponse, {
+        "items": [{"companyId": "co-DEMO0001", "name": "(주)가상데이터", "industry": "소프트웨어 개발", "size": "중소기업", "district": "해운대구",
+                   "mainProduct": "데이터 분석 솔루션", "badges": [CG], "openPostings": 0,
+                   "facts": ["청끌기업 · 급여", "해운대구", "업종: 소프트웨어 개발", "주력 제품: 데이터 분석 솔루션", "규모: 중소기업"],
+                   "source": "부산광역시", "asOf": "2026-06-30"}],
+        "basis": copy_rules.COMPANIES_BASIS, "notice": copy_rules.COMPANIES_NOTICE, "dataAsOf": AS_OF}),
     "GET_policies": (m.PolicyWalletResponse, {
         "profileUsed": {"ageRange": "22~23", "residence": "부산 남구", "employment": "UNEMPLOYED", "income": "UNKNOWN"},
         "buckets": {"OPEN_NOW": [], "NEXT_CYCLE": [DIDIMDOL], "AFTER_EMPLOYMENT": [JOY], "SETTLEMENT": [], "CLOSED": []},
@@ -105,6 +179,7 @@ MOCKS = {
     "GET_policies_id": (m.PolicyDetailResponse, {"policy": {**JOY, "checklist": ["주민등록초본", "신청서"], "url": "https://example.invalid/busan-policy"}, "dataAsOf": AS_OF}),
     "POST_policies_id_alerts": (m.PolicyAlertResponse, {"alert": {"policyId": "seed-busan-joy-double", "scheduledAt": "2027-08-03T09:00:00+09:00"}, "created": True}),
     "GET_me_preferences": (m.PreferencesView, {"sort": "BUSAN_FIRST", "leaveReason": "SALARY", "notifications": {"email": False, "weekly": False}, "receivingPolicies": []}),
+    "PUT_me_preferences": (m.PreferencesView, {"sort": "MATCH", "leaveReason": "SALARY", "notifications": {"email": False, "weekly": False}, "receivingPolicies": []}),
     "POST_saved": (m.SaveResponse, {
         "saved": {"jobPostingId": "alio-DEMO0001", "kind": "TARGET", "status": "PLANNED", "isBusan": True,
                   "savedAt": "2026-11-21T10:12:00+09:00", "workspaceId": "ws-alio-DEMO0001"},
@@ -124,8 +199,16 @@ ERROR = {"error": {"code": "POSTING_NOT_FOUND", "message": "공고를 찾을 수
                    "details": {"jobPostingId": "wk24-NOPE"}}}
 
 
+# 응답 모델 없이 핸들러가 dict로 돌려주는 것 (rest_handler.py의 rest_mark_read, rest_track)
+PLAIN = {
+    "POST_notifications_id_read": {"notificationId": "20261123T090000-a1b2c3d4", "read": True},
+    "POST_track": {"recorded": True},
+}
+
+
 def build() -> dict[str, dict]:
     out = {name: model.model_validate(raw).to_api() for name, (model, raw) in MOCKS.items()}
+    out.update(PLAIN)
     out["ERROR_404"] = ERROR
     return out
 

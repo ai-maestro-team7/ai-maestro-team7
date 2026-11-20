@@ -1,0 +1,20 @@
+{
+  "question": "언제 신청해요?",
+  "answered": true,
+  "answer": "작년에는 8월 10일부터 21일까지 받았어요. 올해 일정은 공지가 나오면 확인해 주세요.",
+  "sources": [
+    {
+      "kind": "POLICY",
+      "id": "seed-busan-joy-double",
+      "title": "부산청년 기쁨두배통장",
+      "quote": "8.10~8.21 신청",
+      "url": "https://example.invalid/busan-policy",
+      "asOf": "2026-11-20"
+    }
+  ],
+  "relatedPolicies": [],
+  "manualChecks": [
+    "올해 모집 공고에서 일정 확인"
+  ],
+  "dataAsOf": "2026-11-21T04:52:00+09:00"
+}
