@@ -66,7 +66,8 @@ def build_document(raw: dict, policy: dict) -> tuple[str, dict]:
         "source": policy.get("source") or "YOUTHCENTER",
         "asOf": policy.get("asOf") or "",
     }
-    return text, metadata
+    # Bedrock KB는 빈 문자열 값을 받지 않는다 (그 문서가 통째로 색인에서 빠진다). 빈 값은 키를 뺀다
+    return text, {key: value for key, value in metadata.items() if value != ""}
 
 
 def _region_key(regions: list[dict]) -> str:
