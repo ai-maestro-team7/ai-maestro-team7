@@ -4,6 +4,6 @@
 """
 
 SCORING_VERSION = "v1.0"  # C §3 점수 설정 파일 버전. 점수 계산은 3차
-PROMPT_A_VERSION = "A-v1"  # 질문 생성
+PROMPT_A_VERSION = "A-v2"  # 질문 생성
 PROMPT_B_VERSION = "B-v1"  # 꼬리질문 판단
 PROMPT_VERSION = f"{PROMPT_A_VERSION}/{PROMPT_B_VERSION}"
