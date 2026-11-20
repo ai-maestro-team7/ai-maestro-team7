@@ -15,7 +15,15 @@ from datetime import date, datetime
 from ..config import OpportunityConfig
 from ..deps import Deps
 from ..models.api import EligibilityResult, FeedResponse, PostingCard, Ranking
-from ..models.enums import CareerType, CheonggeulType, EmploymentType, MatchLevel, RemoteWork, Sort
+from ..models.enums import (
+    CareerType,
+    CheonggeulType,
+    EmploymentType,
+    MatchLevel,
+    RegionalTalentStatus,
+    RemoteWork,
+    Sort,
+)
 from ..models.errors import invalid_input
 from ..models.posting import AltCandidates, Job, PostingLatest
 from ..models.profile import BasicProfile, DesiredJob
@@ -423,7 +431,9 @@ def _card(deps: Deps, row: dict, as_of: datetime, alt_count: int | None, profile
     cfg, posting, match = deps.config, row["posting"], row["match"]
     commute = facts.commute_minutes(deps.local_life, profile, posting.work_region)
     distance = facts.distance_km(deps.local_life, profile, posting.work_region)
+    talent = facts.card_regional_talent(cfg, profile, posting)
     fact_list = facts.compact([facts.job_fact(cfg, match.job_match, basis=match.job_basis),
+                               facts.FACT_REGIONAL_TALENT_CARD if talent == RegionalTalentStatus.LIKELY else None,
                                facts.overseas_fact(posting.work_region) if is_overseas_posting(posting) else None,
                                facts.commute_fact(commute) or facts.distance_fact(distance),  # 통근 시간이 없으면 거리
                                *facts.eligibility_facts(row["eligibility"]),
@@ -436,7 +446,7 @@ def _card(deps: Deps, row: dict, as_of: datetime, alt_count: int | None, profile
         career_type=posting.career_type, match_score=round(match.score, facts.SCORE_DIGITS), match_level=match_level(cfg, match.score),
         rank_score=round(row["rank"], facts.SCORE_DIGITS), eligibility=row["eligibility"],
         badges=facts.valid_badges(posting.badges), facts=fact_list, busan_alternatives_count=alt_count,
-        commute_minutes=commute, distance_km=distance, is_sample=posting.is_sample,
+        commute_minutes=commute, distance_km=distance, regional_talent=talent, is_sample=posting.is_sample,
     )
 
 
@@ -452,7 +462,7 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
                     limit: int = 20, as_of: str | date | datetime | None = None, job_name: str | None = None,
                     query_terms: Sequence[str] | None = None, min_salary: int | None = None,
                     career_type: str | CareerType | None = None, organization: str | None = None,
-                    scope: str | None = None) -> FeedResponse:
+                    scope: str | None = None, regional_talent: bool = False) -> FeedResponse:
     """전국 공고를 찾아 정렬한다. 후보는 벡터 질의 두 번(부산, 전국)으로 모은다. 이 경로에 LLM은 없다.
 
     sort가 None이면 사용자 설정을 쓴다. BUSAN_FIRST와 MATCH는 공고 집합이 같고 순서만 다르다 (T-01).
@@ -462,6 +472,8 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
     대화 조건 (개발계획서4 §9): job_name은 이번 검색에만 희망 직무로 쓰고 저장하지 않는다. query_terms는 질의 글에만
     넣는다. min_salary(만 원/년)·career_type·organization은 거르기만 하고 적합도·정렬 계산은 그대로다.
     scope는 OFFICIAL(공공 API로 모은 공고만)·TEAM(팀이 넣어 둔 공고만)·ALL(기본, 둘 다)이다 (§9.1).
+    regional_talent=True면 지역인재 전형이 있을 수 있는 공고(이전 공공기관 등)만 남긴다. 순서와 점수는 그대로다.
+    학교 소재지가 맞는 공고는 카드의 regionalTalent가 LIKELY다.
     """
     cfg = deps.config
     region = (region or REGION_ALL).strip().upper()
@@ -496,7 +508,8 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
         if not (is_open(posting, ctx.as_of) and _in_region(posting, region, sidos)
                 and _job_code_ok(posting, job_codes) and _keyword_ok(posting, keyword)
                 and _organization_ok(posting, organization) and _salary_ok(posting, min_salary)
-                and _career_ok(posting, career) and _scope_ok(posting, scope)):
+                and _career_ok(posting, career) and _scope_ok(posting, scope)
+                and (not regional_talent or facts.card_regional_talent(cfg, ctx.profile, posting) is not None)):
             continue
         match, result = score_posting(deps, ctx, posting, similarity[pid])
         rank = rank_score(cfg, match.score, is_busan=is_busan_posting(cfg, posting), sort=sort)

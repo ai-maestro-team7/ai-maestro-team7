@@ -7,6 +7,7 @@ from rules.test_ncs_match import ALIO_IT, ALIO_OFFICE, OVERSEAS_VN, add_posting
 
 from opportunity.core import copy_rules, eligibility, facts, ranking
 from opportunity.models import MatchLevel, OppError, Sort
+from opportunity.models.enums import RegionalTalentStatus
 from opportunity.models.posting import AltCandidate, AltCandidates, Job, Salary, WorkRegion
 from opportunity.models.profile import BasicProfile, DesiredJob
 from opportunity.models.region import LocalLifeData
@@ -531,3 +532,49 @@ def test_scope_splits_official_and_team_data(deps, as_of):
     with pytest.raises(OppError) as e:
         feed(deps, as_of, scope="CRAWLED")
     assert e.value.code == "INVALID_INPUT"
+
+
+# ---------------------------------------------------------------- 지역인재 (출신 학교 소재지)
+def _school(deps, user, region, name=None):
+    deps.users.profiles[user] = deps.users.get_basic_profile(user).model_copy(
+        update={"university_region": region, "school_name": name})
+
+
+def test_regional_talent_filter_keeps_only_talent_postings(deps, as_of):
+    everything = feed(deps, as_of, "demo3")
+    only = feed(deps, as_of, "demo3", regional_talent=True)
+    assert ids(only) and set(ids(only)) < set(ids(everything))
+    assert all(c.regional_talent is not None for c in only.items)
+    assert [i for i in ids(everything) if i in set(ids(only))] == ids(only)  # 순서는 그대로
+    assert w.BUSAN_DATA not in ids(only)  # 민간 공고는 빠진다
+
+
+def test_card_says_likely_only_when_school_is_in_busan(deps, as_of):
+    card = next(c for c in feed(deps, as_of, "demo3").items if c.job_posting_id == w.BUSAN_FINANCE_PUBLIC)
+    assert card.regional_talent == RegionalTalentStatus.LIKELY
+    assert facts.FACT_REGIONAL_TALENT_CARD in card.facts
+    for region in ("11", None):
+        _school(deps, "demo3", region)
+        card = next(c for c in feed(deps, as_of, "demo3").items if c.job_posting_id == w.BUSAN_FINANCE_PUBLIC)
+        assert card.regional_talent == RegionalTalentStatus.CHECK_NEEDED
+        assert facts.FACT_REGIONAL_TALENT_CARD not in card.facts
+
+
+def test_school_does_not_change_scores_or_order(deps, as_of):
+    before = [(c.job_posting_id, c.match_score, c.rank_score) for c in feed(deps, as_of, "demo3").items]
+    _school(deps, "demo3", "11")
+    after = [(c.job_posting_id, c.match_score, c.rank_score) for c in feed(deps, as_of, "demo3").items]
+    assert before == after
+
+
+def test_regional_talent_card_copy_is_allowed(deps, as_of):
+    assert not copy_rules.find_forbidden(facts.FACT_REGIONAL_TALENT_CARD)
+
+
+def test_certificates_from_basic_profile_count_for_preferred(deps):
+    profile = BasicProfile(desired_jobs=[DesiredJob(name="데이터 분석", ncs_code="20010105")])
+    posting = deps.catalog.get_latest(w.BUSAN_DATA)
+    assert posting.preferred_names, "데모 공고에 우대 요건이 있어야 한다"
+    without = ranking.preferred_ok_value(profile, posting)
+    with_cert = ranking.preferred_ok_value(profile.model_copy(update={"certificates": [posting.preferred_names[0]]}), posting)
+    assert without is None and with_cert is not None and with_cert > 0

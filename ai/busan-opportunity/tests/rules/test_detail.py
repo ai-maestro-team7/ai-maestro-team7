@@ -145,3 +145,12 @@ def test_local_life_does_not_change_other_detail_fields(deps, as_of):
     before = detail(deps, as_of, w.SEOUL_DATA).to_api()
     after = detail(_with_local_life(deps), as_of, w.SEOUL_DATA).to_api()
     assert before == after
+
+
+def test_regional_talent_message_uses_school_name(deps, as_of):
+    profile = deps.users.get_basic_profile("demo3").model_copy(update={"school_name": "가상대학교"})
+    deps.users.profiles["demo3"] = profile
+    view = posting_detail.get_regional_talent(deps, "demo3", w.BUSAN_FINANCE_PUBLIC, as_of=as_of).regional_talent
+    assert view.status == RegionalTalentStatus.LIKELY
+    assert view.message == "가상대학교(부산) 졸업 예정이라 지역인재 전형 대상일 수 있어요 · 공고문 확인"
+    assert not copy_rules.find_forbidden(view.message)
