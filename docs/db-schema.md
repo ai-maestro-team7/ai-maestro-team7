@@ -9,6 +9,7 @@
 | v1.0 | 초안 |
 | v1.1 | 면접 담당 요청, 멘토링 담당 피드백 반영 (Workspace, GSI에 userId, `*_LATEST#`, 문서 버전, TASK, 삭제 규칙, 평가 로그) |
 | v1.2 | B 피드백 반영: 공고·정책·기업은 `team07-catalog`(B 설계), B 사용자 데이터는 `career-mentor`의 `OPP#`, 공통 프로필은 `PROFILE#BASIC`로. 알림 ID 형식, 저장 공고 ↔ 워크스페이스 연결 규칙 추가 |
+| v1.5 | 기본 정보 화면: `PROFILE#BASIC`에 `schoolName`(대학 이름, 전문대 이상, 50자)·`certificates[]`(가진 자격증, 10개, 50자) 추가. `universityRegion`은 최종 학교 소재지로 쓴다 (대학원이면 학부 대학, 고졸이면 고등학교). 지역인재 판정과 자격 요건 비교에 쓴다 |
 | v1.4 | 채팅 Agent (D-38~D-40, `docs/개발계획서4.md` §8): `SESSION#`·`CHAT#{sessionId}#{messageId}` 필드 확정, `PROFILE#BASIC`에 `desiredSalaryMin`·`desiredCareerType` 추가. 면접 `documentId`는 `DOC_LATEST#`에 `extractedTextKey`가 없으면 `DOC#{id}#V#{n}`의 `textKey`를 읽는다 |
 | v1.3.1 | C 명세 변경 반영 (`transcriptKey`, `eyesOpen`, `baseline=None`) |
 | v1.3 | 파트 간 충돌 정리: `eligibilityRules[]` 구조와 공통 판정 함수, 고용24·NCS 직무 코드 병행 + 매핑(`MAP#WORK24#`), 요건 종류 `REQUIRED_SKILL`/`PREFERRED_SKILL`, 옛 테이블 4개 삭제, `team07-reference` 생성 |
@@ -48,7 +49,7 @@
 
 | 엔티티 | SK | GSI1PK / GSI1SK | 주요 필드 |
 |---|---|---|---|
-| **공통 프로필** (모두 읽음) | `PROFILE#BASIC` | — | `birthYear`, `residenceSido`, `residenceSigungu`, `residenceSince`, `universityRegion`, `graduationStatus`, `employmentStatus`, `monthlyIncome`, `householdIncomeLevel`, `desiredJobs[]`, `desiredRegion`, **`educationLevel`(`HIGH_SCHOOL`/`ASSOCIATE`/`BACHELOR`/`MASTER`/`DOCTOR`), `major`, `priorities[]`** (B 요청), `careerYears`, **`desiredSalaryMin`(정수, 만 원/년), `desiredCareerType`(`NEW`/`EXPERIENCED`/`ANY`)** (채팅 조건 저장 D-40), `talentPoolConsent`(예약, 기본 false), `isDemo`(데모 계정). `desiredJobs[] = [{work24Code, ncsCode, name}]` 최대 3개 |
+| **공통 프로필** (모두 읽음) | `PROFILE#BASIC` | — | `birthYear`, `residenceSido`, `residenceSigungu`, `residenceSince`, `universityRegion`(최종 학교 소재지), `schoolName`, `certificates[]`, `graduationStatus`, `employmentStatus`, `monthlyIncome`, `householdIncomeLevel`, `desiredJobs[]`, `desiredRegion`, **`educationLevel`(`HIGH_SCHOOL`/`ASSOCIATE`/`BACHELOR`/`MASTER`/`DOCTOR`), `major`, `priorities[]`** (B 요청), `careerYears`, **`desiredSalaryMin`(정수, 만 원/년), `desiredCareerType`(`NEW`/`EXPERIENCED`/`ANY`)** (채팅 조건 저장 D-40), `talentPoolConsent`(예약, 기본 false), `isDemo`(데모 계정). `desiredJobs[] = [{work24Code, ncsCode, name}]` 최대 3개 |
 | **워크스페이스** | `WORKSPACE#{wsId}` | `USER#{u}#WSLIST` / `{status}#{updatedAt}` | `workspaceId`, `jobPostingId`, `snapshotId`, `targetNcsCode`, `status`, `selectedDocuments{RESUME, COVER_LETTER: {documentId, version}}`, `latestAnalysisId`, `latestReviewId`, `latestLearningPathId`, `latestInterviewId` |
 | 문서 (최신·목록용) | `DOC_LATEST#{docId}` | — | `documentId`, `documentType`, `title`, `latestVersion`, 최신 버전의 `s3Key`·`extractedTextKey`·`extractionStatus` 사본. 업로드 완료 전(`PENDING`)에만 `expiresAt`(발급 후 24시간) |
 | 문서 버전 | `DOC#{docId}#V#0001` | — | `version`, `parentVersion`, `s3Key`, `extractedTextKey`, `extractionStatus`, `sourceDocumentId`, `relatedStoryIds[]`, `checksum`, `sizeBytes`. 업로드 완료 전(`PENDING`)에만 `expiresAt`(발급 후 24시간), 완료하면 뺀다 |

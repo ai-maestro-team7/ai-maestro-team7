@@ -32,7 +32,9 @@ class CommonProfile(ContractModel):
     residence_sido: Optional[SidoCode] = None
     residence_sigungu: Optional[SigunguCode] = None
     residence_since: Optional[YearMonth] = None
+    # 최종 학교 소재지 시·도. 지역인재 판정에 쓴다. 대학원까지 마쳤으면 학부 대학, 고졸이면 고등학교 소재지
     university_region: Optional[SidoCode] = None
+    school_name: Optional[Annotated[str, non_blank(50)]] = None  # 대학 이름 (전문대 이상만, 고졸은 비운다)
     graduation_status: Optional[Literal["ENROLLED", "GRADUATING", "GRADUATED"]] = None
     education_level: Optional[Literal["HIGH_SCHOOL", "ASSOCIATE", "BACHELOR", "MASTER", "DOCTOR"]] = None
     major: Optional[Annotated[str, non_blank(50)]] = None
@@ -44,3 +46,5 @@ class CommonProfile(ContractModel):
     desired_region: Optional[Annotated[str, AfterValidator(_region)]] = None
     priorities: Optional[Annotated[list[Priority], Field(max_length=3)]] = None
     talent_pool_consent: Optional[StrictBool] = None
+    # 가진 자격증 이름 (사용자 입력, 최대 10개). 공고의 자격 요건·우대 조건과 맞춰 본다
+    certificates: Optional[Annotated[list[Annotated[str, non_blank(50)]], Field(max_length=10)]] = None
