@@ -84,7 +84,7 @@ export function Gnb() {
                   href={item.href}
                   aria-current={active ? "page" : undefined}
                   className={cn(
-                    "flex h-12 items-center whitespace-nowrap border-b-2 text-body",
+                    "flex h-12 items-center whitespace-nowrap border-b-2 text-body transition-colors",
                     active
                       ? "border-blue-500 font-bold text-blue-500"
                       : "border-transparent font-medium text-grey-800 hover:text-grey-900",

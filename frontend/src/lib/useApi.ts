@@ -18,8 +18,9 @@ function toApiError(error: unknown): ApiError {
 /**
  * 화면에서 API를 부른다. `key`가 바뀌거나 `reload()`를 부르면 다시 부르고, 응답이 오기 전에는 loading이다.
  * 늦게 온 이전 응답은 버린다. `key`가 null이면 부르지 않는다 (예: 주소에 ID가 없을 때).
+ * 세 번째 값은 바로 앞에 성공한 응답이다. 조건을 바꿔 다시 부르는 동안 이전 목록을 흐리게 두고 싶을 때 쓴다.
  */
-export function useApi<T>(key: string | null, fetcher: () => Promise<T>): [ApiState<T>, () => void] {
+export function useApi<T>(key: string | null, fetcher: () => Promise<T>): [ApiState<T>, () => void, T | undefined] {
   const [settled, setSettled] = useState<Settled<T> | null>(null);
   const [attempt, setAttempt] = useState(0);
   const fullKey = key === null ? null : `${key}#${attempt}`;
@@ -39,6 +40,7 @@ export function useApi<T>(key: string | null, fetcher: () => Promise<T>): [ApiSt
   }, [fullKey]);
 
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
-  if (fullKey === null || !settled || settled.key !== fullKey) return [{ status: "loading" }, reload];
-  return [settled.result, reload];
+  const previous = settled?.result.status === "success" ? settled.result.data : undefined;
+  if (fullKey === null || !settled || settled.key !== fullKey) return [{ status: "loading" }, reload, previous];
+  return [settled.result, reload, previous];
 }

@@ -15,8 +15,8 @@ export function Chip({ selected, className, children, ...rest }: ChipProps) {
       className={cn(
         "inline-flex h-8.5 shrink-0 items-center justify-center whitespace-nowrap rounded-control border px-3 text-small font-medium transition-colors",
         selected
-          ? "border-grey-900 bg-grey-900 text-white"
-          : "border-grey-300 bg-white text-grey-800 hover:bg-grey-50",
+          ? "border-grey-900 bg-grey-900 text-white hover:bg-grey-800"
+          : "border-grey-300 bg-white text-grey-800 hover:border-grey-400 hover:bg-grey-50",
         className,
       )}
       {...rest}
