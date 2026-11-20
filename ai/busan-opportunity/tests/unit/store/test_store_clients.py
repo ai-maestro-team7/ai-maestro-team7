@@ -87,6 +87,23 @@ def test_vector_put_get_delete(vec):
     stub.assert_no_pending_responses()
 
 
+def test_vector_similarities_read_in_batches_of_100(vec):
+    """이름으로 찾은 공고의 유사도 (B-D08): GetVectors로 100개씩 읽어 query와 같은 값(1 - 코사인 distance)을 낸다."""
+    index, stub = vec
+    keys = [f"wk24-{i:03d}" for i in range(101)]
+    target = {"vectorBucketName": "team07-opp-vectors", "indexName": "postings-v1", "returnData": True}
+    stub.add_response("get_vectors", {"vectors": [
+        {"key": "wk24-000", "data": {"float32": [1.0, 0.0]}},
+        {"key": "wk24-001", "data": {"float32": [0.0, 2.0]}},
+        {"key": "wk24-002", "data": {"float32": [-1.0, 0.0]}},  # 반대 방향이어도 0 아래로 내려가지 않는다
+    ]}, expected_params={**target, "keys": keys[:100]})
+    stub.add_response("get_vectors", {"vectors": [{"key": "wk24-100", "data": {"float32": [3.0, 3.0]}}]},
+                      expected_params={**target, "keys": keys[100:]})
+    found = index.similarities([2.0, 0.0], [*keys, "wk24-000"])  # 겹친 키는 한 번만 읽는다. 없는 키는 빠진다
+    assert found == pytest.approx({"wk24-000": 1.0, "wk24-001": 0.0, "wk24-002": 0.0, "wk24-100": 0.70710678})
+    stub.assert_no_pending_responses()
+
+
 def test_vector_errors_become_aws_service_error(vec):
     index, stub = vec
     stub.add_client_error("query_vectors", service_error_code="AccessDeniedException",

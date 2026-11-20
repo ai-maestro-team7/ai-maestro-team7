@@ -91,11 +91,9 @@ export type InterviewStatusBody = {
   error?: InterviewError | null;
 };
 
-/** 면접 시작 입력. 서류는 직접 쓴 글(`resumeText`)이나 올린 문서(`documentId`, A 문서) 가운데 하나를 보낸다. */
+/** 자소서는 글(resumeText) 또는 저장된 A 문서(documentId) 가운데 하나 (`/start`, 개발계획서3 §5.2) */
 export type StartInterviewInput = {
   job: string;
-  resumeText?: string;
-  documentId?: string;
   interviewType: InterviewType;
   cameraConsent: boolean;
-};
+} & ({ resumeText: string; documentId?: never } | { documentId: string; resumeText?: never });

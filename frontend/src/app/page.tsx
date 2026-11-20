@@ -2,9 +2,9 @@ import { Suspense } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SectionHeader } from "@/components/ui/SectionHeader";
+import { ChatPanel } from "@/features/chat/components/ChatPanel";
 import { RecommendedJobs, RecommendedJobsLoading } from "@/features/jobs/components/RecommendedJobs";
 import { ContinueList } from "@/features/mentor/components/ContinueList";
-import { MentorPanel } from "@/features/mentor/components/MentorPanel";
 import { continueItems } from "@/features/mentor/data";
 import { OpenPolicies } from "@/features/policies/components/OpenPolicies";
 import { PolicyTableSkeleton } from "@/features/policies/components/PolicyTable";
@@ -15,7 +15,7 @@ export default function HomePage() {
       <PageHeader title="부산 취업 준비" />
 
       <div className="flex w-full flex-col gap-12 lg:flex-row lg:items-start">
-        <MentorPanel />
+        <ChatPanel />
         <ContinueList items={continueItems} />
       </div>
 

@@ -52,6 +52,41 @@ def _normalize(text: str) -> str:
 # ---------------------------------------------------------------- 함수 입력
 
 
+def _optional_text(value: str | None, max_len: int) -> str | None:
+    if value is None:
+        return None
+    value = value.strip()
+    if len(value) > max_len:
+        raise ValueError("length")
+    return value or None
+
+
+class JobPostingInput(_CamelModel):
+    """채용공고 입력 (#158 결정 1). 업무·요건·인재상은 따로 받지 않고 AI가 본문에서 찾는다."""
+
+    title: str | None = None
+    company: str | None = None
+    text: str
+
+    @field_validator("title")
+    @classmethod
+    def _title(cls, value: str | None) -> str | None:
+        return _optional_text(value, settings.JOB_POSTING_TITLE_MAX)
+
+    @field_validator("company")
+    @classmethod
+    def _company(cls, value: str | None) -> str | None:
+        return _optional_text(value, settings.JOB_POSTING_COMPANY_MAX)
+
+    @field_validator("text")
+    @classmethod
+    def _text(cls, value: str) -> str:
+        value = value.strip()  # 붙여 넣은 공고는 앞뒤 줄바꿈이 많아 정리한 뒤 잰다 (design §3)
+        if not settings.JOB_POSTING_TEXT_MIN <= len(value) <= settings.JOB_POSTING_TEXT_MAX:
+            raise ValueError("length")
+        return value
+
+
 class QuestionRequest(_CamelModel):
     """generate_questions 입력. start_interview도 같은 규칙을 쓴다 (Requirement 7 기준 2)."""
 
@@ -59,6 +94,7 @@ class QuestionRequest(_CamelModel):
     resume_text: str
     interview_type: InterviewType
     profile: CareerProfileSummary | None = None
+    job_posting: JobPostingInput | None = None  # #158. 질문 생성에만 쓰고 Session에는 남기지 않는다
 
     @field_validator("job")
     @classmethod

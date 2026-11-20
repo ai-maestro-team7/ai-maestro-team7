@@ -7,12 +7,15 @@ import { ATTACHMENT_ACCEPT, attachmentError } from "@/features/mentor/data";
 
 export type UploadedDocument = {
   name: string;
-  sizeBytes: number;
+  /** 채팅에서 넘겨받은 저장된 문서는 크기를 모른다 */
+  sizeBytes?: number;
   /** uploading: 올리는 중 · extracting: 글자 읽는 중 · ready: 면접에 쓸 수 있음 · failed: 실패 */
   status: "uploading" | "extracting" | "ready" | "failed";
   documentId?: string;
   charCount?: number;
   error?: string;
+  /** 채팅에서 고른 저장된 문서 (A 문서). 새로 올린 파일이 아니다 */
+  saved?: boolean;
 };
 
 function formatSize(bytes: number): string {
@@ -123,7 +126,7 @@ export function DocumentUpload({
               {file.name}
             </p>
             <p className="text-small text-grey-600" aria-live="polite">
-              {formatSize(file.sizeBytes)} ·{" "}
+              {file.saved ? "채팅에서 고른 저장된 서류" : file.sizeBytes !== undefined ? formatSize(file.sizeBytes) : ""} ·{" "}
               <span className={cn(file.status === "ready" && "text-blue-500", file.status === "failed" && "text-red-500")}>
                 {STATUS_TEXT[file.status]}
               </span>

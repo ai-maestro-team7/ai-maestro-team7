@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { type FormEvent, useEffect, useId, useRef, useState } from "react";
+import { type FormEvent, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { TwoColumn } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -11,8 +11,11 @@ import { RadioList } from "@/components/ui/RadioList";
 import { TextArea } from "@/components/ui/TextArea";
 import { TextField } from "@/components/ui/TextField";
 import { loginHref } from "@/features/auth/lib";
+import { useSessionOwner } from "@/features/auth/useSessionOwner";
+import { parseHandoff, readHandoffRaw, subscribeHandoff } from "@/features/chat/lib";
 import { createPdfDocument, errorMessage, waitForDocumentText } from "@/features/mentoring/api";
 import { ApiError, AUTH_REQUIRED } from "@/lib/api";
+import { sessionOwner } from "@/lib/session";
 import { startInterview } from "../api";
 import { interviewDefaults, MODE_OPTIONS, RULES, TYPE_OPTIONS } from "../data";
 import { interviewQuery, modeLabel, parseMode, readJob, typeLabel } from "../lib";
@@ -40,15 +43,32 @@ const KIND_OPTIONS: { value: DocumentKind; label: string }[] = [
  * [장비 점검하기]는 카메라 분석에 동의해야 켜진다. 동의하지 않으면 [카메라 없이 계속]으로 진행한다.
  */
 export function SetupForm() {
+  const owner = useSessionOwner();
+  // 계정이 바뀌면 인계 문서와 사용자가 고친 자소서를 포함한 폼 상태를 새로 만든다.
+  return <InterviewSetup key={owner ?? "anonymous"} owner={owner} />;
+}
+
+function InterviewSetup({ owner }: { owner: string | null }) {
   const router = useRouter();
   const params = useSearchParams();
   const formId = useId();
   const hintId = useId();
   const [job, setJob] = useState(() => readJob(params.get("job")));
-  const [coverLetter, setCoverLetter] = useState<string>(interviewDefaults.coverLetter);
-  const [source, setSource] = useState<DocumentSource>("text");
+  // 채팅에서 넘어왔으면 넘겨받은 자소서를 채운다 (개발계획서4 §10). 서버 렌더에는 값이 없다
+  const handoffRaw = useSyncExternalStore(subscribeHandoff, readHandoffRaw, () => null);
+  const handoff = parseHandoff(handoffRaw);
+  // 채팅에서 고른 저장된 자소서(A 문서)는 이미 올린 PDF처럼 보여 준다. 크기·글자 수는 모르니 길이는 서버가 확인한다
+  const handoffDocument: UploadedDocument | null = handoff?.documentId
+    ? { name: handoff.documentTitle ?? "저장된 자기소개서", status: "ready", documentId: handoff.documentId, saved: true }
+    : null;
+  const [editedCoverLetter, setCoverLetter] = useState<string | null>(null);
+  const coverLetter = editedCoverLetter ?? handoff?.coverLetter ?? interviewDefaults.coverLetter;
+  const [chosenSource, setSource] = useState<DocumentSource | null>(null);
+  const source: DocumentSource = chosenSource ?? (handoffDocument ? "pdf" : "text");
   const [kind, setKind] = useState<DocumentKind>("COVER_LETTER");
-  const [pdf, setPdf] = useState<UploadedDocument | null>(null);
+  // undefined: 아직 고르지 않음(채팅 인계 문서를 쓴다) · null: 뺐음
+  const [pickedPdf, setPdf] = useState<UploadedDocument | null | undefined>(undefined);
+  const pdf = pickedPdf === undefined ? handoffDocument : pickedPdf;
   // 올리는 중에 파일을 빼거나 바꾸면 앞의 요청 결과를 버린다
   const upload = useRef<AbortController | null>(null);
   useEffect(() => () => upload.current?.abort(), []);
@@ -105,6 +125,8 @@ export function SetupForm() {
   }
 
   async function start(nextMode: InterviewMode) {
+    // 다른 탭에서 로그인 계정이 바뀐 직후, 이전 렌더의 클릭 핸들러가 실행될 수 있다.
+    if (owner !== sessionOwner()) return;
     const next = validate();
     setErrors(next);
     if (Object.keys(next).length > 0) return;
@@ -119,6 +141,7 @@ export function SetupForm() {
         // 카메라 방식이고 동의했을 때만 시선을 본다. 그 밖에는 태도가 측정되지 않는다
         cameraConsent: nextMode === "camera" && consent,
       });
+      if (owner !== sessionOwner()) return;
       router.push(`/interview/check?${interviewQuery({ session: sessionId, job: job.trim(), mode: nextMode })}`);
     } catch (e) {
       const needsLogin = e instanceof ApiError && e.code === AUTH_REQUIRED;
