@@ -26,7 +26,8 @@ ai/interview/
   prompting.py           태그 감싸기·태그 무력화, 프롬프트 파일 읽기·채우기
   prompts/
     system_v1.md         공통 규칙 (데이터 태그, 06 제약, 지어내지 않기, JSON만 출력)
-    a_questions_v1.md    Prompt_A: 질문 3개 생성
+    a_questions_v1.md    Prompt_A 이전 판 (A-v1, 기록용으로 남김)
+    a_questions_v2.md    Prompt_A: 질문 3개 생성 (A-v2, #58)
     b_follow_up_v1.md    Prompt_B: 꼬리질문 판단
   questions.py           generate_questions (독립 함수)
   follow_up.py           judge_follow_up
@@ -104,7 +105,7 @@ C ★ 예시에 `modelId`, `promptVersion`(결정 8)과 `currentQuestion`을 더
   "profile": {"projects": ["공공데이터 활용 부산 관광 수요 분석 프로젝트"], "skills": ["Python", "SQL", "데이터 시각화"],
               "needsConfirmation": ["실무 데이터 파이프라인 경험"], "profileId": "profile-demo-1", "profileVersion": 2},
   "scoringVersion": "v1.0",
-  "modelId": "global.anthropic.claude-haiku-5-5", "promptVersion": "A-v1/B-v1",
+  "modelId": "global.anthropic.claude-haiku-5-5", "promptVersion": "A-v2/B-v1",
   "questions": [{"questionId": "q1", "questionType": "experience", "question": "..."}],
   "currentIndex": 0, "followUpUsed": false,
   "currentQuestion": {"questionId": "q1", "answerId": "a-q1-1", "text": "...", "isFollowUp": false},
@@ -235,8 +236,11 @@ def _get_model():
     from strands.models import BedrockModel     # 지연 import
     global _model
     if _model is None:
-        _model = BedrockModel(model_id=settings.model_id(), region_name=settings.region(),
-                              max_tokens=settings.max_tokens())
+        kwargs = {"model_id": settings.model_id(), "region_name": settings.region(),
+                  "max_tokens": settings.max_tokens()}
+        if (thinking := settings.thinking_off(kwargs["model_id"])) is not None:
+            kwargs["additional_request_fields"] = {"thinking": thinking}
+        _model = BedrockModel(**kwargs)
     return _model
 
 class StrandsLLMClient:
@@ -244,10 +248,19 @@ class StrandsLLMClient:
         from strands import Agent
         agent = Agent(model=_get_model(), system_prompt=system_prompt, tools=[],
                       callback_handler=None)    # 호출마다 새 Agent, 표준 출력에 쓰지 않음
-        return str(agent(user_prompt))
+        try:
+            return str(agent(user_prompt))
+        except Exception as exc:
+            if type(exc).__name__ == "MaxTokensReachedException":
+                raise OutputTruncated() from None   # 출력 문제로 넘긴다 (§6.3)
+            raise
 ```
 
-- `BedrockModel(model_id, region_name, max_tokens)`는 `examples/strands_hello.py`와 같은 사용법이다.
+- `BedrockModel(model_id, region_name, max_tokens)`는 `examples/strands_hello.py`와 같은 사용법이다. strands-agents 1.65.0에서 `max_tokens`는 `BedrockConfig` 키이고 Converse 요청의 `inferenceConfig.maxTokens`로 간다.
+- 생각(thinking) 끄기 (#58): Claude 5 이후 모델은 요청에 `thinking`이 없으면 adaptive thinking으로 돌고, 생각 토큰도 `max_tokens`에 들어간다. 실제 Bedrock 확인에서 Haiku 5.5가 생각에 1,024토큰을 다 써서 JSON이 잘렸다(`reasoningContent` 블록, `outputTokens=1024`). 질문 생성·꼬리질문 판단은 짧은 JSON이라 생각을 끈다.
+  - 값은 `settings.THINKING_OFF_BY_MODEL`에 둔다. Haiku 5.5는 `{"type": "disabled"}`, Sonnet 5.5는 `disabled`가 400이라 `{"type": "between_tools"}`(응답 전 생각 끔. 도구를 쓰지 않으므로 생각하지 않는다). 근거는 Bedrock 사용자 가이드 "Adaptive thinking"의 "Thinking configuration by model" 표다.
+  - strands의 `additional_request_fields`가 Converse `additionalModelRequestFields`로 그대로 간다. `output_config.effort`는 보내지 않는다. 두 모델 모두 기본 effort가 high 이하라 끄는 값과 같이 쓸 수 있다.
+  - 표에 없는 모델은 `thinking`을 보내지 않는다. 모델마다 받는 값이 달라 잘못 보내면 400이 나기 때문이다. 그런 모델로 바꾸면 이 표에 먼저 넣는다.
 - `callback_handler=None`이 중요하다. Strands 기본 콜백은 모델 출력을 표준 출력에 찍는데, Lambda에서는 그게 CloudWatch 로그가 되어 질문·답변 관련 문장이 남는다 (Requirement 12). 설치된 버전에서 이 인자 이름과 `str(result)` 동작을 확인하는 작업을 tasks 4.2에 넣었다.
 - 호출마다 Agent를 새로 만들어 대화 기록이 다른 세션으로 이어지지 않게 한다 (Requirement 4 기준 5).
 - `settings.model_id()`는 `MODEL_ID`가 비면 `InterviewError("AWS_SERVICE_ERROR", ..., retryable=False)`를 던진다. 배포 Lambda에는 #29로 값이 들어 있으므로, 이 오류는 로컬·설정 누락 상황에서만 난다.
@@ -262,6 +275,7 @@ def call_json(llm, *, system_prompt, user_prompt, schema: type[BaseModel], stage
         try:
             raw = llm.complete(system_prompt=system_prompt, user_prompt=user_prompt)
         except InterviewError: raise
+        except OutputTruncated: 로그(stage, attempt, "AI_OUTPUT_INVALID", reason=maxTokens) 후 다음 시도
         except Exception: → InterviewError("AWS_SERVICE_ERROR", retryable=True)
         try:
             return schema.model_validate(extract_json(raw))
@@ -270,7 +284,10 @@ def call_json(llm, *, system_prompt, user_prompt, schema: type[BaseModel], stage
 ```
 
 - `extract_json`: 앞뒤 공백을 지우고, ```` ```json ... ``` ```` 코드 블록이 있으면 안쪽을, 없으면 첫 `{`부터 마지막 `}`까지를 `json.loads`한다.
-- 재시도는 출력 형식 실패에만 한다. 모델 호출 실패(한도 초과 등)는 재시도하지 않고 `AWS_SERVICE_ERROR`(retryable true)로 넘긴다. 다시 시도할지는 화면이 정한다 (C §5.6 "retryable: true면 다시 시도 버튼").
+- 재시도는 AI 출력 문제에만 한다. 출력 형식 실패와 출력 잘림(`max_tokens` 도달)이 여기에 든다.
+  - 출력 잘림: strands가 `MaxTokensReachedException`을 던지면 `StrandsLLMClient`가 `OutputTruncated`로 바꾼다. 모델 호출은 성공했고 출력이 끝나지 않은 것이라 서비스 오류가 아니다 (#58). 클래스를 import하지 않고 이름으로 비교해 SDK 내부 모듈 경로에 묶이지 않게 한다.
+  - 두 번 다 실패하면 `AI_OUTPUT_INVALID`(retryable true)다. 로그에는 원문 없이 `reason=maxTokens`만 남긴다.
+- 모델 호출 실패(권한, 한도 초과, 네트워크 등)는 재시도하지 않고 `AWS_SERVICE_ERROR`(retryable true)로 넘긴다. 다시 시도할지는 화면이 정한다 (C §5.6 "retryable: true면 다시 시도 버튼").
 - 재시도할 때 프롬프트는 같다. 다른 문장을 덧붙이지 않아 두 시도의 입력이 같고 테스트가 단순하다.
 
 ## 7. 프롬프트 (`prompts/`, `prompting.py`)
@@ -285,7 +302,7 @@ def call_json(llm, *, system_prompt, user_prompt, schema: type[BaseModel], stage
   - 외모, 나이, 성별, 출신 지역, 가족, 종교, 혼인 여부처럼 직무와 무관한 요소를 묻지 않고 판단 근거로 쓰지 않는다 (기준 5)
 - 출력 규칙: 설명 없이 지정한 JSON 하나만 출력한다. 한국어로 쓴다.
 
-### 7.2 Prompt_A (`a_questions_v1.md`)
+### 7.2 Prompt_A (`a_questions_v2.md`, A-v2)
 
 입력: `<job>`, `<interview_type>`, `<resume>`, `<profile>`(없으면 빈 태그. 있으면 `projects`, `skills`, `needsConfirmation` 목록)
 
@@ -294,6 +311,9 @@ def call_json(llm, *, system_prompt, user_prompt, schema: type[BaseModel], stage
 - 경험 질문은 자소서에 실제로 적힌 경험을 소재로 한다. `profile`의 `needsConfirmation` 항목은 "경험이 있다면 설명해 달라"는 확인 질문의 소재로만 쓴다.
 - 면접 유형 반영: `PERSONALITY`는 인성 중심, `JOB`은 직무 중심, `MIXED`는 섞는다. 유형 구성 비율은 C 기능 정리 페이지(노션)가 기준인데 저장소에 없어서, 1차 프롬프트는 이 방향만 주고 코드는 유형 값(3종)과 개수(3개)만 검사한다 (§15 열린 질문 3).
 - 한 질문에 한 가지만 묻는다. 2분 안에 답할 수 있는 크기로 만든다.
+  - A-v2 (#58): 여러 요구를 이어 붙인 질문("A와 B를 설명하고 C는 무엇인가요")을 금지 예로 들고, 나쁜 예·좋은 예를 두 쌍 붙였다.
+  - A-v2: 질문 하나는 한 문장, 공백 포함 80자 이하. 앞뒤에 배경 설명·번호·해설을 붙이지 않는다. 출력 검사 한도(`QUESTION_MAX` 300자)는 그대로 둔다.
+- A-v1(`a_questions_v1.md`)은 지우지 않는다. 예전 세션의 `promptVersion`이 가리키는 판을 확인할 수 있게 하기 위해서다.
 
 출력:
 ```json
@@ -318,7 +338,7 @@ def call_json(llm, *, system_prompt, user_prompt, schema: type[BaseModel], stage
 - `wrap(tag, text)`: `<tag>\n{text}\n</tag>`. 넣기 전에 `text` 안의 `<tag`, `</tag`(대소문자 무시, 위 5개 태그와 `interview_type` 전부)를 `&lt;tag`, `&lt;/tag`로 바꾼다 (Requirement 6 기준 2).
 - `profile`은 `model_dump(by_alias=True, exclude_none=True)`를 JSON 문자열로 바꿔 `<profile>`에 넣는다.
 - 프롬프트 파일의 자리표시(`{{RESUME}}` 등)는 `str.replace`로 채운다. JSON 예시의 중괄호와 섞이지 않게 `str.format`은 쓰지 않는다.
-- 버전: `versions.PROMPT_A_VERSION = "A-v1"`, `PROMPT_B_VERSION = "B-v1"`, `PROMPT_VERSION = "A-v1/B-v1"`. 프롬프트 파일을 바꾸면 파일 이름과 버전을 같이 올린다.
+- 버전: `versions.PROMPT_A_VERSION = "A-v2"`, `PROMPT_B_VERSION = "B-v1"`, `PROMPT_VERSION = "A-v2/B-v1"`. 프롬프트 파일을 바꾸면 파일 이름과 버전을 같이 올린다.
 
 ## 8. 설정 (`settings.py`)
 
@@ -326,7 +346,8 @@ def call_json(llm, *, system_prompt, user_prompt, schema: type[BaseModel], stage
 | --- | --- | --- | --- |
 | `model_id()` | 환경변수 `MODEL_ID` | 없음 (비면 오류) | 결정 5. 배포 값은 `infra/config.sh` 22행 (기본 Haiku, 시연 Sonnet) |
 | `region()` | 환경변수 `AWS_REGION` | `ap-northeast-2` | Lambda는 자동으로 넣는다 |
-| `max_tokens()` | 환경변수 `INTERVIEW_MAX_TOKENS` | 1024 | Prompt_A·B 출력은 짧은 JSON |
+| `max_tokens()` | 환경변수 `INTERVIEW_MAX_TOKENS` | 1024 | Prompt_A·B 출력은 짧은 JSON. 생각을 끄므로 생각 토큰 몫은 두지 않는다 |
+| `thinking_off(model_id)` | 상수 `THINKING_OFF_BY_MODEL` | Haiku 5.5 `disabled`, Sonnet 5.5 `between_tools`, 그 밖 None | 생각 끄기 값 (§6.2). None이면 요청에 넣지 않는다 |
 | `JOB_MIN`, `JOB_MAX` | 상수 | 1, 50 | C §5.2, 계약 `InterviewJobContext` |
 | `RESUME_MIN`, `RESUME_MAX` | 상수 | 50, 5000 | C §5.2 |
 | `QUESTION_MIN`, `QUESTION_MAX` | 상수 | 5, 300 | LLM 질문 문장 길이 검사 (이 문서의 제안) |
@@ -362,8 +383,8 @@ def call_json(llm, *, system_prompt, user_prompt, schema: type[BaseModel], stage
 | --- | --- | --- | --- |
 | 입력·`profile`·Session·Answer_Result 검사 실패, 끝난 면접, `answerId` 불일치, `IN_PROGRESS` | `INVALID_INPUT` | false | `flow.py`, `questions.py` |
 | `MODEL_ID` 없음, `strands` import 실패 | `AWS_SERVICE_ERROR` | false | `settings.py`, `llm.py` |
-| 모델 호출 예외 | `AWS_SERVICE_ERROR` | true | `llm.call_json` |
-| LLM 출력 2회 검사 실패 | `AI_OUTPUT_INVALID` | true | `llm.call_json` |
+| 모델 호출 예외 (출력 잘림 제외) | `AWS_SERVICE_ERROR` | true | `llm.call_json` |
+| LLM 출력 2회 실패 (검사 실패 또는 `max_tokens` 도달로 잘림, 섞여도 합해서 2회) | `AI_OUTPUT_INVALID` | true | `llm.call_json` |
 
 - `message`는 정해진 한국어 문장이다 (예: "면접 질문을 만들지 못했어요. 다시 시도해 주세요."). Pydantic·계약 오류 내용(입력값이 들어 있을 수 있음)은 메시지에 넣지 않고, 실패한 필드 이름만 로그에 남긴다.
 - 백엔드는 이 세 코드를 HTTP 400/500/503으로 바꾸고 (450~454행), 뒤에서 처리하는 작업에서는 세션을 `FAILED`로 남긴다 (302~314행).
@@ -388,14 +409,15 @@ uv run --no-project --python 3.13 --with-requirements ai/interview/requirements-
 | `test_package.py` | `__all__`의 9개 이름, 백엔드 호출 형태로 `inspect.signature().bind` 성공 (`start_interview` 6개, `start_transcription` 5개 등), 소스에 `backend`·`interview_stub`·`common` import 없음(AST 검사), `MODEL_ID` 없이 import 성공 | 1, 14.4 |
 | `test_errors.py` | 코드별 retryable 기본값, 속성 | 2 |
 | `test_models.py` | 카멜 직렬화, `extra="forbid"`, 입력 한도 경계값(0·1·50·51자, 49·50·5000·5001자), `profile` 계약 검사(정상, C §5.2 예시 형식 거절, 항목 수 초과 거절) | 3, 8.2, 8.3 |
-| `test_llm.py` | 코드 블록 JSON 추출, 1회 재시도 후 성공, 2회 실패 시 `AI_OUTPUT_INVALID`, 호출 예외 시 `AWS_SERVICE_ERROR`, `MODEL_ID` 없음 | 4.2, 5 |
-| `test_prompting.py` | 태그 무력화, 프롬프트에 06 제약·데이터 규칙 문장 포함, `profile` JSON 삽입, 버전 문자열 | 6 |
+| `test_llm.py` | 코드 블록 JSON 추출, 1회 재시도 후 성공, 2회 실패 시 `AI_OUTPUT_INVALID`, 호출 예외 시 `AWS_SERVICE_ERROR`, `MODEL_ID` 없음, 출력 잘림 1회 재시도 후 `AI_OUTPUT_INVALID`, 설치된 strands로 만든 요청의 `inferenceConfig.maxTokens`와 `additionalModelRequestFields.thinking` (가짜 자격 증명, `~/.aws`와 분리, 네트워크 없음) | 4.2, 5 |
+| `test_settings.py` | 환경변수 읽기, `max_tokens` 기본값·잘못된 값, 모델별 생각 끄기 값 | 4 |
+| `test_prompting.py` | 태그 무력화, 프롬프트에 06 제약·데이터 규칙 문장 포함, `profile` JSON 삽입, 버전 문자열, A-v2 나쁜 예·좋은 예·80자 규칙, A-v1 파일 유지 | 6 |
 | `test_questions.py` | 질문 3개와 ID 부여, 개수·유형·중복 오류 처리, Session 없이 호출 | 7 |
 | `test_flow.py` | 시작(`profile` 있음·없음), 한 바퀴, 무응답, 변환 실패, 꼬리질문 2개 이상, 꼬리질문 답변 뒤 판단 없음, 끝난 면접, `answerId` 불일치, 입력 Session 불변 | 8, 9, 10 |
 | `test_placeholders.py` | 대역과 같은 반환 값, `start_transcription`이 가짜 S3 클라이언트에 `output_bucket`·`output_key`로 쓰기, `compute_baseline` 유효 2개 → `None`·3개 → 기준값, `analyze_face`의 `eyesOpen` | 11 |
 | `test_backend_flow.py` | 백엔드 순서 재현: `start_interview` → `synthesize_question` → `start_transcription`(가짜 S3) → `get_transcription_result` 결과로 `process_answer` 반복 → `compute_baseline` → `generate_report`. 각 단계 결과를 `json.dumps` → `json.loads`로 왕복시켜 저장·재전달을 흉내 냄 | 1.5, 3.6, 11 |
 | `test_logging.py` | 로그에 원문 없음, `print` 없음(AST) | 12 |
-| `test_bedrock_manual.py` | `RUN_BEDROCK=1`이고 `MODEL_ID`가 있을 때만 실행. 샘플 자소서로 실제 질문 3개 생성 | 14.6 |
+| `test_bedrock_manual.py` | `RUN_BEDROCK=1`이고 `MODEL_ID`가 있을 때만 실행. 샘플 자소서로 실제 질문 3개 생성. `SHOW_RAW=1`이면 잘린 응답의 블록 종류, `outputTokens`, 텍스트 길이와 앞 500자를 표준 출력에만 찍는다 (운영 로그에는 남기지 않음) | 14.6 |
 
 - Fake_LLM: 응답 문자열 목록을 차례로 돌려주고, 받은 `system_prompt`·`user_prompt`를 기록한다. 응답 문자열은 `samples/llm/`에서 읽는다.
 - 가짜 S3 클라이언트: `put_object` 호출 인자를 기록만 한다. `moto`는 쓰지 않는다 (의존성을 늘리지 않기 위해).

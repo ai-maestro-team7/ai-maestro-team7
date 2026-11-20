@@ -47,6 +47,22 @@ def test_max_tokens_invalid(monkeypatch, raw):
     assert exc.value.retryable is False
 
 
+@pytest.mark.parametrize("model_id, expected", [
+    ("global.anthropic.claude-haiku-5-5", {"type": "disabled"}),
+    ("anthropic.claude-haiku-5-5", {"type": "disabled"}),
+    ("global.anthropic.claude-sonnet-5-5", {"type": "between_tools"}),
+    ("global.anthropic.claude-opus-5-5", None),
+    ("test-model", None),
+])
+def test_thinking_off_by_model(model_id, expected):
+    assert settings.thinking_off(model_id) == expected
+
+
+def test_thinking_off_returns_copy():
+    settings.thinking_off("global.anthropic.claude-haiku-5-5")["type"] = "adaptive"
+    assert settings.thinking_off("global.anthropic.claude-haiku-5-5") == {"type": "disabled"}
+
+
 def test_versions():
     assert versions.SCORING_VERSION == "v1.0"
     assert versions.PROMPT_VERSION == "A-v2/B-v1"

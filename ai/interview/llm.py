@@ -110,7 +110,12 @@ def _get_model():
             from strands.models import BedrockModel
         except ImportError:
             raise InterviewError(AWS_SERVICE_ERROR, settings.CONFIG_ERROR_MESSAGE, retryable=False) from None
-        _model = BedrockModel(model_id=model_id, region_name=settings.region(), max_tokens=settings.max_tokens())
+        kwargs = {"model_id": model_id, "region_name": settings.region(), "max_tokens": settings.max_tokens()}
+        thinking = settings.thinking_off(model_id)
+        if thinking is not None:
+            # strands BedrockConfig.additional_request_fields → Converse additionalModelRequestFields
+            kwargs["additional_request_fields"] = {"thinking": thinking}
+        _model = BedrockModel(**kwargs)
     return _model
 
 
