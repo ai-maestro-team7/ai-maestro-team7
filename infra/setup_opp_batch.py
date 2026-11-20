@@ -65,16 +65,16 @@ def set_lambda_config(current):
     return variables
 
 
-def put_schedule(name, expression, event, function_arn, role_arn, *, disabled):
+def put_schedule(name, expression, event, function_arn, role_arn, *, disabled, event_key="oppBatch", description="team07 부산 기회 추천 정기 수집"):
     spec = {
         "Name": name, "GroupName": "default",
-        "Description": "team07 부산 기회 추천 정기 수집",
+        "Description": description,
         "ScheduleExpression": expression, "ScheduleExpressionTimezone": "Asia/Seoul",
         "FlexibleTimeWindow": {"Mode": "OFF"},
         "State": "DISABLED" if disabled else "ENABLED",
         "Target": {
             "Arn": function_arn, "RoleArn": role_arn,
-            "Input": json.dumps({"oppBatch": event}, separators=(",", ":")),
+            "Input": json.dumps({event_key: event}, separators=(",", ":")),
             # 전송 실패는 두 번 재시도하되 한 시간 넘게 지연된 실행은 시작하지 않는다.
             "RetryPolicy": {"MaximumEventAgeInSeconds": 3600, "MaximumRetryAttempts": 2},
         },

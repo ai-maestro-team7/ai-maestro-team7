@@ -45,6 +45,10 @@ def health():
 
 def lambda_handler(event, context):
     # 뒤에서 처리하는 작업 (Lambda 비동기 자기 호출)
+    if "mentoringCollection" in event:
+        from mentoring.reference.collection import collect
+
+        return collect(event["mentoringCollection"])
     if "mentoringTask" in event:
         return part("mentoring_api").run_task(event)
     if "task" in event:
