@@ -10,17 +10,17 @@
     - `tests/test_errors.py`: 코드별 기본값, `code`·`message`·`retryable` 속성
     - _Requirements: 2.1, 2.2, 2.3_
 
-- [ ] 2. 설정과 데이터 모델
-  - [ ] 2.1 `settings.py`, `versions.py`를 만든다
+- [x] 2. 설정과 데이터 모델
+  - [x] 2.1 `settings.py`, `versions.py`를 만든다
     - `model_id()`(비면 `AWS_SERVICE_ERROR` retryable false), `region()`, `max_tokens()`(`INTERVIEW_MAX_TOKENS`, 기본 1024), 입력·출력 길이 상수, `SCORING_VERSION`, `PROMPT_A_VERSION`, `PROMPT_B_VERSION`, `PROMPT_VERSION`
     - 값은 호출할 때 읽는다
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 6.7_
-  - [ ] 2.2 `models.py`에 Pydantic v2 모델을 만든다 (design §4)
+  - [x] 2.2 `models.py`에 Pydantic v2 모델을 만든다 (design §4)
     - `StartInterviewInput`(`profile`은 `team07_contracts.CareerProfileSummary`), `Question`, `NextQuestion`, `AnswerRecord`, `Session`(`modelId`, `promptVersion`, `currentQuestion` 포함), `Word`, `Transcription`, `AnswerResult`, `GeneratedQuestion`, `QuestionsOutput`, `FollowUpOutput`
     - 카멜 별칭, Session·Answer_Result는 `extra="forbid"`
     - 계약 검사 실패를 `INVALID_INPUT`으로 바꾸는 변환 함수 (실패 필드 이름만 로그)
     - _Requirements: 3.1, 3.2, 3.3, 3.6, 8.3_
-  - [ ] 2.3 `tests/test_models.py`를 쓴다
+  - [x] 2.3 `tests/test_models.py`를 쓴다
     - 카멜 직렬화, 모르는 키 거절, `job`·`resume_text` 경계값, `camera_consent` 엄격 불리언, `profile` 계약 검사(정상, C §5.2 예시 형식 거절, 항목 수 초과 거절), `QuestionsOutput` 개수·중복, `FollowUpOutput`의 필요=true·질문 0개 거절
     - _Requirements: 3.4, 7.5, 8.2, 8.3, 10.4_
 
