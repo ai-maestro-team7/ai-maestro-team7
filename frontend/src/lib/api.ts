@@ -183,17 +183,21 @@ export async function getMyProfile(): Promise<BasicProfile | null> {
   }
 }
 
-/** `PUT /api/v1/me/profile`. 보낸 항목만 바뀌고 null을 보내면 그 항목이 지워진다. 401이면 한 번 갱신하고 다시 보낸다. */
-export async function saveMyProfile(profile: BasicProfileInput): Promise<BasicProfile> {
+/**
+ * 토큰이 필요한 쓰기 호출 (POST·PUT). 본문은 JSON 값이거나 `FormData`(녹음·이미지 업로드)다.
+ * 401이면 한 번 갱신하고 다시 보낸다. `FormData`는 브라우저가 경계 문자열을 붙이므로 content-type을 직접 넣지 않는다.
+ */
+export async function apiSend<T>(method: "POST" | "PUT", path: string, body: FormData | object): Promise<T> {
   let session = readSession();
   if (!session) throw new ApiError(401, AUTH_REQUIRED, "로그인이 필요해요.");
   if (session.expiresAt - Date.now() < REFRESH_MARGIN_MS) session = (await refresh(session)) ?? session;
 
+  const isForm = typeof FormData !== "undefined" && body instanceof FormData;
   const call = (token: string) =>
-    fetch(`${API_BASE}/api/v1/me/profile`, {
-      method: "PUT",
-      headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-      body: JSON.stringify(profile),
+    fetch(`${API_BASE}${path}`, {
+      method,
+      headers: { authorization: `Bearer ${token}`, ...(isForm ? {} : { "content-type": "application/json" }) },
+      body: isForm ? body : JSON.stringify(body),
     });
 
   let response = await call(session.accessToken);
@@ -206,5 +210,10 @@ export async function saveMyProfile(profile: BasicProfileInput): Promise<BasicPr
     response = await call(renewed.accessToken);
   }
   if (!response.ok) throw await toApiError(response);
-  return (await response.json()) as BasicProfile;
+  return (await response.json()) as T;
+}
+
+/** `PUT /api/v1/me/profile`. 보낸 항목만 바뀌고 null을 보내면 그 항목이 지워진다. */
+export function saveMyProfile(profile: BasicProfileInput): Promise<BasicProfile> {
+  return apiSend<BasicProfile>("PUT", "/api/v1/me/profile", profile);
 }
