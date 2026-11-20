@@ -27,6 +27,12 @@
       "Resource": "arn:aws:dynamodb:ap-northeast-2:${ACCOUNT_ID}:table/team07-*"
     },
     {
+      "Sid": "DynamoDBIndexQuery",
+      "Effect": "Allow",
+      "Action": "dynamodb:Query",
+      "Resource": "arn:aws:dynamodb:ap-northeast-2:${ACCOUNT_ID}:table/team07-*/index/*"
+    },
+    {
       "Sid": "S3Uploads",
       "Effect": "Allow",
       "Action": [

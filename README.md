@@ -37,9 +37,16 @@ uv run --no-project --python 3.13 --with boto3 --with "moto[dynamodb,scheduler]"
 # 코드 배포 (Lambda만)
 infra/deploy.sh
 
+# 정기 수집 연결 (코드 배포·역할 정책 적용 후, 기존 환경변수 보존)
+python3 infra/setup_opp_batch.py
+# 시연 중 정기 수집 중지 / 재개는 위 명령 다시 실행
+python3 infra/setup_opp_batch.py --disabled
+
 # 에이전트 예제
 uv run --python 3.13 --with strands-agents --with "botocore[crt]" examples/strands_hello.py
 ```
+
+수집 연결·검증·미지원 출처는 [BATCH.md](ai/busan-opportunity/BATCH.md)를 참고하세요.
 
 처음 한 번만: `infra/setup-role.sh` → `infra/setup-data.sh` → `infra/setup-api.sh` → `infra/setup-auth.sh` → `uv run --python 3.13 --with boto3 --with "botocore[crt]" infra/seed_demo.py` (모두 실행됨). A Knowledge Base는 `infra/setup-kb.sh --upload <지식패키지>/bedrock/documents --sync` (실행됨, `docs/team-guide.md` §3)
 

@@ -13,6 +13,7 @@ CAREER_DOCS_BUCKET=${PREFIX}-career-docs-${ACCOUNT_ID}   # 명세 §7.2 개인 �
 KB_SOURCE_BUCKET=${PREFIX}-kb-source-${ACCOUNT_ID}       # 명세 §7.2 KB 원천 (docs/ 13쌍만)
 OPP_DATA_BUCKET=${PREFIX}-opp-data-${ACCOUNT_ID}         # B: raw/, normalized/, seed/, snapshots/, runs/
 OPP_VECTOR_BUCKET=${PREFIX}-opp-vectors                  # B: S3 Vectors, 인덱스 postings-v1
+OPP_SECRET_ID=${OPP_SECRET_ID:-team07/opp-api-keys}
 OPP_VECTOR_INDEX=postings-v1
 CATALOG_TABLE=${PREFIX}-catalog
 
