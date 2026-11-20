@@ -243,9 +243,6 @@ function PostingView({ detail }: { detail: PostingDetailResponse }) {
               <Button href={interviewHref(posting.title)} fullWidth>
                 이 공고로 모의면접
               </Button>
-              <Button href="/diagnosis/result" variant="secondary" fullWidth>
-                직무 진단 자세히 보기
-              </Button>
             </div>
             <p className="text-small text-grey-600">내 프로필을 공고 요건과 비교한 결과예요. 합격 확률이 아니에요.</p>
           </Panel>
