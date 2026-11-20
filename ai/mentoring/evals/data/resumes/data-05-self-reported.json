@@ -1,0 +1,14 @@
+{
+  "resumeId": "virtual-data-05",
+  "jobRole": "데이터 분석",
+  "ncsCode": "20010105",
+  "documentType": "RESUME",
+  "text": "성명: 가상 지원자 E\n연락처: 010-0000-XXXX\n이메일: virtual-e@example.com\n보유 기술은 Python, SQL, Tableau입니다. 관련 프로젝트와 산출물은 기재하지 않았습니다.",
+  "expectedSkills": [
+    {"name": "Python", "quote": "보유 기술은 Python, SQL, Tableau입니다", "evidenceLevel": "SELF_REPORTED"},
+    {"name": "SQL", "quote": "보유 기술은 Python, SQL, Tableau입니다", "evidenceLevel": "SELF_REPORTED"},
+    {"name": "Tableau", "quote": "보유 기술은 Python, SQL, Tableau입니다", "evidenceLevel": "SELF_REPORTED"}
+  ],
+  "notMentioned": ["프로젝트 산출물"],
+  "notes": "기술 보유 선언만 있고 행동 근거가 없는 사례"
+}

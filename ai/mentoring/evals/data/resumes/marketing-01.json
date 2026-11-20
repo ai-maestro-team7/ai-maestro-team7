@@ -1,0 +1,12 @@
+{
+  "resumeId": "virtual-marketing-01",
+  "jobRole": "마케팅전략기획",
+  "ncsCode": "02010301",
+  "documentType": "RESUME",
+  "text": "성명: 가상 지원자 I\n연락처: 010-0000-XXXX\n이메일: virtual-i@example.com\n가상 브랜드 설문 결과를 바탕으로 고객 세그먼트별 캠페인 아이디어를 제안했습니다.",
+  "expectedSkills": [
+    {"name": "고객 세분화", "quote": "고객 세그먼트별 캠페인 아이디어를 제안했습니다", "evidenceLevel": "EVIDENCED"}
+  ],
+  "notMentioned": ["광고 예산 집행"],
+  "notes": "마케팅전략기획 직무 교차 평가 사례"
+}

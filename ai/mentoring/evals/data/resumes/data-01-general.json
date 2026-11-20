@@ -1,0 +1,13 @@
+{
+  "resumeId": "virtual-data-01",
+  "jobRole": "데이터 분석",
+  "ncsCode": "20010105",
+  "documentType": "RESUME",
+  "text": "성명: 가상 지원자 A\n연락처: 010-0000-XXXX\n이메일: virtual-a@example.com\n가상대학교 통계학과에서 Python으로 가상 매출 데이터 1,200건을 정제하고 분석 보고서를 작성했습니다.",
+  "expectedSkills": [
+    {"name": "데이터 정제", "quote": "Python으로 가상 매출 데이터 1,200건을 정제", "evidenceLevel": "EVIDENCED"},
+    {"name": "분석 보고서 작성", "quote": "분석 보고서를 작성했습니다", "evidenceLevel": "EVIDENCED"}
+  ],
+  "notMentioned": ["머신러닝 모델 배포"],
+  "notes": "일반적인 데이터 분석 경험과 원문 수치가 있는 사례"
+}

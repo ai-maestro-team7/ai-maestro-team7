@@ -1,0 +1,12 @@
+{
+  "resumeId": "virtual-mechanical-01",
+  "jobRole": "기계품질관리",
+  "ncsCode": "15040102",
+  "documentType": "RESUME",
+  "text": "성명: 가상 지원자 K\n연락처: 010-0000-XXXX\n이메일: virtual-k@example.com\n가상제조 실습에서 측정 장비로 부품 치수를 검사하고 불량 기록표를 작성했습니다.",
+  "expectedSkills": [
+    {"name": "품질 검사", "quote": "측정 장비로 부품 치수를 검사하고 불량 기록표를 작성했습니다", "evidenceLevel": "EVIDENCED"}
+  ],
+  "notMentioned": ["공정 감사"],
+  "notes": "기계품질관리 직무 교차 평가 사례"
+}

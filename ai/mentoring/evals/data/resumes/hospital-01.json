@@ -1,0 +1,12 @@
+{
+  "resumeId": "virtual-hospital-01",
+  "jobRole": "병원행정",
+  "ncsCode": "06010201",
+  "documentType": "RESUME",
+  "text": "성명: 가상 지원자 J\n연락처: 010-0000-XXXX\n이메일: virtual-j@example.com\n가상병원 실습에서 진료 예약 문서를 정리하고 내원 안내 절차를 확인했습니다.",
+  "expectedSkills": [
+    {"name": "진료 행정", "quote": "진료 예약 문서를 정리하고 내원 안내 절차를 확인했습니다", "evidenceLevel": "EVIDENCED"}
+  ],
+  "notMentioned": ["보험 심사"],
+  "notes": "병원행정 직무 교차 평가 사례"
+}

@@ -1,0 +1,12 @@
+{
+  "resumeId": "virtual-data-03",
+  "jobRole": "데이터 분석",
+  "ncsCode": "20010105",
+  "documentType": "RESUME",
+  "text": "성명: 가상 지원자 C\n연락처: 010-0000-XXXX\n이메일: virtual-c@example.com\n가상 데이터 동아리 팀이 고객 이탈 분석 프로젝트를 완료했습니다. 제가 직접 맡은 역할은 별도로 적지 않았습니다.",
+  "expectedSkills": [
+    {"name": "고객 이탈 분석", "quote": "팀이 고객 이탈 분석 프로젝트를 완료했습니다", "evidenceLevel": "PARTIAL"}
+  ],
+  "notMentioned": ["개인 담당 역할", "성과 측정"],
+  "notes": "팀 성과는 있으나 지원자 행동이 불분명한 사례"
+}
