@@ -355,6 +355,22 @@ def _keyword_ok(posting: PostingLatest, keyword: str | None) -> bool:
     return _keyword_hit(keyword, (posting.title, posting.organization, posting.job.name))
 
 
+def _job_name_term(job_name: str | None) -> str:
+    """띄어쓰기만 무시한다. 엔지니어·분석가 같은 직무 구분어는 남긴다."""
+    return _norm(job_name)
+
+
+def _job_name_ok(posting: PostingLatest, job_name: str | None, profile: BasicProfile) -> bool:
+    """명시한 직무와 이름 또는 저장된 정확한 직종 코드가 맞는 공고만 남긴다."""
+    term = _job_name_term(job_name)
+    if not term:
+        return True
+    if any(term in _norm(value) for value in (posting.title, posting.job.name)):
+        return True
+    return any(desired.work24_code and desired.work24_code == posting.job.code
+               for desired in profile.desired_jobs)
+
+
 def is_team_data(posting: PostingLatest) -> bool:
     """팀이 넣어 둔 공고인지. 지금은 시연용(sourceType=DEMO)만이다. 크롤링 데이터를 넣으면 여기 한 곳만 고친다."""
     return posting.is_sample
@@ -406,6 +422,17 @@ def _name_candidates(deps: Deps, as_of: datetime, keyword: str | None, organizat
             and _keyword_hit(keyword, (n.title, n.organization, n.job_name))
             and _organization_hit(organization, n.organization)]
     rows.sort(key=lambda n: (bool(needle) and needle not in n.organization.lower(), n.job_posting_id))
+    return [n.job_posting_id for n in rows[:NAME_MATCH_LIMIT]]
+
+
+def _job_name_candidates(deps: Deps, as_of: datetime, job_name: str, organization: str | None) -> list[str]:
+    """명시한 직무를 이름 색인에서 찾는다. 띄어쓰기가 달라도 같은 직무로 본다."""
+    term = _job_name_term(job_name)
+    rows = [n for n in deps.catalog.posting_names()
+            if not clock.is_expired(n.closes_at, as_of)
+            and _organization_hit(organization, n.organization)
+            and any(term in _norm(value) for value in (n.title, n.job_name))]
+    rows.sort(key=lambda n: n.job_posting_id)
     return [n.job_posting_id for n in rows[:NAME_MATCH_LIMIT]]
 
 
@@ -461,6 +488,12 @@ def _sort_key(sort: Sort):
     if sort == Sort.RECENT:
         return lambda row: (_neg_time(row["posting"].checked_at), -row["rank"], row["posting"].job_posting_id)
     return lambda row: (-row["rank"], -row["match"].score, row["posting"].closes_at, row["posting"].job_posting_id)
+
+
+def _job_name_sort_key(sort: Sort):
+    """명시한 직무와의 관계를 먼저 보고, 같은 관계 안에서는 기존 정렬을 쓴다."""
+    secondary = _sort_key(sort)
+    return lambda row: (-row["job_name_hit"], -(row["match"].job_match or 0), secondary(row))
 
 
 def _neg_time(iso_text: str) -> float:
@@ -586,7 +619,10 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
     #    공고라서, 프로필과 먼 회사의 공고는 거르기 전에 이미 빠져 있다 ("삼성"을 찾으면 0건이었다, 2026-11-21).
     #    더한 공고의 유사도는 벡터 질의와 같은 값으로 계산해서, 후보로 들어온 길에 따라 적합도가 달라지지 않게 한다.
     #    벡터가 아직 없는 공고는 None이다 (내용 유사도를 빼고 계산한다).
-    named = [pid for pid in _name_candidates(deps, ctx.as_of, keyword, organization) if pid not in similarity]
+    named_ids = set(_name_candidates(deps, ctx.as_of, keyword, organization))
+    if has_job_name:
+        named_ids.update(_job_name_candidates(deps, ctx.as_of, job_name or "", organization))
+    named = sorted(pid for pid in named_ids if pid not in similarity)
     if named:
         found = deps.vectors.similarities(vector, named)
         similarity.update({pid: found.get(pid) for pid in named})
@@ -609,10 +645,11 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
             continue
         match, result = score_posting(deps, ctx, posting, similarity[pid])
         rank = rank_score(cfg, match.score, is_busan=is_busan_posting(cfg, posting), sort=sort)
-        rows.append({"posting": posting, "match": match, "eligibility": result, "rank": rank})
+        rows.append({"posting": posting, "match": match, "eligibility": result, "rank": rank,
+                     "job_name_hit": has_job_name and _job_name_ok(posting, job_name, ctx.profile)})
 
     # 3. 정렬과 쪽 나누기
-    rows.sort(key=_sort_key(sort))
+    rows.sort(key=_job_name_sort_key(sort) if has_job_name else _sort_key(sort))
     page = rows[offset:offset + limit]
     next_cursor = _encode_cursor(offset + limit) if offset + limit < len(rows) else None
 
@@ -640,7 +677,8 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
         empty_message = copy_rules.EMPTY_BUSAN
 
     data_as_of, stale = freshness(deps, ctx.as_of)
-    ranking = Ranking(sort=sort, basis=copy_rules.RANKING_BASIS[sort],
+    basis = copy_rules.JOB_NAME_RANKING_BASIS[sort] if has_job_name else copy_rules.RANKING_BASIS[sort]
+    ranking = Ranking(sort=sort, basis=basis,
                       busan_boost=cfg.ranking.busan_boost if sort == Sort.BUSAN_FIRST else None)
     return FeedResponse(items=cards, ranking=ranking, data_as_of=data_as_of, stale=stale, next_cursor=next_cursor,
                         ask_leave_reason=ask, empty_message=empty_message)

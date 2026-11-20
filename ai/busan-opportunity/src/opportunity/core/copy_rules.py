@@ -21,6 +21,13 @@ RANKING_BASIS = {
     Sort.RECENT: "최근에 확인한 순서로 보여드려요",
 }
 
+JOB_NAME_RANKING_BASIS = {
+    Sort.BUSAN_FIRST: "요청한 직무와 가까운 공고를 먼저, 그 안에서 부산 근무 공고를 우선 보여드려요",
+    Sort.MATCH: "요청한 직무와 가까운 공고를 먼저, 그 안에서 적합도 순으로 보여드려요",
+    Sort.DEADLINE: "요청한 직무와 가까운 공고를 먼저, 그 안에서 마감 순으로 보여드려요",
+    Sort.RECENT: "요청한 직무와 가까운 공고를 먼저, 그 안에서 최근 확인 순으로 보여드려요",
+}
+
 WHY_SHOWN_DEFAULT = "보고 있는 공고와 하는 일이 비슷해요"
 WHY_SHOWN_BY_REASON = {
     LeaveReason.SALARY: "하는 일이 비슷하고 급여가 공고에 적혀 있어요",
