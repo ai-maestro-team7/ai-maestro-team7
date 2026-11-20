@@ -50,7 +50,18 @@ export type ChatAction =
   | { type: "START_INTERVIEW"; job: string; documentId: string; title?: string }
   | { type: "REQUEST_COVER_LETTER"; job: string; minChars: number; maxChars: number }
   /** 사용자가 채팅으로 저장을 승낙해 Agent가 저장했다 (D-40) */
-  | { type: "CONDITIONS_SAVED"; conditions: string[] };
+  | { type: "CONDITIONS_SAVED"; conditions: string[] }
+  /** A 이력서·직무 진단을 시작했다. 화면이 진단 흐름을 저장하고 결과 화면을 연다 */
+  | {
+      type: "OPEN_DIAGNOSIS";
+      job: string;
+      analysisId: string;
+      profileId: string;
+      profileVersion: number;
+      documentId: string;
+      targetNcsCode?: string;
+      jobPostingId?: string;
+    };
 
 export type ChatError = { code: string; message: string; retryable: boolean };
 
@@ -83,4 +94,6 @@ export type InterviewHandoff = {
   documentId?: string;
   documentTitle?: string;
   source: "chat";
+  /** 남긴 사용자 (토큰 sub). 지금 로그인한 사용자와 다르면 쓰지 않는다 */
+  owner: string | null;
 };

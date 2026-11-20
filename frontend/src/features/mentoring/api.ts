@@ -181,10 +181,13 @@ export function createTextDocument(text: string, title = "직무 진단 이력�
   );
 }
 
-export async function createPdfDocument(file: File): Promise<CreateDocumentResponse> {
+export async function createPdfDocument(
+  file: File,
+  documentType: "RESUME" | "COVER_LETTER" = "RESUME",
+): Promise<CreateDocumentResponse> {
   const created = await post<{ documentId: string; uploadUrl: string }>(
     "/api/v1/mentoring/documents/upload-url",
-    { fileName: file.name, contentType: "application/pdf", sizeBytes: file.size, documentType: "RESUME" },
+    { fileName: file.name, contentType: "application/pdf", sizeBytes: file.size, documentType },
     "document-upload",
   );
   const uploaded = await fetch(created.uploadUrl, { method: "PUT", headers: { "content-type": "application/pdf" }, body: file });

@@ -46,7 +46,7 @@ class DynamoChatStore:
 
     # ------------------------------------------------------------ 대화
     def get_session(self, user_id, session_id):
-        item = self.table.get_item(Key={"PK": _pk(user_id), "SK": _session_sk(session_id)}).get("Item")
+        item = self.table.get_item(Key={"PK": _pk(user_id), "SK": _session_sk(session_id)}, ConsistentRead=True).get("Item")
         return ChatSession.model_validate(_to_plain(item)) if item else None
 
     def create_session(self, session):
@@ -89,7 +89,9 @@ class DynamoChatStore:
         self.table.put_item(Item=_to_dynamo(item))
 
     def get_message(self, user_id, session_id, message_id):
-        item = self.table.get_item(Key={"PK": _pk(user_id), "SK": f"{_chat_prefix(session_id)}{message_id}"}).get("Item")
+        # 방금 쓴 메시지를 바로 읽는다 (claim 직후 작업자). 최종 일관 읽기면 못 찾고 턴을 건너뛸 수 있다
+        item = self.table.get_item(Key={"PK": _pk(user_id), "SK": f"{_chat_prefix(session_id)}{message_id}"},
+                                   ConsistentRead=True).get("Item")
         return ChatMessage.model_validate(_to_plain(item)) if item else None
 
     def list_messages(self, user_id, session_id, limit):
@@ -97,7 +99,7 @@ class DynamoChatStore:
 
         response = self.table.query(
             KeyConditionExpression=Key("PK").eq(_pk(user_id)) & Key("SK").begins_with(_chat_prefix(session_id)),
-            ScanIndexForward=False, Limit=limit)
+            ScanIndexForward=False, Limit=limit, ConsistentRead=True)
         items = [ChatMessage.model_validate(_to_plain(i)) for i in response.get("Items", [])]
         return list(reversed(items))
 

@@ -4,8 +4,11 @@ import { FileText, Paperclip } from "lucide-react";
 import { type ChangeEvent, type DragEvent, type ReactNode, useRef, useState } from "react";
 
 const INPUT_ID = "chat-pdf-input";
+
+type DocKind = "RESUME" | "COVER_LETTER";
 import { createPdfDocument, errorMessage, getDocument, poll } from "@/features/mentoring/api";
 import { ATTACHMENT_ACCEPT, attachmentError } from "@/features/mentor/data";
+import { Chip } from "@/components/ui/Chip";
 import { cn } from "@/lib/cn";
 
 /**
@@ -18,15 +21,17 @@ export function PdfDropZone({
   children,
 }: {
   disabled: boolean;
-  onReady: (documentId: string, fileName: string) => void;
+  onReady: (documentId: string, fileName: string, kind: DocKind) => void;
   children: ReactNode;
 }) {
   const dragDepth = useRef(0);
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // 고른 파일. 이력서인지 자기소개서인지 고른 뒤 올린다 (자소서로 올려야 면접 체험에서 바로 쓸 수 있다)
+  const [picked, setPicked] = useState<File | null>(null);
 
-  async function upload(files: FileList | null | undefined) {
+  function pick(files: FileList | null | undefined) {
     const file = files?.[0];
     if (!file || disabled || uploading) return;
     if (files.length > 1) {
@@ -35,12 +40,16 @@ export function PdfDropZone({
     }
     const problem = attachmentError(file);
     setError(problem);
-    if (problem) return;
+    setPicked(problem ? null : file);
+  }
+
+  async function upload(file: File, kind: DocKind) {
+    setPicked(null);
     setUploading(file.name);
     try {
-      const created = await createPdfDocument(file);
+      const created = await createPdfDocument(file, kind);
       await poll(() => getDocument(created.documentId));
-      onReady(created.documentId, file.name);
+      onReady(created.documentId, file.name, kind);
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -49,7 +58,7 @@ export function PdfDropZone({
   }
 
   function handleFile(event: ChangeEvent<HTMLInputElement>) {
-    void upload(event.target.files);
+    pick(event.target.files);
     event.target.value = ""; // 같은 파일을 다시 고를 수 있게 비운다
   }
 
@@ -75,7 +84,7 @@ export function PdfDropZone({
     event.preventDefault();
     dragDepth.current = 0;
     setDragging(false);
-    void upload(event.dataTransfer.files);
+    pick(event.dataTransfer.files);
   }
 
   return (
@@ -97,6 +106,14 @@ export function PdfDropZone({
       )}
       <input id={INPUT_ID} type="file" accept={ATTACHMENT_ACCEPT} onChange={handleFile} className="sr-only" tabIndex={-1} />
       {children}
+      {picked && (
+        <div className="flex flex-wrap items-center gap-2 text-small text-grey-800">
+          <span>‘{picked.name}’은</span>
+          <Chip onClick={() => void upload(picked, "RESUME")}>이력서예요</Chip>
+          <Chip onClick={() => void upload(picked, "COVER_LETTER")}>자기소개서예요</Chip>
+          <Chip onClick={() => setPicked(null)}>취소</Chip>
+        </div>
+      )}
       {uploading && (
         <p role="status" className="text-small text-grey-600">
           ‘{uploading}’에서 글자와 역량을 찾고 있어요. 1분쯤 걸려요.
