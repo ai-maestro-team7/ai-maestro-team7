@@ -18,8 +18,8 @@ import { createPdfDocument, errorMessage, waitForDocumentText } from "@/features
 import { ApiError, AUTH_REQUIRED } from "@/lib/api";
 import { sessionOwner } from "@/lib/session";
 import { startInterview } from "../api";
-import { interviewDefaults, MODE_OPTIONS, RULES, TYPE_OPTIONS } from "../data";
-import { interviewQuery, modeLabel, parseMode, readJob, typeLabel } from "../lib";
+import { interviewDefaults, MODE_OPTIONS, RULES, SETUP_PLACEHOLDERS, TYPE_OPTIONS } from "../data";
+import { interviewQuery, modeLabel, parseMode, typeLabel } from "../lib";
 import type { InterviewMode, InterviewType } from "../types";
 import { DocumentUpload, type UploadedDocument } from "./DocumentUpload";
 import { type JobPostingDraft, JobPostingField, type LinkedJobPosting } from "./JobPostingField";
@@ -60,7 +60,8 @@ function InterviewSetup({ owner }: { owner: string | null }) {
   const params = useSearchParams();
   const formId = useId();
   const hintId = useId();
-  const [job, setJob] = useState(() => readJob(params.get("job")));
+  // 직무와 자기소개서는 빈칸으로 시작한다. 리포트에서 "다시 하기"로 오면 주소의 직무를 채운다
+  const [job, setJob] = useState(() => params.get("job")?.trim() ?? "");
   // 채팅에서 넘어왔으면 넘겨받은 자소서를 채운다 (개발계획서4 §10). 서버 렌더에는 값이 없다
   const handoffRaw = useSyncExternalStore(subscribeHandoff, readHandoffRaw, () => null);
   const handoff = parseHandoff(handoffRaw);
@@ -69,7 +70,7 @@ function InterviewSetup({ owner }: { owner: string | null }) {
     ? { name: handoff.documentTitle ?? "저장된 자기소개서", status: "ready", documentId: handoff.documentId, saved: true }
     : null;
   const [editedCoverLetter, setCoverLetter] = useState<string | null>(null);
-  const coverLetter = editedCoverLetter ?? handoff?.coverLetter ?? interviewDefaults.coverLetter;
+  const coverLetter = editedCoverLetter ?? handoff?.coverLetter ?? "";
   const [chosenSource, setSource] = useState<DocumentSource | null>(null);
   const source: DocumentSource = chosenSource ?? (handoffDocument ? "pdf" : "text");
   const [kind, setKind] = useState<DocumentKind>("COVER_LETTER");
@@ -250,6 +251,7 @@ function InterviewSetup({ owner }: { owner: string | null }) {
             id="interview-job"
             label="희망 직무"
             maxLength={RULES.jobMax}
+            placeholder={SETUP_PLACEHOLDERS.job}
             value={job}
             onChange={(event) => setJob(event.target.value)}
             error={errors.job}
@@ -270,8 +272,9 @@ function InterviewSetup({ owner }: { owner: string | null }) {
                 rows={5}
                 value={coverLetter}
                 onChange={(event) => setCoverLetter(event.target.value)}
+                placeholder={SETUP_PLACEHOLDERS.coverLetter}
                 error={errors.coverLetter}
-                counterSuffix={`/ ${RULES.resumeMin}~${RULES.resumeMax.toLocaleString()}자`}
+                counterSuffix={`/ ${RULES.resumeMax.toLocaleString()}자`}
               />
             ) : (
               <>
