@@ -3,6 +3,8 @@
 사실 목록은 문장이 아니라 짧은 사실이다. 출처·기준일이 없는 배지는 여기서 뺀다 (T-08).
 """
 
+import math
+
 from datetime import datetime
 
 from ..config import OpportunityConfig
@@ -100,6 +102,27 @@ def commute_minutes(local_life: LocalLifeData, profile: BasicProfile, region: Wo
     if not (local_life.commute_source and local_life.commute_as_of):
         return None
     return local_life.commute_minutes.get(f"{home}>{work}")
+
+
+def distance_km(local_life: LocalLifeData, profile: BasicProfile, region: WorkRegion) -> float | None:
+    """거주 구청 → 근무지 구청 직선거리 (km, 소수 한 자리). 두 구청 위치와 출처·기준일이 있을 때만. 같은 구면 None."""
+    home, work = profile.residence_sigungu, region.sigungu
+    if not home or not work or home == work or region.unknown or region.overseas:
+        return None
+    if not (local_life.gu_offices_source and local_life.gu_offices_as_of):
+        return None
+    a, b = local_life.gu_offices.get(home), local_life.gu_offices.get(work)
+    if a is None or b is None:
+        return None
+    # 하버사인 공식. 지구 반지름 6371km
+    lat1, lat2 = math.radians(a.lat), math.radians(b.lat)
+    dlat, dlng = lat2 - lat1, math.radians(b.lng - a.lng)
+    h = math.sin(dlat / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlng / 2) ** 2
+    return round(2 * 6371.0 * math.asin(math.sqrt(h)), 1)
+
+
+def distance_fact(km: float | None) -> str | None:
+    return copy_rules.DISTANCE_LABEL.format(km=f"{km:g}") if km is not None else None
 
 
 def commute_fact(minutes: int | None) -> str | None:

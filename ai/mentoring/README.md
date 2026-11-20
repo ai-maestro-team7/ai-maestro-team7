@@ -43,6 +43,31 @@ AWS와 네트워크를 부르지 않는다. 메모리 저장소(`store/memory.py
 - `baseVersion`이 최신이 아니면 409 `PRECONDITION_NOT_MET`. `VERIFIED`는 사용자가 확인하거나 고친 필드에만 생기고,
   질문을 다시 만들어도 그 값은 모델 출력으로 바뀌지 않는다.
 
+## 직무 적합도 (`fit/`, mentoring-fit-review-learning Requirement 1~8)
+
+| 요청 | 응답 |
+|---|---|
+| `POST /analyses` `{profileId, profileVersion?, jobPostingId?, targetNcsCode?, workspaceId?}` | 202 `{analysisId, taskId, status: PENDING}`. 공고나 NCS 코드 중 하나는 꼭 있어야 한다 |
+| `GET /analyses/{analysisId}` | 200. 끝나면 `eligibility`(점수보다 앞), `fitScore`·`potentialUpperBound`, `strengths`, `partialEvidence`, `unverifiedSkills`(확인 질문), `confirmedGaps`, `summary`, `sources`, `warnings` |
+
+작업 `JOB_FIT` 순서 (`fit/analysis.py`, 모델은 2·6번에서만):
+1. 프로필 버전과 요건 읽기. 공고는 요청 시점의 `SNAP#`을 고정하고, NCS 모드는 능력단위를 요건으로 쓴다
+2. [모델] 요건마다 프로필에 **이미 있는** `skillId`·`evidenceId` 고르기 (`job-fit-link-v1`)
+3. 없는 ID는 버린다. 근거 단계는 연결된 역량의 저장 상태로 코드가 정한다. 연결이 없으면 미확인 + 확인 질문
+4. 점수(`fit/score.py`), 격차(`fit/gaps.py`), 지원자격(`Deps.eligibility` = 백엔드 `evaluate_eligibility`)
+5. KB 검색: NCS 직무가 하나로 정해졌을 때만, `job_role` 필터(그 직무 + 공통). 방법론 문서는 `role: GUIDANCE`
+6. [모델] 설명 문장 (`job-fit-summary-v1`). 합격 확률·퍼센트 표현이 있으면 1회 다시 쓰게 하고, 그래도 있으면 버린다
+7. `ANALYSIS#` 저장. 워크스페이스가 있으면 GSI1로 워크스페이스 상세에 붙는다
+
+정한 것
+- 점수의 "관련 경험" 분류(0.1)는 MVP에서 쓰지 않는다. 그 분류가 없으면 남은 가중치로 다시 나눈다 (M-8)
+- 자격 보유는 이력서 원문 인용이 붙은 자격만 본다. 사용자가 "없다"고 확인하면 미보유로 넘긴다
+- 공고에 NCS 코드가 0개·여러 개면 하나로 정하지 않고 `ncs.candidates`로 남긴다. 고용24 직종 → NCS 매핑(`MAP#WORK24#`)은 아직 쓰지 않는다
+- 요건 추출이 끝나지 않은 공고(`extractStatus != DONE`)는 `REQUIRES_USER_REVIEW` / `POSTING_NOT_READY` [D-39]
+
+운영 의존성 (`build_aws_deps`): `TABLE_CATALOG`(있음), `TABLE_REFERENCE`·`KB_ID`(BE-4), `eligibility`(BE-8). 없으면 각각
+공고 분석 501, NCS 분석 501, KB 근거 없음 경고, 지원자격 "확인 필요"로 동작한다.
+
 ## PDF 업로드 흐름
 
 1. `POST /documents/upload-url` `{fileName, contentType, sizeBytes, documentType}` → 201 `{documentId, uploadUrl, expiresInSeconds, status: PENDING}`

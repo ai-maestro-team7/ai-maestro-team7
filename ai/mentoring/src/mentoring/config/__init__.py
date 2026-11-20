@@ -60,6 +60,25 @@ class MetricsConfig(_ConfigModel):
     namespace: str = Field(min_length=1)
 
 
+class JobFitConfig(_ConfigModel):
+    """직무 적합도 분석 (개발계획서1 F-02, mentoring-fit-review-learning Requirement 2~8).
+    점수 가중치·근거 단계 값은 `fit/fit_config.json`에 따로 있다."""
+    link_prompt_version: str = Field(min_length=1)
+    summary_prompt_version: str = Field(min_length=1)
+    link_max_tokens: int = Field(ge=256)
+    summary_max_tokens: int = Field(ge=64)
+    schema_retries: int = Field(ge=0, le=2)
+    summary_retries: int = Field(ge=0, le=2)
+    max_requirements: int = Field(ge=1)
+    max_profile_skills: int = Field(ge=1)
+    kb_top_k: int = Field(ge=1, le=10)
+    citation_excerpt_chars: int = Field(ge=0)
+    question_max_chars: int = Field(ge=1)
+    summary_max_chars: int = Field(ge=1)
+    banned_summary_patterns: list[str] = Field(min_length=1)  # 정규식. 합격 확률처럼 보이는 표현 (Requirement 5 기준 8)
+    notice: str = Field(min_length=1)  # "적합도는 실제 합격 확률이 아닙니다" (docs/api.md §6.3)
+
+
 class MentoringConfig(_ConfigModel):
     config_version: str
     document: DocumentConfig
@@ -68,6 +87,7 @@ class MentoringConfig(_ConfigModel):
     idempotency: IdempotencyConfig
     upload: UploadConfig
     metrics: MetricsConfig
+    job_fit: JobFitConfig
 
 
 def load_config(path: Path | str | None = None, *, data: dict | None = None) -> MentoringConfig:

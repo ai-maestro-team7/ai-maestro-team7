@@ -1,0 +1,28 @@
+{
+  "question": "면접 볼 때 정장 빌려주는 곳 있어요?",
+  "answered": true,
+  "answer": "부산 면접정장 대여서비스(드림옷장)가 있어요. 신청 조건은 정책 원문에서 한 번 더 확인해 주세요.",
+  "sources": [
+    {
+      "kind": "POLICY",
+      "id": "seed-busan-dreamcloset",
+      "title": "부산 면접정장 대여서비스(드림옷장)",
+      "quote": "면접용 정장을 무료로 대여",
+      "url": "https://example.invalid/busan-policy/dreamcloset",
+      "asOf": "2026-11-20"
+    }
+  ],
+  "relatedPolicies": [
+    {
+      "policyId": "seed-busan-dreamcloset",
+      "title": "부산 면접정장 대여서비스(드림옷장)",
+      "bucket": "OPEN_NOW",
+      "status": "ELIGIBLE",
+      "summary": "면접용 정장 무료 대여"
+    }
+  ],
+  "manualChecks": [
+    "대여 가능 기간과 예약 방법은 신청 페이지에서 확인"
+  ],
+  "dataAsOf": "2026-11-21T04:52:00+09:00"
+}

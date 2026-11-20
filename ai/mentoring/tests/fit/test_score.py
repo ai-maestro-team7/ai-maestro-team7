@@ -110,3 +110,14 @@ def test_invalid_config_is_rejected(change):
     change(data)
     with pytest.raises((ValidationError, ValueError)):
         load_fit_config(data=data)
+
+
+def test_policy_example_from_spec_is_50_and_85():
+    # 개발계획서1 F-02 "정책 예시": 필수 2개(근거 있음 1, 미확인 1), 우대 1개(자기보고), 관련 경험 1개(근거 있음)
+    score = calculate_fit([
+        requirement("r1", "REQUIRED", EvidenceLevel.EVIDENCED),
+        requirement("r2", "REQUIRED", EvidenceLevel.NOT_FOUND),
+        requirement("p1", "PREFERRED", EvidenceLevel.SELF_REPORTED),
+        requirement("e1", "EXPERIENCE", EvidenceLevel.EVIDENCED),
+    ])
+    assert (score.fit_score, score.potential_upper_bound) == (50, 85)

@@ -9,7 +9,8 @@ from .config import MentoringConfig
 from .ports import DocumentExtractor, Llm, ObjectStore, ReferenceLookup, TaskDispatcher, UserRepo
 from .text_tools import TextTools
 
-if TYPE_CHECKING:  # stories 패키지가 이 모듈을 import하므로 실행 중에는 가져오지 않는다
+if TYPE_CHECKING:  # stories·fit 패키지가 이 모듈을 import하므로 실행 중에는 가져오지 않는다
+    from .fit.ports import AnalysisStore, CatalogReader, EligibilityFn, KnowledgeSearch, NcsLookup
     from .stories.repo import StoryRepo
 
 KST = timezone(timedelta(hours=9))
@@ -38,6 +39,12 @@ class Deps:
     extractor: DocumentExtractor | None = None  # 없으면 PDF 업로드 완료를 받지 않는다 (텍스트 입력만)
     metrics_sink: Callable[[str], None] | None = None  # EMF 한 줄을 받을 곳. 없으면 stdout
     stories: "StoryRepo | None" = None  # 없으면 경험 블록 경로가 501
+    # 직무 적합도 (#88). analyses가 없으면 /analyses가 501
+    analyses: "AnalysisStore | None" = None
+    catalog: "CatalogReader | None" = None      # B 공고 (읽기만). 없으면 공고 기준 분석이 501
+    ncs: "NcsLookup | None" = None              # NCS 정확 조회. 없으면 NCS 기준 분석이 501
+    knowledge: "KnowledgeSearch | None" = None  # Bedrock KB. 없으면 출처 없이 분석하고 경고를 남긴다
+    eligibility: "EligibilityFn | None" = None  # 백엔드가 evaluate_eligibility를 넣는다 (BE-8). 없으면 확인 필요
     now: Callable[[], datetime] = field(default=now_kst)
     new_id: Callable[[str], str] = field(default=new_id)
 

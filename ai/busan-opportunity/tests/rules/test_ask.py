@@ -10,6 +10,7 @@ import pytest
 from opportunity.core import copy_rules
 from opportunity.enrich import ask, prompts
 from opportunity.models import BasicProfile, OppError
+from opportunity.models.enums import PeriodType
 from opportunity.seeds import demo_world as w
 from opportunity.store.memory import MemoryRetriever, ScriptedLlm
 
@@ -226,8 +227,10 @@ def test_injection_inside_document_stays_data(rag):
 
 def test_system_prompt_rules():
     system = prompts.ask_system("policy", "policyId")
-    for rule in ("문서에 있는 내용만", "모른다고", "그대로 쓴다", "판정 결과를 그대로", "권하지 않는다", "해요체로 3~5문장"):
+    for rule in ("문서에 있는 내용만", "모른다고", "그대로 쓴다", "판정 결과를 그대로", "권하지 않는다", "해요체로 3~5문장",
+                 "지난 회차라고 밝히고", "지금 신청할 수 있는 것처럼 말하지 않는다"):
         assert rule in system
+    assert "지난 회차" not in prompts.ask_system("posting", "jobPostingId")  # 공고에는 정책 신청 기간 줄이 없다
     for banned in copy_rules.FORBIDDEN_PATTERNS:
         assert banned in system
 
@@ -402,3 +405,202 @@ def test_ask_posting_unknown_is_404(rag):
     with pytest.raises(OppError) as e:
         ask.ask_posting(rag, "demo1", "wk24-NOPE", "마감이 언제예요?", as_of=AS_OF)
     assert e.value.code == "POSTING_NOT_FOUND"
+
+
+# ---------------------------------------------------------------- 신청 기간과 회차
+# 온통청년에는 같은 정책이 연도별로 따로 등록돼 있다 (실제 예: 기쁨두배통장 2025-07, 2026-08 회차)
+JOY_OLD, JOY_NEW = "ythc-TEST-JOY2025", "ythc-TEST-JOY2026"
+JOY_OLD_TEXT = """# 부산청년 기쁨두배통장
+
+## 신청 기간
+2025-07-01 ~ 2025-07-31
+
+## 신청 방법
+기쁨두배통장 신청은 부산청년플랫폼에서 합니다. 기쁨두배통장 신청 방법 안내."""
+JOY_NEW_TEXT = """# 부산 청년 자산형성 지원(부산청년 기쁨두배통장)
+
+## 신청 방법
+기쁨두배통장 신청은 부산청년플랫폼에서 온라인으로 합니다."""
+
+
+def add_policy(deps, pid, title, text, *, start=None, end="9999-12-31", period=PeriodType.FIXED, sido="26"):
+    """부산 면접 지원(데모)을 본떠 이름·신청 기간만 바꾼 정책을 catalog와 검색에 넣는다."""
+    base = deps.catalog.get_policy(w.P_BUSAN_INTERVIEW)
+    regions = [base.regions[0].model_copy(update={"sido": sido})]
+    deps.catalog.put_policy(base.model_copy(update={
+        "policy_id": pid, "title": title, "apply_start": start, "apply_end": end, "regions": regions,
+        "application": base.application.model_copy(update={"period_type": period})}))
+    deps.retriever.docs[pid] = (text, meta(pid, sido))
+    return deps.catalog.get_policy(pid)
+
+
+def wide_top_k(deps, top_k=10):
+    deps.config = deps.config.model_copy(update={"ask": deps.config.ask.model_copy(update={"top_k": top_k})})
+
+
+def add_joy_rounds(deps):
+    add_policy(deps, JOY_OLD, "부산청년 기쁨두배통장", JOY_OLD_TEXT, start="2025-07-01", end="2025-07-31")
+    add_policy(deps, JOY_NEW, "부산 청년 자산형성 지원(부산청년 기쁨두배통장)", JOY_NEW_TEXT,
+               start="2026-08-10", end="2026-08-21")
+
+
+def joy_reply(answer="올해 회차 신청 기간은 2026년 8월 10일부터 8월 21일까지였고 지금은 지났어요. "
+                     "부산청년플랫폼에서 온라인으로 신청하는 방식이에요."):
+    return json.dumps({"answer": answer, "citations": [
+        {"policyId": JOY_NEW, "quote": "기쁨두배통장 신청은 부산청년플랫폼에서 온라인으로 합니다."}],
+        "notFound": False}, ensure_ascii=False)
+
+
+def prompt_ids(user):
+    return [line.split('id="')[1].split('"')[0] for line in user.splitlines() if line.startswith("<policy id=")]
+
+
+def test_two_rounds_of_same_policy_keep_only_the_latest(rag):
+    add_joy_rounds(rag)
+    scores = {d.doc_id: d.score for d in rag.retriever.retrieve("기쁨두배통장 신청 방법", top_k=20)}
+    assert scores[JOY_OLD] > scores[JOY_NEW]  # 지난 회차가 검색 점수는 더 높다
+    llm = script(rag, joy_reply())
+    result = ask_rent(rag, "기쁨두배통장 신청 방법")
+    _, user = llm.calls[0]
+    assert JOY_NEW in prompt_ids(user) and JOY_OLD not in user and "2025-07-31" not in user
+    ids = [p.policy_id for p in result.related_policies]
+    assert JOY_NEW in ids and JOY_OLD not in ids
+    assert f"- {JOY_NEW}: " in user and "  신청 기간: 2026-08-10 ~ 2026-08-21 (지남)" in user
+    # 답의 날짜(8월 21일)는 문서 글에 없고 신청 기간 줄에만 있다. 그래도 숫자 검증을 통과한다
+    assert "21" not in JOY_NEW_TEXT
+    assert result.answered and result.sources[0].id == JOY_NEW
+
+
+def test_period_line_numbers_only_count_for_given_policies(rag):
+    add_joy_rounds(rag)
+    wrong = joy_reply(answer="신청 기간은 2025년 7월 1일부터 7월 31일까지예요. 부산청년플랫폼에서 신청해요.")
+    script(rag, wrong, wrong)
+    assert not ask_rent(rag, "기쁨두배통장 신청 방법").answered  # 빠진 지난 회차의 날짜는 쓸 수 없다
+
+
+def test_latest_round_keeps_the_first_rounds_place(rag):
+    add_joy_rounds(rag)
+    old, new = rag.catalog.get_policy(JOY_OLD), rag.catalog.get_policy(JOY_NEW)
+    rent = rag.catalog.get_policy(w.P_BUSAN_RENT)
+    kept = ask.latest_rounds([(old, "a"), (rent, "b"), (new, "c")])
+    assert [(p.policy_id, tag) for p, tag in kept] == [(JOY_NEW, "c"), (w.P_BUSAN_RENT, "b")]
+    same_end = new.model_copy(update={"policy_id": "ythc-TEST-JOY-COPY", "title": "2026년 부산 청년 자산형성 지원 (부산청년 기쁨두배통장)"})
+    assert [p.policy_id for p, _ in ask.latest_rounds([(new, 1), (same_end, 2)])] == [JOY_NEW]  # 같으면 먼저 나온 것
+
+
+def test_always_round_beats_dated_and_undated_loses(rag):
+    always = add_policy(rag, "ythc-TEST-A", "청년 마음건강 지원", "마음건강", period=PeriodType.ALWAYS)
+    dated = add_policy(rag, "ythc-TEST-B", "2025년 청년 마음건강 지원", "마음건강", start="2025-03-01", end="2025-03-31")
+    tbd = add_policy(rag, "ythc-TEST-C", "청년 마음건강 지원(2027년도)", "마음건강", period=PeriodType.TBD)
+    assert [p.policy_id for p, in ask.latest_rounds([(dated,), (always,)])] == ["ythc-TEST-A"]
+    assert [p.policy_id for p, in ask.latest_rounds([(tbd,), (dated,)])] == ["ythc-TEST-B"]
+
+
+def test_different_names_or_regions_are_not_merged(rag):
+    transit = add_policy(rag, "ythc-TEST-T", "부산 청년 교통비 지원", "교통비", start="2025-01-01", end="2025-01-31")
+    rent = add_policy(rag, "ythc-TEST-R", "부산 청년 월세 지원", "월세", start="2026-01-01", end="2026-12-31")
+    busan = add_policy(rag, "ythc-TEST-BR", "청년 월세 지원", "월세", start="2025-01-01", end="2025-01-31")
+    seoul = add_policy(rag, "ythc-TEST-SR", "서울 청년 월세 지원", "월세", sido="11", start="2026-01-01", end="2026-12-31")
+    assert not ask.same_policy_round(transit, rent)
+    assert not ask.same_policy_round(busan, seoul)  # 이름이 겹쳐도 지역이 다르면 다른 정책
+    assert ask.same_policy_round(busan, rent)
+    kept = ask.latest_rounds([(transit,), (seoul,), (busan,)])
+    assert [p.policy_id for p, in kept] == ["ythc-TEST-T", "ythc-TEST-SR", "ythc-TEST-BR"]
+
+
+def test_contained_names_with_overlapping_or_undated_periods_are_not_merged(rag):
+    """실제 데이터 예: 사업 묶음 이름("산림산업 창업지원", 일정 미정)과 그 안의 세부 사업은 따로 둔다."""
+    umbrella = add_policy(rag, "ythc-TEST-U", "산림산업 창업지원", "산림", period=PeriodType.TBD)
+    sub = add_policy(rag, "ythc-TEST-U1", "산림산업 창업지원_청년 산림인 성장지원", "산림",
+                     start="2026-02-05", end="2026-02-25")
+    long_run = add_policy(rag, "ythc-TEST-U2", "산림산업 창업지원 (청년)", "산림", start="2026-01-01", end="2026-12-31")
+    assert not ask.same_policy_round(umbrella, sub)   # 한쪽이 일정 미정
+    assert not ask.same_policy_round(sub, long_run)   # 기간이 겹친다 = 함께 운영되는 사업
+    assert len(ask.latest_rounds([(umbrella,), (sub,), (long_run,)])) == 3
+
+
+def test_policies_of_different_gu_are_not_merged(rag):
+    jin = add_policy(rag, "ythc-TEST-G1", "부산진구 청년 자격시험 응시료 지원", "응시료", start="2025-03-04", end="2025-11-20")
+    gijang = add_policy(rag, "ythc-TEST-G2", "청년 자격시험 응시료 지원", "응시료", start="2026-01-01", end="2026-12-15")
+    gu = jin.regions[0].model_copy(update={"scope": "SIGUNGU", "sigungu": "26230"})
+    jin = jin.model_copy(update={"regions": [gu]})
+    gijang = gijang.model_copy(update={"regions": [gu.model_copy(update={"sigungu": "26710"})]})
+    assert not ask.same_policy_round(jin, gijang)
+    assert ask.same_policy_round(jin, gijang.model_copy(update={"regions": [gu]}))
+
+
+def test_round_name_drops_years_brackets_and_spaces():
+    assert ask.round_name("부산 청년 자산형성 지원(부산청년 기쁨두배통장)") == "부산청년자산형성지원부산청년기쁨두배통장"
+    assert ask.round_name("2026년 [데모] 청년 수당 (2025년도)") == "데모청년수당"
+    assert ask.round_name("청년 월세 20만 원") == "청년월세20만원"  # 연도가 아닌 숫자는 남긴다
+
+
+def test_past_policy_goes_after_open_ones_but_stays(rag):
+    wide_top_k(rag)
+    add_policy(rag, "ythc-TEST-PAST", "부산 청년 월세 특별 지원", "부산 월세 지원 신청 방법 " * 4,
+               start="2026-03-02", end="2026-03-20")
+    add_policy(rag, "ythc-TEST-OPEN", "부산 청년 주거 상담", "월세 신청", start="2026-11-01", end="2026-11-30")
+    llm = script(rag, reply())
+    result = ask_rent(rag)
+    scores = {d.doc_id: d.score for d in rag.retriever.retrieve("부산 월세 지원 신청 방법", top_k=20)}
+    assert max(scores, key=scores.get) == "ythc-TEST-PAST"  # 검색 점수는 1등
+    ids = [p.policy_id for p in result.related_policies]
+    assert ids[-1] == "ythc-TEST-PAST" and "ythc-TEST-OPEN" in ids
+    assert prompt_ids(llm.calls[0][1]) == ids  # 문서 순서와 관련 정책 순서가 같다
+    status = {p.policy_id: p.status for p in result.related_policies}
+    rest = [i for i in ids if i != "ythc-TEST-PAST" and status[i] != "NOT_ELIGIBLE"]
+    assert rest == sorted(rest, key=lambda i: -scores[i])  # 같은 칸 안에서는 검색 점수 순서 그대로
+
+
+def test_past_policy_comes_before_not_eligible_only_after_open(rag):
+    add_policy(rag, "ythc-TEST-PAST", "부산 청년 월세 특별 지원", "서울 월세 지원 신청 서울 월세 지원 신청",
+               start="2026-03-02", end="2026-03-20")
+    script(rag, reply())
+    ids = [p.policy_id for p in ask_rent(rag, "서울 월세 지원 신청").related_policies]
+    assert ids[-1] == "ythc-TEST-PAST" and ids[-2] == w.P_SEOUL_RENT  # 지난 정책 > NOT_ELIGIBLE 순으로 뒤로
+
+
+def test_prompt_has_apply_status_lines(rag):
+    wide_top_k(rag)
+    add_policy(rag, "ythc-TEST-PAST", "부산 청년 월세 특별 지원", "월세 신청", start="2026-03-02", end="2026-03-20")
+    add_policy(rag, "ythc-TEST-OPEN", "부산 청년 주거 상담", "월세 신청", start="2026-11-01", end="2026-11-30")
+    add_policy(rag, "ythc-TEST-SOON", "부산 청년 이사 지원", "월세 신청", start="2026-12-01", end="2026-12-15")
+    llm = script(rag, reply())
+    ask_rent(rag)
+    _, user = llm.calls[0]
+    judgements = user.split("<judgements>")[1]
+    assert "신청 기간: 2026-03-02 ~ 2026-03-20 (지남)" in judgements
+    assert "신청 기간: 2026-11-01 ~ 2026-11-30 (진행 중)" in judgements
+    assert "신청 기간: 2026-12-01 ~ 2026-12-15 (시작 전)" in judgements
+    lines = judgements.splitlines()
+    rent_at = next(i for i, line in enumerate(lines) if line.startswith(f"- {w.P_BUSAN_RENT}:"))
+    assert lines[rent_at + 1] == "  신청 기간: 상시"  # 판정 줄 바로 아래
+
+
+def test_ask_policy_also_gets_the_apply_status_line(rag):
+    add_policy(rag, JOY_NEW, "부산 청년 자산형성 지원(부산청년 기쁨두배통장)", JOY_NEW_TEXT,
+               start="2026-08-10", end="2026-08-21")
+    llm = script(rag, joy_reply())
+    result = ask.ask_policy(rag, "demo1", JOY_NEW, "기쁨두배통장 신청 방법", as_of=AS_OF)
+    assert result.answered and "  신청 기간: 2026-08-10 ~ 2026-08-21 (지남)" in llm.calls[0][1]
+
+
+@pytest.mark.parametrize(("start", "end", "period", "expected"), [
+    ("2026-11-21", "2026-11-30", PeriodType.FIXED, "OPEN"),       # 시작 당일
+    ("2026-11-01", "2026-11-21", PeriodType.FIXED, "OPEN"),       # 마감 당일
+    ("2026-11-01", "2026-11-20", PeriodType.FIXED, "PAST"),
+    ("2026-11-22", "2026-11-30", PeriodType.FIXED, "UPCOMING"),
+    ("2026-01-01", "9999-12-31", PeriodType.FIXED, "OPEN"),       # 끝 없이 열림
+    (None, "9999-12-31", PeriodType.ALWAYS, "ALWAYS"),
+    ("2025-01-01", "9999-12-31", PeriodType.ALWAYS, "ALWAYS"),
+    (None, "9999-12-31", PeriodType.MONTHLY, "MONTHLY"),
+    (None, "9999-12-31", PeriodType.TBD, "TBD"),
+    (None, "9999-12-31", PeriodType.FIXED, "UNKNOWN"),
+])
+def test_apply_status_is_computed_from_as_of(rag, start, end, period, expected):
+    policy = add_policy(rag, "ythc-TEST-S", "부산 청년 시험 정책", "시험", start=start, end=end, period=period)
+    assert ask.apply_status(policy, AS_OF) == expected
+    line = ask.period_line(policy, AS_OF)
+    assert line.startswith("신청 기간: ") and line.endswith(prompts.APPLY_STATUS_LABEL[expected].join("()")
+                                                          if start or end != "9999-12-31" else
+                                                          prompts.APPLY_STATUS_LABEL[expected])

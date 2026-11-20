@@ -19,6 +19,8 @@ from ..core.upload import complete_upload, create_upload_url
 from ..deps import Deps
 from ..errors import MentoringError, invalid_input, not_implemented, unauthorized
 from ..models import ConfirmRequest, TextDocumentRequest, UploadUrlRequest
+from ..fit.analysis import analysis_view, create_analysis, get_analysis
+from ..fit.records import AnalysisRequest
 from ..stories import AnswerStoryRequest, CreateStoryRequest, get_story, list_stories
 from ..stories.flow import start_story, story_view, update_story
 from . import errors
@@ -146,9 +148,20 @@ def _story_repo():
     return _deps().stories
 
 
+# ---------------------------------------------------------------- 직무 적합도 (mentoring-fit-review-learning Req 1~8)
+@app.post(f"{PREFIX}/analyses")
+def rest_create_analysis():
+    body = create_analysis(_deps(), _user_id(), _body(AnalysisRequest), _header("Idempotency-Key"))
+    return _json(202, body)
+
+
+@app.get(f"{PREFIX}/analyses/<analysis_id>")
+def rest_get_analysis(analysis_id: str):
+    return analysis_view(get_analysis(_deps(), _user_id(), _id(analysis_id, "analysisId")))
+
+
 # ---------------------------------------------------------------- 아직 만들지 않은 경로 (개발계획서1 §6.1)
 _LATER = [
-    ("POST", "/analyses"), ("GET", "/analyses/<analysis_id>"),
     ("POST", "/reviews"), ("GET", "/reviews/<review_id>"),
     ("POST", "/learning-paths"), ("GET", "/learning-paths/<learning_path_id>"),
     ("POST", "/agent/chat"), ("GET", "/health/readiness"),
