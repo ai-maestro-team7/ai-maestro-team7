@@ -167,6 +167,14 @@ class LocalLifeConfig(OppModel):
     transit_max: int = 3
 
 
+class AskConfig(OppModel):
+    top_k: int = 5            # LLM에 넘길 정책 문서 수
+    candidate_k: int = 20     # 검색에서 먼저 가져올 수
+    max_doc_chars: int = 2000  # 문서 하나에서 LLM에 넘길 글자 수
+    max_tokens: int = 700
+    max_question_chars: int = 300
+
+
 class DataConfig(OppModel):
     stale_after_hours: int
     busan_sido: str
@@ -188,6 +196,7 @@ class OpportunityConfig(OppModel):
     explanation: ExplanationConfig = Field(default_factory=ExplanationConfig)
     agent: AgentConfig = Field(default_factory=AgentConfig)
     local_life: LocalLifeConfig = Field(default_factory=LocalLifeConfig)
+    ask: AskConfig = Field(default_factory=AskConfig)
     data: DataConfig
 
 

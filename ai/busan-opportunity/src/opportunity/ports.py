@@ -143,6 +143,24 @@ class Llm(Protocol):
     def invoke(self, system: str, user: str, *, max_tokens: int = 1024) -> str: ...
 
 
+@dataclass
+class RetrievedDoc:
+    doc_id: str          # policyId
+    text: str            # 검색된 원문 조각
+    score: float
+    metadata: dict = field(default_factory=dict)
+    source_uri: str | None = None
+
+
+class PolicyRetriever(Protocol):
+    """정책 문서 검색 (Bedrock Knowledge Base `team07-opp-policy-kb`의 Retrieve).
+
+    filter는 Bedrock KB 형식이다. 예: {"orAll": [{"equals": {"key": "regionKey", "value": "26"}}, …]}
+    """
+
+    def retrieve(self, query: str, *, top_k: int, filter: dict | None = None) -> list[RetrievedDoc]: ...
+
+
 # ---------------------------------------------------------------- 일정·메일·지표
 class Scheduler(Protocol):
     """EventBridge Scheduler 일회성 일정 (at() 식, Asia/Seoul, 실행 후 자동 삭제)."""

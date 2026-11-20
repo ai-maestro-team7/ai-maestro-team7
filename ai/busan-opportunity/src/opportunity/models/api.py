@@ -364,3 +364,32 @@ class RegionalTalentResponse(OppModel):
     job_posting_id: str
     organization: str
     regional_talent: RegionalTalentView
+
+
+# ---------------------------------------------------------------- 질문하기 (RAG)
+class AskRequest(OppModel):
+    question: str
+
+
+class AskSource(OppModel):
+    """답의 근거. quote는 원문에 실제로 있는 문장이어야 한다."""
+
+    kind: str  # POLICY, POSTING
+    id: str
+    title: str
+    quote: str | None = None
+    url: str | None = None
+    as_of: str | None = None
+
+
+class AskResponse(OppModel):
+    """정책·공고 원문을 근거로 한 답. 근거를 못 찾았거나 검증에 실패하면 answered=false이고 answer는 없다."""
+
+    question: str
+    answered: bool
+    answer: str | None = None
+    sources: list[AskSource] = Field(default_factory=list)
+    related_policies: list[PolicyBrief] = Field(default_factory=list)  # 검색된 정책과 규칙 판정 결과
+    manual_checks: list[str] = Field(default_factory=list)             # 직접 확인할 조건
+    notice: str | None = None
+    data_as_of: str | None = None

@@ -11,6 +11,7 @@ from .ports import (
     EventSink,
     Llm,
     Mailer,
+    PolicyRetriever,
     Scheduler,
     UserRepo,
     VectorIndex,
@@ -31,5 +32,6 @@ class Deps:
     events: EventSink
     llm: Llm | None = None        # 설명 문장·요건 추출에만
     mailer: Mailer | None = None  # 메일 알림. 없으면 알림함만
+    retriever: PolicyRetriever | None = None  # 정책 문서 검색 (RAG). 없으면 질문 기능을 끈다
     region_stats: RegionStats = field(default_factory=RegionStats)  # 비교 패널의 주거비·통근
     local_life: LocalLifeData = field(default_factory=LocalLifeData)  # 부산 근무지 주변 생활 정보

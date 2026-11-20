@@ -358,3 +358,23 @@ class ScriptedLlm:
     def invoke(self, system, user, *, max_tokens=1024):
         self.calls.append((system, user))
         return self.replies.pop(0) if self.replies else ""
+
+
+class MemoryRetriever:
+    """낱말이 겹치는 만큼 점수를 주는 가짜 검색. `docs`는 {doc_id: (text, metadata)}다."""
+
+    def __init__(self, docs: dict[str, tuple[str, dict]] | None = None):
+        self.docs = docs or {}
+        self.calls: list[tuple[str, int, dict | None]] = []
+
+    def retrieve(self, query, *, top_k, filter=None):
+        from ..ports import RetrievedDoc
+
+        self.calls.append((query, top_k, filter))
+        words = [w for w in query.replace("?", " ").split() if len(w) > 1]
+        rows = []
+        for doc_id, (text, metadata) in self.docs.items():
+            score = sum(text.count(w) for w in words)
+            if score:
+                rows.append(RetrievedDoc(doc_id, text, float(score), dict(metadata)))
+        return sorted(rows, key=lambda r: (-r.score, r.doc_id))[:top_k]

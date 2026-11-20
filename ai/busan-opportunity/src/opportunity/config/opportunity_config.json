@@ -85,6 +85,13 @@
     "festivalMax": 2,
     "transitMax": 3
   },
+  "ask": {
+    "topK": 5,
+    "candidateK": 20,
+    "maxDocChars": 2000,
+    "maxTokens": 700,
+    "maxQuestionChars": 300
+  },
   "data": {
     "staleAfterHours": 36,
     "busanSido": "26",
