@@ -68,31 +68,36 @@ class DynamoReferenceLookup:
     def _profile(item: Mapping[str, Any]) -> JobProfile:
         return JobProfile(
             ncs_code=str(item["ncsCode"]),
-            name=str(item["name"]),
-            description=str(item["description"]) if item.get("description") else None,
-            data=dict(item.get("data", {})),
+            name=str(item["jobRole"]),
+            description=str(item["occupationDefinition"]) if item.get("occupationDefinition") else None,
         )
 
     @staticmethod
     def _unit(item: Mapping[str, Any]) -> CompetencyUnit:
         return CompetencyUnit(
             ncs_code=str(item["ncsCode"]),
-            unit_code=str(item["unitCode"]),
-            name=str(item["name"]),
+            unit_code=str(item["competencyUnitCode"]),
+            name=str(item["competencyUnitName"]),
             training_hours=int(item["trainingHours"]) if item.get("trainingHours") is not None else None,
             source_reference_date=str(item["sourceReferenceDate"]) if item.get("sourceReferenceDate") else None,
-            data=dict(item.get("data", {})),
         )
 
     @staticmethod
     def _link(item: Mapping[str, Any]) -> QualificationLink:
         return QualificationLink(
-            unit_code=str(item["unitCode"]),
+            unit_code=str(item["competencyUnitCode"]),
             qualification_code=str(item["qualificationCode"]),
-            name=str(item["name"]),
+            name=str(item["qualificationName"]),
             unit_type=str(item["unitType"]),
-            training_hours=int(item["trainingHours"]) if item.get("trainingHours") is not None else None,
-            data=dict(item.get("data", {})),
+            training_hours=(
+                int(item["minimumTrainingHours"])
+                if item.get("minimumTrainingHours") is not None
+                else (
+                    int(item["minimumTrainingHoursValues"][0])
+                    if item.get("minimumTrainingHoursValues")
+                    else None
+                )
+            ),
         )
 
     def get_job_profile(self, ncs_code: str) -> JobProfile | None:
@@ -142,9 +147,11 @@ class DynamoReferenceLookup:
         return sorted(
             (
                 BasicSkill(
-                    skill_id=str(item["skillId"]),
-                    name=str(item["name"]),
-                    data=dict(item.get("data", {})),
+                    skill_id=f"{int(item['skillNo']):03d}",
+                    name=str(item["abilityName"]),
+                    ability_id=int(item["abilityId"]),
+                    sub_area_id=int(item["subAreaId"]),
+                    sub_area_name=str(item["subAreaName"]),
                 )
                 for item in items
             ),

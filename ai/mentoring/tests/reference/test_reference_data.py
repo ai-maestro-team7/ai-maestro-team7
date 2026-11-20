@@ -21,7 +21,13 @@ def _write(path: Path, rows: list[dict[str, str]]) -> None:
 def structured(tmp_path: Path) -> Path:
     _write(
         tmp_path / "selected_job_profiles.csv",
-        [{"ncs_subcategory_code": "20010105", "job_role": "가상 데이터 분석", "job_description": "가상 직무"}],
+        [
+            {
+                "ncs_subcategory_code": "20010105",
+                "job_role": "가상 데이터 분석",
+                "occupation_definition": "가상 직무",
+            }
+        ],
     )
     _write(
         tmp_path / "selected_competency_units.csv",
@@ -47,9 +53,9 @@ def structured(tmp_path: Path) -> Path:
         "qualification_code": "VIRTUAL-Q1",
         "qualification_name": "가상 데이터 자격",
         "unit_type": "선택",
-        "training_hours": "20",
+        "minimum_training_hours": "20",
     }
-    duplicate = {**qualification, "training_hours": "999"}
+    duplicate = {**qualification, "minimum_training_hours": "999"}
     _write(tmp_path / "selected_qualification_links.csv", [qualification, duplicate])
     _write(
         tmp_path / "selected_ncs_classification.csv",
@@ -57,7 +63,15 @@ def structured(tmp_path: Path) -> Path:
     )
     _write(
         tmp_path / "ncs_basic_skills.csv",
-        [{"skill_id": "COMM", "skill_name": "가상 의사소통"}],
+        [
+            {
+                "순번": "1",
+                "직업기초능력일련번호": "1",
+                "직업기초능력명": "가상 의사소통",
+                "하위영역일련번호": "1",
+                "하위영역명": "가상 문서이해",
+            }
+        ],
     )
     return tmp_path
 
@@ -113,11 +127,13 @@ def test_dry_run_does_not_write_and_two_loads_are_idempotent(structured: Path) -
 
     first = loader.load(table, write=True)
     count = table.scan()["Count"]
+    first_items = sorted(table.scan()["Items"], key=lambda item: (item["PK"], item["SK"]))
     second = loader.load(table, write=True)
 
     assert first.written == first.total
     assert second.total == first.total
     assert table.scan()["Count"] == count
+    assert sorted(table.scan()["Items"], key=lambda item: (item["PK"], item["SK"])) == first_items
 
 
 @mock_aws

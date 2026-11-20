@@ -49,6 +49,7 @@ class CsvData:
     def __init__(self, root: str | Path) -> None:
         self.root = Path(root)
         rows = {name: _read(self.root / filename) for name, filename in FILES.items()}
+        self.rows = rows
         classifications: dict[str, dict[str, str]] = {}
         for row in rows["classifications"]:
             code = _value(row, "ncs_subcategory_code", "ncs_code")
@@ -57,13 +58,14 @@ class CsvData:
         self.job_profiles: list[JobProfile] = []
         for row in rows["profiles"]:
             code = _value(row, "ncs_subcategory_code", "ncs_code")
-            combined = {**classifications.get(code, {}), **row}
             self.job_profiles.append(
                 JobProfile(
                     ncs_code=code,
                     name=_value(row, "job_role", "job_name", "ncs_subcategory_name", "name"),
-                    description=_value(row, "job_description", "description", required=False) or None,
-                    data=combined,
+                    description=_value(
+                        row, "job_description", "occupation_definition", "description", required=False
+                    )
+                    or None,
                 )
             )
 
@@ -74,9 +76,10 @@ class CsvData:
                     ncs_code=_value(row, "ncs_subcategory_code", "ncs_code"),
                     unit_code=_value(row, "competency_unit_code", "unit_code"),
                     name=_value(row, "competency_unit_name", "unit_name", "name"),
-                    training_hours=_integer(_value(row, "training_hours", required=False)),
+                    training_hours=_integer(
+                        _value(row, "training_hours", "minimum_training_hours", required=False)
+                    ),
                     source_reference_date=_value(row, "source_reference_date", required=False) or None,
-                    data=row,
                 )
             )
 
@@ -92,8 +95,9 @@ class CsvData:
                     qualification_code=qualification_code,
                     name=_value(row, "qualification_name", "qual_name", "name"),
                     unit_type=unit_type,
-                    training_hours=_integer(_value(row, "training_hours", required=False)),
-                    data=row,
+                    training_hours=_integer(
+                        _value(row, "training_hours", "minimum_training_hours", required=False)
+                    ),
                 )
         self.qualification_links = sorted(
             links.values(), key=lambda item: (item.unit_code, item.qualification_code, item.unit_type)
@@ -103,9 +107,13 @@ class CsvData:
         for index, row in enumerate(rows["basic_skills"], start=1):
             self.basic_skills.append(
                 BasicSkill(
-                    skill_id=_value(row, "skill_id", "basic_skill_code", "ncs_basic_skill_code", required=False)
-                    or str(index),
-                    name=_value(row, "skill_name", "basic_skill_name", "name"),
-                    data=row,
+                    skill_id=f"{int(_value(row, '순번', required=False) or index):03d}",
+                    name=_value(row, "skill_name", "basic_skill_name", "직업기초능력명", "name"),
+                    ability_id=int(_value(row, "직업기초능력일련번호", required=False) or index),
+                    sub_area_id=int(_value(row, "하위영역일련번호", required=False) or 1),
+                    sub_area_name=_value(
+                        row, "하위영역명", "sub_area_name", required=False
+                    )
+                    or _value(row, "skill_name", "basic_skill_name", "직업기초능력명", "name"),
                 )
             )

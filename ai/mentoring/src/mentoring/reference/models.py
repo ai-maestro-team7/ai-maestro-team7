@@ -14,7 +14,6 @@ class JobProfile(ReferenceModel):
     ncs_code: str = Field(min_length=1)
     name: str = Field(min_length=1)
     description: str | None = None
-    data: dict[str, str] = Field(default_factory=dict)
 
 
 class CompetencyUnit(ReferenceModel):
@@ -23,7 +22,6 @@ class CompetencyUnit(ReferenceModel):
     name: str = Field(min_length=1)
     training_hours: int | None = Field(default=None, ge=0)
     source_reference_date: str | None = None
-    data: dict[str, str] = Field(default_factory=dict)
 
 
 class QualificationLink(ReferenceModel):
@@ -32,10 +30,11 @@ class QualificationLink(ReferenceModel):
     name: str = Field(min_length=1)
     unit_type: str = Field(min_length=1)
     training_hours: int | None = Field(default=None, ge=0)
-    data: dict[str, str] = Field(default_factory=dict)
 
 
 class BasicSkill(ReferenceModel):
     skill_id: str = Field(min_length=1)
     name: str = Field(min_length=1)
-    data: dict[str, str] = Field(default_factory=dict)
+    ability_id: int = Field(ge=1)
+    sub_area_id: int = Field(ge=1)
+    sub_area_name: str = Field(min_length=1)
