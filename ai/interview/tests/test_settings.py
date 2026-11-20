@@ -64,5 +64,5 @@ def test_thinking_off_returns_copy():
 
 
 def test_versions():
-    assert versions.SCORING_VERSION == "v1.0"
+    assert versions.SCORING_VERSION == "v2.0"  # 4차(#108) 분석 제외 기준 추가
     assert versions.PROMPT_VERSION == "A-v2/B-v1"

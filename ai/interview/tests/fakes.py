@@ -96,6 +96,45 @@ class FakePolly:
         return {"AudioStream": io.BytesIO(self.audio), "ContentType": "audio/mpeg"}
 
 
+def face_detail(gaze=(0.0, -10.0), head=(0.0, 5.0), eyes_open=(True, 98.0), confidence=99.9, gaze_confidence=99.0,
+                occluded=(False, 95.0), brightness=70.0, sharpness=40.0):
+    """DetectFaces FaceDetail 하나 (필요한 키만). gaze·head는 (yaw, pitch). None을 주면 그 키를 뺀다.
+
+    기본값은 노트북 카메라 정면 응시: 카메라가 눈보다 아래라 시선 위아래가 약 -10° (C §2.3).
+    """
+    detail = {"Confidence": confidence, "BoundingBox": {"Width": 0.4, "Height": 0.5, "Left": 0.3, "Top": 0.2},
+              "Pose": {"Roll": 1.0, "Yaw": head[0], "Pitch": head[1]} if head is not None else None,
+              "Quality": {"Brightness": brightness, "Sharpness": sharpness},
+              "EyeDirection": ({"Yaw": gaze[0], "Pitch": gaze[1], "Confidence": gaze_confidence}
+                               if gaze is not None else None),
+              "EyesOpen": {"Value": eyes_open[0], "Confidence": eyes_open[1]} if eyes_open is not None else None,
+              "FaceOccluded": {"Value": occluded[0], "Confidence": occluded[1]} if occluded is not None else None}
+    return {k: v for k, v in detail.items() if v is not None}
+
+
+class FakeRekognition:
+    """detect_faces 호출 인자를 기록하고 FaceDetails를 돌려준다.
+
+    - responses: 호출마다 차례로 돌려줄 FaceDetails 목록(또는 던질 예외). 다 쓰면 default
+    - by_image: {이미지 bytes: FaceDetails 또는 예외}. responses보다 먼저 본다
+    """
+
+    def __init__(self, responses=None, default=None, by_image=None):
+        self.responses = list(responses or [])
+        self.default = [face_detail()] if default is None else default
+        self.by_image = dict(by_image or {})
+        self.calls = []
+
+    def detect_faces(self, **kwargs):
+        self.calls.append(kwargs)
+        image = kwargs["Image"].get("Bytes")
+        item = self.by_image[image] if image in self.by_image else (
+            self.responses.pop(0) if self.responses else self.default)
+        if isinstance(item, BaseException):
+            raise item
+        return {"FaceDetails": item}
+
+
 class FakeToolLLM:
     """툴을 쓰는 에이전트 가짜 (피드백 C-2).
 

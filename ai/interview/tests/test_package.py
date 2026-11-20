@@ -41,12 +41,13 @@ def test_backend_call_shapes_bind(name, n_args):
 
 
 def test_public_functions_come_from_real_modules():
-    # 2차(#74): 음성 함수 3개는 voice.py, 3차(#92): generate_report는 report.py, 카메라 2개는 아직 placeholders.py
+    # 2차(#74): 음성 함수 3개는 voice.py, 3차(#92): generate_report는 report.py, 4차(#108): 카메라 2개는 camera.py
     for name in ("synthesize_question", "start_transcription", "get_transcription_result"):
         assert getattr(interview, name).__module__ == "interview.voice"
     assert interview.generate_report.__module__ == "interview.report"
     for name in ("analyze_face", "compute_baseline"):
-        assert getattr(interview, name).__module__ == "interview.placeholders"
+        assert getattr(interview, name).__module__ == "interview.camera"
+    assert not (PACKAGE_DIR / "placeholders.py").exists()  # 임시 구현은 모두 바뀌었다
 
 
 def test_import_without_boto3():
@@ -58,6 +59,7 @@ def test_import_without_boto3():
         "sys.modules['strands'] = None\n"
         "import interview\n"
         "assert interview.synthesize_question('질문입니다') is None\n"  # boto3가 없으면 음성 없이 진행
+        "assert interview.analyze_face(b'img')['reason'] == 'ANALYSIS_FAILED'\n"  # 카메라 캡처만 빼고 진행
         "print('ok')\n"
     )
     env = {k: v for k, v in os.environ.items() if k != "MODEL_ID"}

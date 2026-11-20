@@ -41,7 +41,7 @@ def test_start_initial_session():
     assert session["sessionId"] == SESSION_ID
     assert session["currentIndex"] == 0 and session["followUpUsed"] is False
     assert session["answers"] == [] and session["baseline"] is None
-    assert session["scoringVersion"] == "v1.0"
+    assert session["scoringVersion"] == "v2.0"
     assert session["modelId"] == "test-model"
     assert session["promptVersion"] == "A-v2/B-v1"
     assert [q["questionId"] for q in session["questions"]] == ["q1", "q2", "q3"]
