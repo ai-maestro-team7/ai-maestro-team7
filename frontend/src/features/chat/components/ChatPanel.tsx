@@ -114,7 +114,7 @@ function Launcher({ guest }: { guest: boolean }) {
         )}
       </div>
       {guest ? (
-        <p className="text-small text-grey-600">
+        <p className="text-halo text-small text-grey-700">
           로그인하면 바로 대화를 시작할 수 있어요.{" "}
           <Link href={loginHref("/")} className="font-medium text-blue-500 hover:underline">
             로그인
@@ -123,13 +123,13 @@ function Launcher({ guest }: { guest: boolean }) {
       ) : (
         <Link
           href={chatHref()}
-          className="group flex items-center gap-0.5 text-small font-medium text-grey-600 transition-colors hover:text-grey-900"
+          className="text-halo group flex items-center gap-0.5 text-small font-medium text-grey-700 transition-colors hover:text-grey-900"
         >
           지난 대화 보기
           <ChevronRight aria-hidden className="size-3.5 transition-transform group-hover:translate-x-0.5" strokeWidth={2.2} />
         </Link>
       )}
-      <p className="max-w-150 text-center text-small text-grey-500">
+      <p className="text-halo max-w-150 text-center text-small text-grey-600">
         공고·정책은 공식 데이터(고용24·잡알리오·온통청년)에서 먼저 찾고, 없으면 팀이 넣어 둔 데이터에서 찾아 따로 표시해요.
         이력서·자기소개서 PDF는 클립 버튼으로 고르거나 입력칸에 끌어다 놓을 수 있어요 (10MB 이하). 적합도는 실제 합격 확률이
         아닙니다.
