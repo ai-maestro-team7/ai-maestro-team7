@@ -40,11 +40,12 @@ def test_backend_call_shapes_bind(name, n_args):
     sig.bind(*range(n_args))  # TypeError면 백엔드 호출이 깨진다
 
 
-def test_voice_functions_are_real_implementations():
-    # 2차(#74): 음성 함수 3개는 voice.py, 카메라·리포트 3개는 아직 placeholders.py
+def test_public_functions_come_from_real_modules():
+    # 2차(#74): 음성 함수 3개는 voice.py, 3차(#92): generate_report는 report.py, 카메라 2개는 아직 placeholders.py
     for name in ("synthesize_question", "start_transcription", "get_transcription_result"):
         assert getattr(interview, name).__module__ == "interview.voice"
-    for name in ("analyze_face", "compute_baseline", "generate_report"):
+    assert interview.generate_report.__module__ == "interview.report"
+    for name in ("analyze_face", "compute_baseline"):
         assert getattr(interview, name).__module__ == "interview.placeholders"
 
 

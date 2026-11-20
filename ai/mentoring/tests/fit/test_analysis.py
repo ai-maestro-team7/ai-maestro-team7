@@ -247,6 +247,21 @@ def test_idempotency_and_workspace_link():
     assert item["GSI1SK"].startswith("ANALYSIS#") and item["GSI1SK"].endswith(first[1]["analysisId"])
 
 
+def test_idempotency_replays_omitted_profile_version_after_profile_update():
+    deps = fit_deps()
+    body = {"profileId": "profile-1", "jobPostingId": "job-demo-busan-001"}
+    headers = {"Idempotency-Key": "fit-latest-profile"}
+    first = call(deps, "POST", "/analyses", body, headers=headers)
+    assert first[0] == 202
+
+    current = deps.users.get_profile_version(USER, "profile-1", 1)
+    updated = current.model_copy(update={"profile_version": 2, "based_on_version": 1})
+    deps.users.put_profile_version(updated, expected_version=1)
+
+    assert call(deps, "POST", "/analyses", body, headers=headers) == first
+    stored = deps.analyses.get_analysis(USER, first[1]["analysisId"])
+    assert stored.profile_version == 1
+
 def test_analyses_are_501_without_store():
     deps = fit_deps()
     deps.analyses = None

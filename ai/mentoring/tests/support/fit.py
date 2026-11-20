@@ -87,7 +87,6 @@ class FakeNcs:
         return [BasicSkill(skill_id="003", name="의사소통능력", ability_id=1, sub_area_id=3, sub_area_name="경청능력"),
                 BasicSkill(skill_id="010", name="문제해결능력", ability_id=3, sub_area_id=1, sub_area_name="사고력")]
 
-
 @dataclass
 class Hit:
     document_id: str

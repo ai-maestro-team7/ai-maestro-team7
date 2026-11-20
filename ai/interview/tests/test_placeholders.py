@@ -4,11 +4,12 @@ import interview
 from interview import placeholders
 
 
-def test_only_camera_and_report_remain():
-    # 음성 함수 3개는 2차에서 voice.py로 옮겼다 (#74)
-    for name in ("synthesize_question", "start_transcription", "get_transcription_result", "_s3_client"):
+def test_only_camera_functions_remain():
+    # 음성 함수 3개는 2차(voice.py, #74), generate_report는 3차(report.py, #92)로 옮겼다
+    for name in ("synthesize_question", "start_transcription", "get_transcription_result", "_s3_client",
+                 "generate_report"):
         assert not hasattr(placeholders, name)
-    for name in ("analyze_face", "compute_baseline", "generate_report"):
+    for name in ("analyze_face", "compute_baseline"):
         assert getattr(interview, name) is getattr(placeholders, name)
 
 
@@ -29,10 +30,4 @@ def test_compute_baseline_threshold(n_valid, expect_none):
         assert set(baseline) == {"gaze", "head"}
 
 
-def test_generate_report_shape():
-    session = {"job": "데이터 분석", "interviewType": "MIXED",
-               "answers": [{"evaluable": True}, {"evaluable": False}, {"evaluable": True}]}
-    report = interview.generate_report(session, [{}, {}])
-    assert report["evaluatedBaseQuestions"] == 2
-    assert report["frameCount"] == 2
-    assert report["totalScore"] is None and report["scoringVersion"] == "stub"
+

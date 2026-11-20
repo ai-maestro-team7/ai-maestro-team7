@@ -114,24 +114,27 @@ def create_analysis(deps, user_id: str, request: AnalysisRequest, idempotency_ke
     if request.target_ncs_code is not None and not _NCS_CODE.match(request.target_ncs_code):
         raise invalid_input("NCS 직무 코드 형식이 올바르지 않아요.", field="targetNcsCode")
 
-    profile = _load_profile(deps, user_id, request.profile_id, request.profile_version)
-    latest = None
-    if request.job_posting_id:
-        catalog = _require(deps.catalog, "catalog")
-        raw = catalog.get_latest(request.job_posting_id)
-        if raw is None:
-            raise not_found("공고를 찾을 수 없어요.")
-        latest = PostingLatestView.model_validate(raw)
-    if request.target_ncs_code:
-        ncs = _require(deps.ncs, "ncs")
-        if ncs.get_job_profile(request.target_ncs_code) is None:  # UT-09
-            raise invalid_input("NCS 직무 코드를 찾을 수 없어요.", field="targetNcsCode")
-
-    payload = {"profileId": profile.profile_id, "profileVersion": profile.profile_version,
+    # 멱등 해시는 사용자가 보낸 값 그대로 만든다. 생략한 profileVersion을 현재 최신
+    # 버전으로 바꾸면 프로필 갱신 뒤 같은 키를 재시도할 때 다른 요청으로 오인한다.
+    payload = {"profileId": request.profile_id, "profileVersion": request.profile_version,
                "jobPostingId": request.job_posting_id, "targetNcsCode": request.target_ncs_code,
                "workspaceId": request.workspace_id}
 
     def create() -> dict:
+        # 최신 버전과 공고 스냅샷은 이 멱등 요청을 처음 만들 때만 고정한다.
+        # REPLAY는 이 콜백을 실행하지 않고 처음 생성한 ID를 그대로 반환한다.
+        profile = _load_profile(deps, user_id, request.profile_id, request.profile_version)
+        latest = None
+        if request.job_posting_id:
+            catalog = _require(deps.catalog, "catalog")
+            raw = catalog.get_latest(request.job_posting_id)
+            if raw is None:
+                raise not_found("공고를 찾을 수 없어요.")
+            latest = PostingLatestView.model_validate(raw)
+        if request.target_ncs_code:
+            ncs = _require(deps.ncs, "ncs")
+            if ncs.get_job_profile(request.target_ncs_code) is None:  # UT-09
+                raise invalid_input("NCS 직무 코드를 찾을 수 없어요.", field="targetNcsCode")
         now = deps.now_iso()
         analysis_id = deps.new_id("analysis")
         task_id = f"task-{analysis_id}-fit"

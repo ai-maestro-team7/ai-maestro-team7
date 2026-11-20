@@ -11,8 +11,10 @@ import pytest
 
 import interview
 from conftest import sample_json, sample_text
-from fakes import FakeLLM, FakePolly, FakeS3, FakeTranscribe
+from fakes import FakeLLM, FakePolly, FakeS3, FakeToolLLM, FakeTranscribe
+from interview import llm as interview_llm
 from interview import voice
+from interview.content import RUBRIC_KEYS
 from interview.models import Session
 
 RESUME = sample_text("resume_data_analysis.txt")
@@ -59,6 +61,22 @@ def aws(monkeypatch):
     monkeypatch.setattr(voice, "_polly_client", lambda: fake.polly)
     monkeypatch.setattr(voice, "_transcribe_client", lambda: fake.transcribe)
     monkeypatch.setattr(voice, "_s3_client", lambda: fake.s3)
+    return fake
+
+
+def _c1(qtype, score=4):
+    return json.dumps({"items": [{"key": k, "score": score, "evidenceType": "missing", "evidence": "빠진 요소"}
+                                 for k in RUBRIC_KEYS[qtype]]}, ensure_ascii=False)
+
+
+@pytest.fixture
+def report_llm(monkeypatch):
+    """백엔드는 generate_report(session, frames)로만 부른다. 기본 LLM 클라이언트를 가짜로 바꾼다 (C-1 3번 + C-2 1번)."""
+    fake = FakeToolLLM([sample_text("llm/c2_feedback_ok.json")],
+                       tool_calls=[("get_confirmed_scores", {"question_id": "q1"}),
+                                   ("get_answer_text", {"question_id": "q1"})],
+                       responses=[_c1("experience"), _c1("knowledge"), _c1("situation")])
+    monkeypatch.setattr(interview_llm, "default_client", lambda: fake)
     return fake
 
 
@@ -109,12 +127,14 @@ def run_interview(aws, follow_up_responses, calibration_images, profile=PROFILE)
     answer_frames = [{k: f.get(k) for k in ("type", "questionId", "answerId", "capturedAt", "accepted", "valid",
                                             "gaze", "head", "eyesOpen")} for f in frames if f["type"] == "ANSWER"]
     report = interview.generate_report(session, answer_frames)
+    report.setdefault("interviewDate", "2026-11-21")  # 백엔드 make_report와 같이
+    report = store(report)  # INTERVIEW#{ivId}#REPORT에 저장했다가 다시 연 값
     session = store(session)
     assert llm.responses == []
     return actions, session, report, answer_frames
 
 
-def test_backend_flow_with_follow_up_and_baseline(aws):
+def test_backend_flow_with_follow_up_and_baseline(aws, report_llm):
     responses = [sample_text("llm/follow_up_needed.json"), sample_text("llm/follow_up_sufficient.json"),
                  sample_text("llm/follow_up_sufficient.json")]
     actions, session, report, answer_frames = run_interview(aws, responses, [b"\xff\xd8a", b"\xff\xd8b", b"\xff\xd8c"])
@@ -132,15 +152,24 @@ def test_backend_flow_with_follow_up_and_baseline(aws):
     assert session["baseline"] == {"gaze": {"yaw": 0, "pitch": 0}, "head": {"yaw": 0, "pitch": 0}}  # 0.0 → 0
     assert session["profile"]["profileVersion"] == 2
     Session.model_validate(session)  # 저장·조회와 기준값 추가 뒤에도 Session 형식 그대로
-    assert report["evaluatedBaseQuestions"] == 4 and report["frameCount"] == len(answer_frames) == 4
+    assert len(answer_frames) == 4
     assert all(f["eyesOpen"] == {"value": True, "confidence": 98.5} for f in answer_frames)
+    # 리포트: 기준값이 있어도 3차는 태도 미측정 (임시 카메라 값으로 점수를 만들지 않는다)
+    assert report["evaluatedBaseQuestions"] == 3 and report["interviewDate"] == "2026-11-21"
+    assert report["areas"]["attitude"] == {"score": None, "notMeasuredReason": "ATTITUDE_NOT_READY"}
+    assert report["areas"]["content"]["score"] == 80 and isinstance(report["totalScore"], int)
+    assert report["weightBasis"] == "내용 70% · 전달력 30% 기준"
+    assert report["questions"][0]["followUp"]["question"]  # 꼬리질문 묶음
+    assert [q["contentScore"] for q in report["questions"]] == [80, 80, 80]
+    assert len(report_llm.calls) == 3 and len(report_llm.runs) == 1  # C-1 묶음 3개 + C-2 에이전트 1번
 
 
-def test_backend_flow_baseline_none_with_few_calibration_frames(aws):
+def test_backend_flow_baseline_none_with_few_calibration_frames(aws, report_llm):
     sufficient = sample_text("llm/follow_up_sufficient.json")
     actions, session, report, _ = run_interview(aws, [sufficient] * 3, [b"\xff\xd8a", b""], profile=None)
     assert actions == ["NEXT_QUESTION", "NEXT_QUESTION", "REPORT"]
     assert session["baseline"] is None  # 유효 3장 미만 → 태도 미측정, 대체값 없음
     assert session["profile"] is None
     Session.model_validate(session)
-    assert report["totalScore"] is None
+    assert report["areas"]["attitude"]["notMeasuredReason"] == "ATTITUDE_NOT_READY"
+    assert report["questions"][0]["followUp"] is None

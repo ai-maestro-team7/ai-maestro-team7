@@ -278,6 +278,141 @@ def test_strands_other_errors_stay_aws_service_error(monkeypatch, reset_model, f
     assert len(fake_strands["prompts"]) == 1
 
 
+# ---------------------------------------------------------------- 툴 사용 에이전트 (피드백 C-2)
+
+
+@pytest.fixture
+def fake_tool_strands(monkeypatch):
+    record = {"models": [], "agents": [], "calls": [], "wrapped": []}
+
+    class BedrockModel:
+        def __init__(self, **kwargs):
+            record["models"].append(kwargs)
+
+    class Result:
+        stop_reason = "end_turn"
+
+        def __str__(self):
+            return '{"value": 5}'
+
+    class Agent:
+        def __init__(self, **kwargs):
+            record["agents"].append(kwargs)
+
+        def __call__(self, prompt, **kwargs):
+            record["calls"].append({"prompt": prompt, **kwargs})
+            return Result()
+
+    def tool(fn):
+        record["wrapped"].append(fn.__name__)
+        return ("wrapped", fn)
+
+    strands = types.ModuleType("strands")
+    strands.Agent, strands.tool = Agent, tool
+    models = types.ModuleType("strands.models")
+    models.BedrockModel = BedrockModel
+    strands.models = models
+    monkeypatch.setitem(sys.modules, "strands", strands)
+    monkeypatch.setitem(sys.modules, "strands.models", models)
+    return record
+
+
+def _a_tool(question_id: str) -> dict:
+    """테스트용 툴."""
+    return {"questionId": question_id}
+
+
+def test_run_with_tools_passes_tools_limits_and_feedback_max_tokens(monkeypatch, reset_model, fake_tool_strands):
+    monkeypatch.setenv("MODEL_ID", "global.anthropic.claude-haiku-5-5")
+    monkeypatch.delenv("INTERVIEW_MAX_TOKENS", raising=False)
+    monkeypatch.delenv("INTERVIEW_FEEDBACK_MAX_TOKENS", raising=False)
+    client = llm.StrandsLLMClient()
+    out = client.run_with_tools(system_prompt="S", user_prompt="U", tools=[_a_tool], limits={"turns": 6})
+    assert out == '{"value": 5}'
+    assert fake_tool_strands["wrapped"] == ["_a_tool"]
+    agent = fake_tool_strands["agents"][0]
+    assert agent["tools"] == [("wrapped", _a_tool)] and agent["callback_handler"] is None
+    assert fake_tool_strands["calls"] == [{"prompt": "U", "limits": {"turns": 6}}]
+    # 피드백은 2048, 다른 호출은 1024로 모델을 따로 만든다. 생각 끄기는 둘 다
+    client.complete(system_prompt="S", user_prompt="U")
+    assert [m["max_tokens"] for m in fake_tool_strands["models"]] == [2048, 1024]
+    assert all(m["additional_request_fields"] == {"thinking": {"type": "disabled"}} for m in fake_tool_strands["models"])
+
+
+def test_run_with_tools_max_tokens_becomes_output_truncated(monkeypatch, reset_model, fake_tool_strands):
+    monkeypatch.setenv("MODEL_ID", "test-model")
+
+    def boom(self, prompt, **kwargs):
+        raise MaxTokensReachedException("max")
+
+    monkeypatch.setattr(sys.modules["strands"].Agent, "__call__", boom)
+    with pytest.raises(llm.OutputTruncated):
+        llm.StrandsLLMClient().run_with_tools(system_prompt="S", user_prompt="U", tools=[], limits={})
+
+
+def test_call_json_with_tools_retry_and_check():
+    class FakeTools:
+        def __init__(self, outputs):
+            self.outputs, self.seen = list(outputs), []
+
+        def run_with_tools(self, **kwargs):
+            self.seen.append(kwargs)
+            return self.outputs.pop(0)
+
+    def check(parsed):
+        if parsed.value != 2:
+            raise ValueError("not 2")
+
+    fake = FakeTools(['{"value": 1}', '{"value": 2}'])
+    out = llm.call_json_with_tools(fake, system_prompt="S", user_prompt="U", tools=[_a_tool], limits={"turns": 1},
+                                   schema=Out, stage="t", check=check)
+    assert out.value == 2 and len(fake.seen) == 2
+    assert fake.seen[0]["tools"] == [_a_tool] and fake.seen[0]["limits"] == {"turns": 1}
+    with pytest.raises(InterviewError) as exc:
+        llm.call_json_with_tools(FakeTools(['{"value": 1}', '{"value": 1}']), system_prompt="S", user_prompt="U",
+                                 tools=[], limits={}, schema=Out, stage="t", check=check)
+    assert exc.value.code == AI_OUTPUT_INVALID
+
+
+def test_call_json_with_tools_before_attempt_runs_each_attempt():
+    seen = []
+
+    class FakeTools:
+        def __init__(self):
+            self.outputs = ['not json', '{"value": 3}']
+
+        def run_with_tools(self, **kwargs):
+            seen.append("run")
+            return self.outputs.pop(0)
+
+    out = llm.call_json_with_tools(FakeTools(), system_prompt="S", user_prompt="U", tools=[], limits={},
+                                   schema=Out, stage="t", before_attempt=lambda: seen.append("reset"))
+    assert out.value == 3 and seen == ["reset", "run", "reset", "run"]
+
+
+def test_real_strands_tool_wraps_feedback_tools():
+    # 설치된 strands가 우리 툴(타입 힌트 + docstring)을 툴로 감쌀 수 있는지. 네트워크 없음
+    strands = pytest.importorskip("strands")
+    from interview import feedback
+
+    usage = feedback.ToolUsage(12)
+
+    class _Ctx:  # 툴 정의만 확인하므로 데이터는 쓰지 않는다
+        question_ids = ["q1"]
+        resume_text = ""
+
+        def bundle(self, question_id):
+            return None
+
+    names = []
+    for fn in feedback.make_feedback_tools(_Ctx(), usage):
+        wrapped = strands.tool(fn)
+        spec = wrapped.tool_spec
+        names.append(spec["name"])
+        assert spec["description"] and "question_id" in json.dumps(spec["inputSchema"]) or spec["name"] == "find_resume_passages"
+    assert sorted(names) == ["find_resume_passages", "get_answer_text", "get_confirmed_scores", "get_delivery_metrics"]
+
+
 def test_strands_client_without_model_id(monkeypatch, reset_model, fake_strands):
     monkeypatch.delenv("MODEL_ID", raising=False)
     with pytest.raises(InterviewError) as exc:

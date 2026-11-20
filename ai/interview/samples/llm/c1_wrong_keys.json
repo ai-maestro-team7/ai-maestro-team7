@@ -1,0 +1,6 @@
+{"items": [
+  {"key": "accuracy", "score": 4, "evidenceType": "missing", "evidence": "지식 질문 항목을 잘못 씀"},
+  {"key": "relevance", "score": 4, "evidenceType": "missing", "evidence": "질문에 답함"},
+  {"key": "logic", "score": 3, "evidenceType": "missing", "evidence": "근거가 약함"},
+  {"key": "support", "score": 3, "evidenceType": "missing", "evidence": "예시 없음"}
+]}
