@@ -7,7 +7,7 @@
   },
   "extraction": {
     "promptVersion": "profile-extract-v2",
-    "maxTokens": 4096,
+    "maxTokens": 16000,
     "schemaRetries": 1,
     "factRetries": 1,
     "maxCandidateUnits": 45,
@@ -50,7 +50,7 @@
   },
   "review": {
     "promptVersion": "review-v1",
-    "maxTokens": 4096,
+    "maxTokens": 16000,
     "schemaRetries": 1,
     "textMinChars": 50,
     "textMaxChars": 10000,
