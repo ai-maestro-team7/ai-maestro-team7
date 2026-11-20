@@ -36,6 +36,15 @@ THINKING_OFF_BY_MODEL: tuple[tuple[str, dict], ...] = (
 )
 
 
+# 음성 (voice design §4·§5, C §11: Polly Seoyeon·Transcribe 한국어 확인됨)
+LANGUAGE_CODE = "ko-KR"
+POLLY_VOICE_ID = "Seoyeon"
+POLLY_ENGINE = "neural"  # 수동 테스트에서 실패하거나 어색하면 "standard" (voice design §15-4)
+POLLY_OUTPUT_FORMAT = "mp3"
+# Transcribe StartTranscriptionJob MediaFormat 허용 값
+MEDIA_FORMATS = frozenset({"mp3", "mp4", "m4a", "wav", "flac", "ogg", "amr", "webm"})
+
+
 def model_id() -> str:
     value = os.environ.get("MODEL_ID", "").strip()
     if not value:
