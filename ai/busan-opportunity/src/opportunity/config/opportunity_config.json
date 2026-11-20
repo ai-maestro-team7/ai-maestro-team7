@@ -92,6 +92,9 @@
     "maxTokens": 700,
     "maxQuestionChars": 300
   },
+  "companies": {
+    "limit": 12
+  },
   "data": {
     "staleAfterHours": 36,
     "busanSido": "26",

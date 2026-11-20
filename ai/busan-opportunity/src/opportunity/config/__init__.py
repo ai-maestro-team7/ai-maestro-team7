@@ -175,6 +175,10 @@ class AskConfig(OppModel):
     max_question_chars: int = 300
 
 
+class CompaniesConfig(OppModel):
+    limit: int = 12
+
+
 class DataConfig(OppModel):
     stale_after_hours: int
     busan_sido: str
@@ -197,6 +201,7 @@ class OpportunityConfig(OppModel):
     agent: AgentConfig = Field(default_factory=AgentConfig)
     local_life: LocalLifeConfig = Field(default_factory=LocalLifeConfig)
     ask: AskConfig = Field(default_factory=AskConfig)
+    companies: CompaniesConfig = Field(default_factory=CompaniesConfig)
     data: DataConfig
 
 

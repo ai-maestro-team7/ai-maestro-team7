@@ -39,6 +39,8 @@ SIMULATED = "시뮬레이션"
 SAMPLE_DATA = "데모 데이터"
 
 LOCAL_LIFE_TITLE = "이 동네에서 일하면"
+COMPANIES_BASIS = "부산시가 선정한 청끌기업 가운데 희망 직무와 업종이 가까운 곳이에요"
+COMPANIES_NOTICE = "지금 채용 중인지는 회사 채용 페이지에서 확인해 주세요"
 ASK_NOT_FOUND = "원문에서 확인되지 않아요. 공고문이나 담당 기관에 확인해 주세요"
 ASK_UNAVAILABLE = "지금은 답을 만들지 못했어요. 아래 정책 원문을 확인해 주세요"
 COMMUTE_LABEL = "대중교통 약 {minutes}분 (사는 구청에서 근무지 구청까지)"  # 집 주소가 아니라 구청 사이 시간이다

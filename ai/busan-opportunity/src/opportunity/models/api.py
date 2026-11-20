@@ -393,3 +393,27 @@ class AskResponse(OppModel):
     manual_checks: list[str] = Field(default_factory=list)             # 직접 확인할 조건
     notice: str | None = None
     data_as_of: str | None = None
+
+
+# ---------------------------------------------------------------- 부산 기업 둘러보기 (B-D01)
+class CompanyCard(OppModel):
+    """회사 정보만 보여 준다. 채용 여부·직무·급여를 지어내지 않는다 (DECISIONS.md B-D01)."""
+
+    company_id: str
+    name: str
+    industry: str | None = None
+    size: str | None = None
+    district: str | None = None        # 소재 구·군 (원문)
+    main_product: str | None = None
+    badges: list[Badge] = Field(default_factory=list)  # 출처·기준일이 있는 것만
+    open_postings: int = 0             # 지금 우리 데이터에 있는 이 회사의 진행 중 공고 수
+    facts: list[str] = Field(default_factory=list)
+    source: str
+    as_of: str
+
+
+class CompaniesResponse(OppModel):
+    items: list[CompanyCard] = Field(default_factory=list)
+    basis: str          # 어떤 기준으로 골랐는지 (화면에 보여 준다)
+    notice: str | None = None  # "채용 여부는 회사 채용 페이지에서 확인하세요"
+    data_as_of: str | None = None
