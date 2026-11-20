@@ -162,9 +162,14 @@ def load_resume_text(user_id, document_id):
     if "#" in document_id:
         raise TeamError(400, "INVALID_INPUT", "documentId 형식이 올바르지 않아요.")
     doc = table().get_item(Key={"PK": pk(user_id), "SK": f"DOC_LATEST#{document_id}"}).get("Item")  # 최신 버전 사본
-    if not doc or not doc.get("extractedTextKey"):
+    key = (doc or {}).get("extractedTextKey")
+    if doc and not key and doc.get("latestVersion"):
+        # A는 정규화 텍스트 키를 문서 버전(DOC#{id}#V#{n})의 textKey에 둔다 (db-schema v1.4)
+        version = table().get_item(Key={"PK": pk(user_id), "SK": f"DOC#{document_id}#V#{int(doc['latestVersion']):04d}"}).get("Item")
+        key = (version or {}).get("textKey")
+    if not doc or not key:
         raise TeamError(404, "DOCUMENT_NOT_FOUND", "자소서 문서를 찾을 수 없거나 아직 글자 추출이 끝나지 않았어요.")
-    obj = s3().get_object(Bucket=DOCS_BUCKET, Key=doc["extractedTextKey"])
+    obj = s3().get_object(Bucket=DOCS_BUCKET, Key=key)
     return obj["Body"].read().decode("utf-8")
 
 
