@@ -9,7 +9,8 @@ import { Breadcrumb } from "@/components/ui/Breadcrumb";
 import { Button } from "@/components/ui/Button";
 import { DetailSection, DotList, LabeledValue } from "@/components/ui/DetailSection";
 import { Panel } from "@/components/ui/Panel";
-import { ApiErrorNotice, ApiLoading } from "@/features/auth/components/ApiFallback";
+import { PageSkeleton } from "@/components/ui/Skeleton";
+import { ApiErrorNotice } from "@/features/auth/components/ApiFallback";
 import { useUsername } from "@/features/auth/useUsername";
 import { policyDetailHref } from "@/features/policies/lib";
 import { cn } from "@/lib/cn";
@@ -52,7 +53,7 @@ export function JobDetail() {
   }, [title]);
 
   if (!id) return <NotFound />;
-  if (state.status === "loading") return <ApiLoading className="py-24" label="공고를 불러오는 중" />;
+  if (state.status === "loading") return <PageSkeleton label="공고를 불러오는 중" />;
   if (state.status === "error") {
     return state.error.status === 404 ? <NotFound /> : <ApiErrorNotice error={state.error} onRetry={reload} />;
   }

@@ -1,12 +1,12 @@
 "use client";
 
-import { ApiErrorNotice, ApiLoading } from "@/features/auth/components/ApiFallback";
+import { ApiErrorNotice } from "@/features/auth/components/ApiFallback";
 import { useUsername } from "@/features/auth/useUsername";
 import { useApi } from "@/lib/useApi";
 import { fetchFeed } from "../data";
 import { asOfDate, SORT_LABELS } from "../lib";
 import type { FeedResponse } from "../types";
-import { JobTable } from "./JobTable";
+import { JobTable, JobTableSkeleton } from "./JobTable";
 
 const HOME_COUNT = 3;
 
@@ -17,7 +17,7 @@ export function RecommendedJobs() {
     fetchFeed({ sort: "BUSAN_FIRST", region: "ALL", limit: HOME_COUNT }),
   );
 
-  if (state.status === "loading") return <ApiLoading />;
+  if (state.status === "loading") return <JobTableSkeleton rows={HOME_COUNT} />;
   if (state.status === "error") return <ApiErrorNotice error={state.error} onRetry={reload} />;
   return (
     <>

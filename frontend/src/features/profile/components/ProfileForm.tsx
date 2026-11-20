@@ -2,12 +2,13 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, type ReactNode, useState } from "react";
-import { ApiErrorNotice, ApiLoading } from "@/features/auth/components/ApiFallback";
+import { ApiErrorNotice } from "@/features/auth/components/ApiFallback";
 import { safeNextPath } from "@/features/auth/lib";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { Field, fieldA11y } from "@/components/ui/Field";
 import { TextField } from "@/components/ui/TextField";
+import { PageSkeleton } from "@/components/ui/Skeleton";
 import { ApiError, getMyProfile, saveMyProfile } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { useApi } from "@/lib/useApi";
@@ -115,7 +116,7 @@ function toForm(profile: BasicProfile | null): FormState {
 export function ProfileForm() {
   const [loaded, reload] = useApi("me-profile", getMyProfile);
 
-  if (loaded.status === "loading") return <ApiLoading />;
+  if (loaded.status === "loading") return <PageSkeleton label="프로필을 불러오는 중" sections={2} />;
   if (loaded.status === "error") return <ApiErrorNotice error={loaded.error} onRetry={reload} />;
   return <ProfileFields profile={loaded.data} />;
 }

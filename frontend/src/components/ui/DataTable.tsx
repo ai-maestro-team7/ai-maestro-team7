@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
+import { Skeleton, SkeletonGroup } from "./Skeleton";
 
 export type Column = {
   key: string;
@@ -18,18 +19,24 @@ export function DataTable({
   columns,
   label,
   minWidthClassName = "min-w-240",
+  headerClassName,
   children,
 }: {
   columns: Column[];
   label: string;
   minWidthClassName?: string;
+  /** 머리줄에 더할 클래스 (예: 행과 같은 좌우 여백 "px-4") */
+  headerClassName?: string;
   children: ReactNode;
 }) {
   return (
     <div className="w-full overflow-x-auto">
       <div role="table" aria-label={label} className={cn("w-full border-t border-grey-800", minWidthClassName)}>
         <div role="rowgroup">
-          <div role="row" className="flex items-center gap-4 border-b border-grey-200 bg-grey-50 py-2.5">
+          <div
+            role="row"
+            className={cn("flex items-center gap-4 border-b border-grey-200 bg-grey-50 py-2.5", headerClassName)}
+          >
             {columns.map((column) => (
               <div
                 key={column.key}
@@ -64,5 +71,56 @@ export function TableCell({ className, children }: { className?: string; childre
     <div role="cell" className={cn(className ?? "min-w-0 flex-1")}>
       {children}
     </div>
+  );
+}
+
+/**
+ * 표를 불러오는 동안 보여주는 자리. 실제 표와 같은 열 폭과 머리줄을 쓰고, 셀마다 회색 막대 두 줄을 둔다.
+ * 아이콘 열(`srOnly`)은 작은 네모 하나만 둔다.
+ */
+export function DataTableSkeleton({
+  columns,
+  label,
+  rows = 3,
+  minWidthClassName,
+  headerClassName,
+  rowClassName = "py-4",
+}: {
+  columns: Column[];
+  label: string;
+  rows?: number;
+  minWidthClassName?: string;
+  headerClassName?: string;
+  rowClassName?: string;
+}) {
+  return (
+    <SkeletonGroup label={label}>
+      {/* 빈 표가 읽히지 않게 표 전체를 숨기고 label만 읽힌다 */}
+      <div aria-hidden>
+        <DataTable
+        columns={columns}
+        label={label}
+        minWidthClassName={minWidthClassName}
+        headerClassName={headerClassName}
+      >
+        {Array.from({ length: rows }, (_, row) => (
+          <TableRow key={row} className={rowClassName}>
+            {columns.map((column) => (
+              <TableCell key={column.key} className={cn(column.className, "flex flex-col gap-1.5")}>
+                {column.srOnly ? (
+                  <Skeleton className="size-4" />
+                ) : (
+                  <>
+                    <Skeleton className="h-4 w-4/5" />
+                    <Skeleton className="h-3 w-1/2" />
+                  </>
+                )}
+              </TableCell>
+            ))}
+          </TableRow>
+        ))}
+        </DataTable>
+      </div>
+    </SkeletonGroup>
   );
 }

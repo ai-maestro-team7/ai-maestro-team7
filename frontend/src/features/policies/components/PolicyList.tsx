@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
-import { ApiErrorNotice, ApiLoading } from "@/features/auth/components/ApiFallback";
+import { ApiErrorNotice } from "@/features/auth/components/ApiFallback";
 import { useUsername } from "@/features/auth/useUsername";
 import { formatDateTime } from "@/lib/format";
 import { useApi } from "@/lib/useApi";
 import { fetchPolicies } from "../data";
 import { POLICY_BUCKETS } from "../lib";
 import type { PolicyBucket, PolicyWalletResponse } from "../types";
-import { PolicyTable } from "./PolicyTable";
+import { PolicyTable, PolicyTableSkeleton } from "./PolicyTable";
 
 /** 한 번에 보여주는 정책 수. 정책은 한 번에 다 받아 오고 화면에서만 나눠 보여준다. */
 const PAGE = 20;
@@ -22,7 +22,7 @@ export function PolicyList() {
   const [bucket, setBucket] = useState<PolicyBucket>("OPEN_NOW");
   const [shown, setShown] = useState(PAGE);
 
-  if (state.status === "loading") return <ApiLoading className="py-24" label="정책을 불러오는 중" />;
+  if (state.status === "loading") return <PolicyTableSkeleton rows={6} />;
   if (state.status === "error") return <ApiErrorNotice error={state.error} onRetry={reload} />;
 
   const wallet = state.data;
