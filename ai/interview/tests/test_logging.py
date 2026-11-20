@@ -16,6 +16,7 @@ PROFILE = sample_json("profile_data_analysis.json")
 QUESTIONS = sample_json("llm/questions_ok.json")["questions"]
 ANSWER_TEXT = sample_json("answers/normal_q1.json")["transcription"]["text"]
 FOLLOW_UP_TEXT = sample_json("llm/follow_up_needed.json")["followUpQuestions"][0]
+JOB_POSTING = sample_json("job_posting_data_analysis.json")
 
 SECRETS = [
     "공공데이터 포털의 관광지 입장객 통계",  # 자소서
@@ -24,6 +25,9 @@ SECRETS = [
     QUESTIONS[0]["question"],                # 질문
     FOLLOW_UP_TEXT,                          # 꼬리질문
     "실무 데이터 파이프라인 경험",            # profile
+    "관광 통계 데이터 정제와 대시보드 운영",  # 채용공고 본문 (#158)
+    JOB_POSTING["title"],                    # 채용공고 제목
+    JOB_POSTING["company"],                  # 채용공고 회사
 ]
 
 
@@ -73,6 +77,28 @@ def test_failure_paths_have_no_raw_text(caplog):
     assert_clean(caplog.text)
     assert_clean(str(exc.value))
     assert_clean(repr(exc.value))
+
+
+def test_job_posting_paths_have_no_raw_text(caplog, capsys):
+    # #158: 공고가 있는 시작, 잘못된 공고(검사 함수·시작 함수), 변환 함수 모두 원문을 남기지 않는다
+    too_long = dict(JOB_POSTING, text=JOB_POSTING["text"] * 40)  # 4,000자 넘음
+    with caplog.at_level(logging.DEBUG):
+        interview.start_interview("iv-1", "데이터 분석", RESUME, "MIXED", True, PROFILE, JOB_POSTING,
+                                  llm=FakeLLM([sample_text("llm/questions_ok.json")]))
+        for call in (lambda: interview.normalize_job_posting(too_long),
+                     lambda: interview.start_interview("iv-1", "데이터 분석", RESUME, "MIXED", True, PROFILE, too_long,
+                                                       llm=FakeLLM([]))):
+            with pytest.raises(interview.InterviewError) as exc:
+                call()
+            assert_clean(str(exc.value))
+            assert_clean(repr(exc.value))
+        interview.job_posting_from_posting({"title": JOB_POSTING["title"], "organization": JOB_POSTING["company"],
+                                            "jobDescription": JOB_POSTING["text"]})
+    assert "jobPosting=True" in caplog.text and "fields=text" in caplog.text
+    assert "fields=job_posting.text" in caplog.text  # 함수 인자로 넘기므로 Python 필드 이름
+    assert_clean(caplog.text)
+    captured = capsys.readouterr()
+    assert captured.out == "" and captured.err == ""
 
 
 def test_follow_up_fallback_logs_have_no_raw_text(caplog):

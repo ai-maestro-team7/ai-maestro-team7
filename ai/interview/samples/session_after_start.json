@@ -14,7 +14,7 @@
     },
     "scoringVersion": "v1.0",
     "modelId": "global.anthropic.claude-haiku-5-5",
-    "promptVersion": "A-v2/B-v2",
+    "promptVersion": "A-v3/B-v2",
     "questions": [
       {"questionId": "q1", "questionType": "experience", "question": "부산 관광 수요 분석 프로젝트에서 관광지 이름이 자료마다 달랐던 문제를 어떻게 해결했는지 설명해 주세요."},
       {"questionId": "q2", "questionType": "knowledge", "question": "서로 다른 출처의 데이터를 합칠 때 누락 값과 형식 차이를 처리하는 방법을 설명해 주세요."},

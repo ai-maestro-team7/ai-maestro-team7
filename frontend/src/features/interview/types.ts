@@ -91,9 +91,9 @@ export type InterviewStatusBody = {
   error?: InterviewError | null;
 };
 
+/** 자소서는 글(resumeText) 또는 저장된 A 문서(documentId) 가운데 하나 (`/start`, 개발계획서3 §5.2) */
 export type StartInterviewInput = {
   job: string;
-  resumeText: string;
   interviewType: InterviewType;
   cameraConsent: boolean;
-};
+} & ({ resumeText: string; documentId?: never } | { documentId: string; resumeText?: never });
