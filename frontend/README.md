@@ -4,7 +4,7 @@
 로그인(카카오·Google)과 채용 공고·청년 정책 화면(홈 요약 포함)은 B 부산 기회 추천 API(`/api/v1/opportunities/*`)에 연결했다.
 진단·첨삭·학습 로드맵은 `/api/v1/mentoring` API를 부른다.
 모의면접은 `/api/v1/interview/*`를 부른다: 설정에서 세션을 만들고, 장비 점검에서 마이크·카메라를 확인하고(정면 보정), 면접에서 질문 음성 재생·녹음·2초 간격 캡처·답변 제출을 하고, 리포트에서 채점 결과를 보여준다 (`src/features/interview/`).
-홈의 AI 멘토만 아직 `src/features/mentor/data.ts`의 Mock 데이터를 읽는다.
+AI 멘토만 아직 `src/features/mentor/data.ts`의 Mock 데이터를 읽는다. 홈에서 질문을 보내면 대화 화면(`/mentor/?c=<대화 ID>`)으로 넘어가 거기서 답을 보여준다.
 요구사항·설계·작업 목록은 `.kiro/specs/frontend-ui/`에 있다.
 
 ## 실행
@@ -30,8 +30,10 @@ npm run build      # 정적 파일을 out/ 에 만든다 (S3 + CloudFront 배포
   NEXT_PUBLIC_API_BASE=https://<API Gateway 주소>
   ```
 
-- 로그인은 카카오·Google 소셜 로그인이다 (`/login/`). 처음 들어오면 기본 정보(`/profile/`)를 먼저 받는다. 시연 계정(`demo1`~`demo3`)은 메뉴에 없는 `/login/demo/`에서 아이디로 들어간다. 비밀번호는 Secrets Manager `team07/demo-accounts`에 있다. 토큰은 브라우저 localStorage에 두고, 401이 오면 `/auth/refresh`로 한 번 갱신한다 (`src/lib/api.ts`).
+- 로그인은 카카오·Google 소셜 로그인이다 (`/login/`). 처음 들어오면 기본 정보(`/profile/`)를 먼저 받는다. 시연 계정(`demo1`~`demo3`)은 메뉴에 없는 `/login/demo/`에서 아이디로 들어간다. 이 화면으로 가는 링크는 로그인 화면에서 개발 모드를 켰을 때만 보인다. 비밀번호는 Secrets Manager `team07/demo-accounts`에 있다. 토큰은 브라우저 localStorage에 두고, 401이 오면 `/auth/refresh`로 한 번 갱신한다 (`src/lib/api.ts`).
 - 멘토링 화면도 같은 `team07.session`을 읽는다. 이력서·자기소개서 원문은 브라우저 저장소에 보관하지 않는다.
+- AI 멘토 대화는 저장하는 API가 없어 브라우저 localStorage에 둔다. 키는 사용자마다 다르다 (`team07.mentorChats.<sub>`, 로그인 전에는 `team07.mentorChats.anonymous`). 로그아웃해도 지우지 않아 같은 브라우저로 다시 로그인하면 그대로 보인다. 최근 50개까지 남기고 붙인 PDF는 파일 이름만 적는다.
+- `/login/` 아래 "개발 모드로 로그인"을 켜고 로그인하면 이름 옆에 "개발 모드"가 보이고 사용자 메뉴에 "유저 정보 모두 초기화"가 생긴다. 누르면 `POST /api/v1/me/reset`을 부른 다음 이 브라우저의 대화 기록과 `team07.mentoringFlow.<sub>`를 지우고 `/profile/`로 보낸다. 로그인은 그대로 해야 한다 (인증을 건너뛰지 않는다).
 - 공고·정책 ID는 B가 매일 새로 모으는 값이라 빌드 때 알 수 없다. 상세는 `/jobs/detail/?id=…`, `/policies/detail/?id=…` 한 화면을 내보내고 브라우저에서 `?id=`를 읽어 부른다.
 
 ## CI/CD
@@ -56,6 +58,7 @@ src/
 ├── app/                 라우트와 화면 조립
 │   ├── page.tsx         홈 (AI 멘토, 이어서 하기, 공고·정책 요약)
 │   ├── login/           로그인
+│   ├── mentor/          AI 멘토 대화 (?c=)
 │   ├── jobs/            채용 공고 목록, detail 상세 (?id=)
 │   ├── policies/        청년 지원 정책 목록, detail 상세 (?id=)
 │   ├── diagnosis/       이력서·직무 진단, result 결과

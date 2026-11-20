@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
+import { DevModeOption } from "@/features/auth/components/DevModeOption";
 import { SocialLoginButtons } from "@/features/auth/components/SocialLoginButtons";
 
 export const metadata: Metadata = { title: "로그인" };
@@ -22,6 +23,10 @@ export default function LoginPage() {
           <SocialLoginButtons />
         </Suspense>
         <p className="text-small text-grey-500">이름과 이메일은 받지 않아요. 로그인 확인에만 써요.</p>
+        {/* 팀 테스트용 개발 모드. 돌아갈 주소(?next=)를 읽어서 Suspense 경계 안에 둔다 */}
+        <Suspense fallback={null}>
+          <DevModeOption />
+        </Suspense>
       </div>
     </PageContainer>
   );

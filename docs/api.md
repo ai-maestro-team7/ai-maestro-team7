@@ -14,6 +14,7 @@ A(멘토링), B(부산 기회 추천), C(AI 모의면접) 명세의 공통 부�
 | `/api/v1/opportunities/*` | B 부산 기회 추천 | 연결됨 (`backend/opportunities_api.py`). 배포는 백엔드 담당 확인 후 |
 | `/api/v1/me/profile` (GET, PUT) | 공통 **기본 프로필** (`PROFILE#BASIC`). PUT은 보낸 필드만 수정, `null`이면 삭제 | ✅ |
 | `/api/v1/me/workspaces` (GET `?status=`, POST) · `/api/v1/me/workspaces/{wsId}` (GET, PATCH) | 워크스페이스 목록·생성(중복이면 기존 것)·상세(연결된 분석·첨삭·학습·면접)·상태와 문서 버전 변경 | ✅ |
+| `/api/v1/me/reset` (POST) | 내 데이터 모두 지우기. 본문 없음. `USER#{userId}` 아래 아이템과 그 아이템이 가리키는 개인 문서·면접 음성·알림 일정을 지우고 `{deleted: {items, files, schedules}}`를 준다. 로그인 계정은 그대로다 (화면에서는 개발 모드에서만 보인다) | ✅ |
 | `/api/v1/auth/*`, `/api/v1/me` | 로그인 | ✅ |
 | `/api/v1/health` | 상태 확인 | ✅ |
 
