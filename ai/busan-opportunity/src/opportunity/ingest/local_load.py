@@ -8,9 +8,12 @@
 - `work24_gangso/`: `region{코드}_p*.xml` 또는 `region{코드}-*.xml`
 - `work24_codes/`: `CMCD_1.xml`(지역), `CMCD_2.xml`(직종). 없으면 표 없이 정규화한다.
 - `alio/`: `list_p*.json`(손으로 받은 것) 또는 `list-*.json`(수집 실행기가 남긴 것). 상세(`detail_*.json`)는 읽지 않는다.
+- `klid/`: `sido_0070NN.xml` 또는 `sido0070NN-*.xml`. 시·군·구는 `work24_codes/CMCD_1.xml` 지역 표로 찾는다.
+- `worldjob/`: `worldjob_pNN.xml` 또는 `list-*.xml`
 
 `--out DIR`을 주면 `DIR/normalized/{day}/policies.jsonl`, `companies.jsonl`, `postings.jsonl`
-(카멜 표기 JSON 한 줄에 하나. 공고는 최신 스냅샷)을 쓴다.
+(카멜 표기 JSON 한 줄에 하나. 공고는 세 출처의 최신 스냅샷을 ID 순서로)을 쓴다.
+공고 요약은 `postings.{alio, klid, worldjob}`에 출처별로, `postings.total`에 합계로 남는다.
 요약에는 건수와 이유만 남긴다. 원문, 담당자 이름, 인증키는 출력하지 않는다.
 """
 
@@ -28,14 +31,31 @@ from ..models.policy import ALWAYS_APPLY_END, Policy
 from ..models.posting import PostingSnapshot
 from ..store.memory import MemoryCatalog
 from . import codes
-from .field_maps import ALIO, WORK24_GANGSO, YOUTHCENTER
+from .field_maps import ALIO, KLID, WORK24_GANGSO, WORLDJOB, YOUTHCENTER
 from .http import FetchError, as_list, parse_body, walk
-from .normalize import SkipRecord, normalize_alio, normalize_gangso, normalize_youthcenter, parse_alio_region
+from .normalize import (
+    SkipRecord,
+    normalize_alio,
+    normalize_gangso,
+    normalize_klid,
+    normalize_postings,
+    normalize_worldjob,
+    normalize_youthcenter,
+    parse_alio_region,
+)
 from .pipeline import upsert_companies, upsert_policies, upsert_postings
 
 POLICY_PATTERNS = ("policies_p*.json", "list-*.json")
 GANGSO_PATTERNS = ("region*_p*.xml", "region*-*.xml")
 POSTING_PATTERNS = ("list_p*.json", "list-*.json")
+KLID_PATTERNS = ("sido_*.xml", "sido*-*.xml")          # 손으로 받은 것 / 수집 실행기가 남긴 것
+WORLDJOB_PATTERNS = ("worldjob_p*.xml", "list-*.xml")
+POSTING_FILES = {
+    "alio": (ALIO, POSTING_PATTERNS, normalize_alio),
+    "klid": (KLID, KLID_PATTERNS, normalize_klid),
+    "worldjob": (WORLDJOB, WORLDJOB_PATTERNS, normalize_worldjob),
+}
+WORLDJOB_TOP_COUNTRIES = 10  # 요약에 보여 줄 나라 수
 REGION_CODES_FILE = "CMCD_1.xml"
 JOB_CODES_FILE = "CMCD_2.xml"
 SEOUL_SIDO = "11"  # 요약에서 서울 건수를 셀 때만 쓴다
@@ -111,65 +131,79 @@ def stored_postings(catalog: MemoryCatalog) -> list[PostingSnapshot]:
     return [row for row in rows if row is not None]
 
 
-def _load_postings(folder: Path, config: OpportunityConfig, catalog: MemoryCatalog, as_of) -> dict:
-    """잡알리오 목록 파일을 정규화해 넣고 건수를 센다. 부산·수도권 건수는 근무지 이름 목록 전체로도 센다."""
+def _dist(values) -> dict:
+    return dict(sorted(Counter(values).items()))
+
+
+def _alio_region_extra(records: dict[str, dict], stored: list[PostingSnapshot], busan: str,
+                       capital: set[str]) -> dict:
+    """잡알리오는 근무지가 여러 곳으로 온다. 근무지 이름 목록 전체로도 부산·수도권 건수를 센다."""
+    region_field = ALIO["fields"]["region_names"]
+    sidos, counts = [], []
+    for snap in stored:
+        names = [n.strip() for n in str(records[snap.job_posting_id].get(region_field) or "").split(",") if n.strip()]
+        counts.append(len(set(names)))
+        sidos.append({r.sido for r in (parse_alio_region(n) for n in names) if r.sido and not r.unknown})
+    return {
+        "busanAny": sum(busan in found for found in sidos),          # 근무지 목록에 부산이 있다
+        "busanOnly": sum(found == {busan} and n == 1 for found, n in zip(sidos, counts)),  # 부산 한 곳
+        "busanMulti": sum(busan in found and n > 1 for found, n in zip(sidos, counts)),
+        "capitalAny": sum(bool(found & capital) for found in sidos),
+        "capitalOnly": sum(bool(found) and found <= capital for found in sidos),
+        "multiRegion": sum(n > 1 for n in counts),
+    }
+
+
+def _load_postings(name: str, folder: Path, config: OpportunityConfig, catalog: MemoryCatalog, as_of, *,
+                   region_names: dict[str, str]) -> dict:
+    """한 출처의 공고 파일을 정규화해 넣고 건수를 센다. 요약에는 건수와 이유만 남긴다."""
+    spec, patterns, normalize = POSTING_FILES[name]
     busan = config.data.busan_sido
     capital = set(config.data.capital_area_sido)
     failures: Counter = Counter()
-    records, totals = _read_items(_files(folder, POSTING_PATTERNS), ALIO, failures)
-    snapshots: dict[str, PostingSnapshot] = {}
-    listed_sidos: dict[str, set[str]] = {}
-    listed_count: dict[str, int] = {}
-    duplicates = 0
-    region_field = ALIO["fields"]["region_names"]
-    for record in records:
-        try:
-            snap = normalize_alio(record, as_of=as_of, first_sido=busan)
-        except SkipRecord as e:
-            failures[e.reason] += 1
-            continue
-        except ValueError:
-            failures["invalid_model"] += 1
-            continue
-        if snap.job_posting_id in snapshots:
-            duplicates += 1
-        snapshots[snap.job_posting_id] = snap
-        names = [n.strip() for n in str(record.get(region_field) or "").split(",") if n.strip()]
-        listed_count[snap.job_posting_id] = len(set(names))
-        listed_sidos[snap.job_posting_id] = {
-            r.sido for r in (parse_alio_region(n) for n in names) if r.sido and not r.unknown}
-    stats = upsert_postings(config, catalog, list(snapshots.values()), as_of=as_of)
+    rows, totals = _read_items(_files(folder, patterns), spec, failures)
+    kwargs: dict = {"as_of": as_of}
+    if name == "alio":
+        kwargs["first_sido"] = busan
+    elif name == "klid":
+        kwargs["region_names"] = region_names or None
+    batch = normalize_postings(rows, normalize, rehash_on_collision=name == "klid", **kwargs)
+    failures.update(batch.skipped)
+    stats = upsert_postings(config, catalog, list(batch.snapshots.values()), as_of=as_of)
     stats["needsEnrich"] = len(stats["needsEnrich"])
 
-    stored = [s for s in stored_postings(catalog) if s.job_posting_id in snapshots]
+    stored = [s for s in stored_postings(catalog) if s.job_posting_id in batch.snapshots]
     latest = [catalog.get_latest(s.job_posting_id) for s in stored]
-    sidos = [listed_sidos.get(s.job_posting_id, set()) for s in stored]
-    counts = [listed_count.get(s.job_posting_id, 0) for s in stored]
-
-    def dist(values) -> dict:
-        return dict(sorted(Counter(values).items()))
-
+    region = {
+        "isBusan": sum(row.is_busan for row in latest),             # LATEST 기준 (여러 곳이면 부산 우선)
+        "isCapitalArea": sum(row.is_capital_area for row in latest),
+        "isOverseas": sum(row.is_overseas for row in latest),
+        "unknown": sum(s.work_region.unknown for s in stored),
+        "withSigungu": sum(s.work_region.sigungu is not None for s in stored),
+        "bySido": _dist(s.work_region.sido or ("overseas" if s.work_region.overseas else "unknown") for s in stored),
+    }
+    if name == "alio":
+        region.update(_alio_region_extra(batch.records, stored, busan, capital))
+    if name == "klid":
+        region["busanBySigungu"] = _dist(s.work_region.label for s in stored if s.work_region.sido == busan)
+    if name == "worldjob":
+        region["byCountry"] = dict(Counter(s.work_region.country for s in stored if s.work_region.overseas)
+                                   .most_common(WORLDJOB_TOP_COUNTRIES))
+    salary = [s.salary for s in stored]
     return {
-        "listed": len(records),
-        "apiTotal": sum(totals.values()) if len(totals) == 1 else totals,
-        "normalized": len(snapshots),
-        "duplicates": duplicates,
+        "listed": len(rows),
+        "apiTotal": sum(totals.values()),
+        "normalized": len(batch.snapshots),
+        "duplicates": batch.duplicates,
+        "rehashed": batch.rehashed,
         "stored": len(stored),
-        "region": {
-            "busanAny": sum(busan in found for found in sidos),          # 근무지 목록에 부산이 있다
-            "busanOnly": sum(found == {busan} and n == 1 for found, n in zip(sidos, counts)),  # 부산 한 곳
-            "busanMulti": sum(busan in found and n > 1 for found, n in zip(sidos, counts)),
-            "isBusan": sum(row.is_busan for row in latest),             # LATEST 기준 (여러 곳이면 부산 우선)
-            "isCapitalArea": sum(row.is_capital_area for row in latest),
-            "capitalAny": sum(bool(found & capital) for found in sidos),
-            "capitalOnly": sum(bool(found) and found <= capital for found in sidos),
-            "multiRegion": sum(n > 1 for n in counts),
-            "unknown": sum(s.work_region.unknown for s in stored),
-            "bySido": dist(s.work_region.sido or "unknown" for s in stored),
-        },
-        "employmentType": dist(s.employment_type.value for s in stored),
-        "educationMin": dist(s.education_min.value if s.education_min else "UNKNOWN" for s in stored),
-        "careerType": dist(s.career_type.value for s in stored),
+        "region": region,
+        "salaryDisclosed": sum(x.disclosed for x in salary),
+        "salaryMinOnly": sum(x.disclosed and x.max is None for x in salary),
+        "salaryMaxOnly": sum(x.disclosed and x.min is None for x in salary),
+        "employmentType": _dist(s.employment_type.value for s in stored),
+        "educationMin": _dist(s.education_min.value if s.education_min else "UNKNOWN" for s in stored),
+        "careerType": _dist(s.career_type.value for s in stored),
         "rolling": sum(s.rolling for s in stored),
         "expired": sum(row.is_expired for row in latest),
         "withOfficialUrl": sum(s.official_url is not None for s in stored),
@@ -177,6 +211,14 @@ def _load_postings(folder: Path, config: OpportunityConfig, catalog: MemoryCatal
         "failedBy": dict(sorted(failures.items())),
         "upsert": stats,
     }
+
+
+def _posting_total(by_source: dict[str, dict]) -> dict:
+    keys = ("stored", "salaryDisclosed", "withOfficialUrl", "failed")
+    total = {k: sum(v[k] for v in by_source.values()) for k in keys}
+    for k in ("isBusan", "isCapitalArea", "isOverseas", "unknown"):
+        total[k] = sum(v["region"][k] for v in by_source.values())
+    return total
 
 
 def load(raw: Path, day: str, *, config: OpportunityConfig | None = None,
@@ -230,8 +272,10 @@ def load(raw: Path, day: str, *, config: OpportunityConfig | None = None,
         companies[company.company_id] = company
     company_stats = upsert_companies(catalog, list(companies.values()))
 
-    # 공고 (잡알리오)
-    posting_summary = _load_postings(raw / "alio" / day, config, catalog, as_of)
+    # 공고 (잡알리오, 지방공공기관, 해외취업)
+    by_source = {name: _load_postings(name, raw / name / day, config, catalog, as_of, region_names=region_names)
+                 for name in POSTING_FILES}
+    posting_summary = {**by_source, "total": _posting_total(by_source)}
 
     stored = list(catalog.policies.values())
     key_counts = Counter(p.region_key() for p in stored)

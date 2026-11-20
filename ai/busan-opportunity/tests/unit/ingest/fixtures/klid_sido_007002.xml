@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<response>
+  <openXmlEmployInfo-header>
+    <resultCode>0</resultCode>
+    <resultMsg>SUCCESS_INFO</resultMsg>
+  </openXmlEmployInfo-header>
+  <openXmlEmployInfo-body>
+    <items>
+      <item>
+        <ENT_NAME>부산도시공사</ENT_NAME>
+        <ENT_TITLE>전문계약직(변호사) 모집공고</ENT_TITLE>
+        <ENT_GB>지방공사</ENT_GB>
+        <ENT_KIND>도시개발</ENT_KIND>
+        <SIDO_CD>부산광역시</SIDO_CD>
+        <STATUS>모집중</STATUS>
+        <EMPYEAR>2026</EMPYEAR>
+        <ENT_RECRUIT>경영·회계·사무</ENT_RECRUIT>
+        <EMPLOY_NUM>1</EMPLOY_NUM>
+        <EMPLOY_GB>경력</EMPLOY_GB>
+        <JOB_TYPE>전문계약직</JOB_TYPE>
+        <RE_MAN_YN>N</RE_MAN_YN>
+        <POSITION>전문계약직 '가'급</POSITION>
+        <YEARINCOME>5000만원 이상</YEARINCOME>
+        <OFFICE_HOURS>null</OFFICE_HOURS>
+        <WORK_PLACE>null</WORK_PLACE>
+        <DUTY_DETAIL>-</DUTY_DETAIL>
+        <RETIREMENT>-</RETIREMENT>
+        <JUDGE_METHOD>공고문 참조</JUDGE_METHOD>
+        <LOCAL_YN>N</LOCAL_YN>
+        <LOCAL_NAME>-</LOCAL_NAME>
+        <LOCAL_REASON>-</LOCAL_REASON>
+        <ENT_LICENSE1>변호사</ENT_LICENSE1>
+        <ENT_LICENSE2>-</ENT_LICENSE2>
+        <ENT_LICENSE3>-</ENT_LICENSE3>
+        <ENT_LICENSE4>-</ENT_LICENSE4>
+        <SPECIAL_ITEM>null</SPECIAL_ITEM>
+        <PUB_DATE>2026-11-05</PUB_DATE>
+        <PUB_END_DATE>2026-11-25</PUB_END_DATE>
+        <ACCUSATION>-</ACCUSATION>
+        <REFERENCE>-</REFERENCE>
+        <EXHIBIT>공고문 참조</EXHIBIT>
+        <JOB_SEEK_ETC>-</JOB_SEEK_ETC>
+        <FILE_NAME1>전문계약직(변호사) 모집공고.pdf</FILE_NAME1>
+        <FILE_NAME2>-</FILE_NAME2>
+        <FILE_NAME3>-</FILE_NAME3>
+        <URL>https://job.cleaneye.go.kr/user/ypCareersData.do?idx=80978</URL>
+        <ADDRESS>부산광역시 부산진구 신천대로 156</ADDRESS>
+        <NO>80978</NO>
+        <UPD_DATE>2026-11-05</UPD_DATE>
+      </item>
+      <item>
+        <ENT_NAME>부산환경공단</ENT_NAME>
+        <ENT_TITLE>부산환경공단 2026년도 하반기 기간제근로자 채용 공고</ENT_TITLE>
+        <ENT_GB>지방공단</ENT_GB>
+        <ENT_KIND>시설관리공단</ENT_KIND>
+        <SIDO_CD>부산광역시</SIDO_CD>
+        <STATUS>모집중</STATUS>
+        <EMPYEAR>2026</EMPYEAR>
+        <ENT_RECRUIT>환경·에너지·안전</ENT_RECRUIT>
+        <EMPLOY_NUM>38</EMPLOY_NUM>
+        <EMPLOY_GB>신입</EMPLOY_GB>
+        <JOB_TYPE>기간제</JOB_TYPE>
+        <RE_MAN_YN>N</RE_MAN_YN>
+        <POSITION>-</POSITION>
+        <YEARINCOME>2800만원 이상</YEARINCOME>
+        <OFFICE_HOURS>null</OFFICE_HOURS>
+        <WORK_PLACE>null</WORK_PLACE>
+        <DUTY_DETAIL>-</DUTY_DETAIL>
+        <RETIREMENT>-</RETIREMENT>
+        <JUDGE_METHOD>-</JUDGE_METHOD>
+        <LOCAL_YN>Y</LOCAL_YN>
+        <LOCAL_NAME>부산광역시</LOCAL_NAME>
+        <LOCAL_REASON>부산광역시 산하 지방공기업</LOCAL_REASON>
+        <ENT_LICENSE1>채용분야별 응시 자격 및 우대사항 등 공고문 참조</ENT_LICENSE1>
+        <ENT_LICENSE2>-</ENT_LICENSE2>
+        <ENT_LICENSE3>-</ENT_LICENSE3>
+        <ENT_LICENSE4>-</ENT_LICENSE4>
+        <SPECIAL_ITEM>null</SPECIAL_ITEM>
+        <PUB_DATE>2026-11-12</PUB_DATE>
+        <PUB_END_DATE>2026-11-20</PUB_END_DATE>
+        <ACCUSATION>-</ACCUSATION>
+        <REFERENCE>-</REFERENCE>
+        <EXHIBIT>이력서, 자기소개서, 주민등록 초본, 응시/가점 자격증 및 사회적약자 관련 서류 스캔본 등</EXHIBIT>
+        <JOB_SEEK_ETC>-</JOB_SEEK_ETC>
+        <FILE_NAME1>부산환경공단 2026년도 하반기 기간제근로자 채용 공고문 1부.pdf</FILE_NAME1>
+        <FILE_NAME2>-</FILE_NAME2>
+        <FILE_NAME3>-</FILE_NAME3>
+        <URL>https://job.cleaneye.go.kr/user/ypCareersData.do?idx=81144</URL>
+        <ADDRESS>부산광역시 동래구 온천천남로 185</ADDRESS>
+        <NO>81144</NO>
+        <UPD_DATE>2026-11-11</UPD_DATE>
+      </item>
+      <item>
+        <ENT_NAME>재단법인 부산남구문화재단</ENT_NAME>
+        <ENT_TITLE>2027년도 (재)부산남구문화재단 위탁시설 직원(기간제 근로자) 채용 공고</ENT_TITLE>
+        <ENT_GB>지방출연기관</ENT_GB>
+        <ENT_KIND>문화·복지·관광</ENT_KIND>
+        <SIDO_CD>부산광역시</SIDO_CD>
+        <STATUS>모집예정</STATUS>
+        <EMPYEAR>2026</EMPYEAR>
+        <ENT_RECRUIT>문화·예술·디자인·방송</ENT_RECRUIT>
+        <EMPLOY_NUM>19</EMPLOY_NUM>
+        <EMPLOY_GB>신입+경력</EMPLOY_GB>
+        <JOB_TYPE>기간제</JOB_TYPE>
+        <RE_MAN_YN>N</RE_MAN_YN>
+        <POSITION>-</POSITION>
+        <YEARINCOME>3000만원 이상</YEARINCOME>
+        <OFFICE_HOURS>null</OFFICE_HOURS>
+        <WORK_PLACE>null</WORK_PLACE>
+        <DUTY_DETAIL>공고문 참조</DUTY_DETAIL>
+        <RETIREMENT>-</RETIREMENT>
+        <JUDGE_METHOD>1차 서류심사 2차 면접시험</JUDGE_METHOD>
+        <LOCAL_YN>N</LOCAL_YN>
+        <LOCAL_NAME>-</LOCAL_NAME>
+        <LOCAL_REASON>-</LOCAL_REASON>
+        <ENT_LICENSE1>-</ENT_LICENSE1>
+        <ENT_LICENSE2>-</ENT_LICENSE2>
+        <ENT_LICENSE3>-</ENT_LICENSE3>
+        <ENT_LICENSE4>-</ENT_LICENSE4>
+        <SPECIAL_ITEM>null</SPECIAL_ITEM>
+        <PUB_DATE>2026-12-01</PUB_DATE>
+        <PUB_END_DATE>2026-12-08</PUB_END_DATE>
+        <ACCUSATION>-</ACCUSATION>
+        <REFERENCE>-</REFERENCE>
+        <EXHIBIT>자가 점검표, 응시원서, 자기소개서, 자격면허 증명서(자격제한경쟁 필수), 가점항목 증빙서류(해당자), 경력(재직)증명서(해당자), 건강보험 자격득실확인서(해당자), 개인정보 수집이용 및 제공 동의서, 주민등록초본</EXHIBIT>
+        <JOB_SEEK_ETC>-</JOB_SEEK_ETC>
+        <FILE_NAME1>[붙임1] 채용공고문.pdf</FILE_NAME1>
+        <FILE_NAME2>[붙임2] 서류심사 응시원서 및 제출서류.hwpx</FILE_NAME2>
+        <FILE_NAME3>-</FILE_NAME3>
+        <URL>https://job.cleaneye.go.kr/user/ypCareersData.do?idx=81373</URL>
+        <ADDRESS>부산광역시 남구 수영로 155 1층 부산남구문화재단</ADDRESS>
+        <NO>81373</NO>
+        <UPD_DATE>2026-11-18</UPD_DATE>
+      </item>
+    </items>
+    <totalCount>3</totalCount>
+  </openXmlEmployInfo-body>
+</response>

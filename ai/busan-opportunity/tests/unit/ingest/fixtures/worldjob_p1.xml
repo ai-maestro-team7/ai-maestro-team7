@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?><WORLDJOB>
+  <HEADER>
+    <ERR_CD>00</ERR_CD>
+    <ERR_NM>NORMAL SERVICE</ERR_NM>
+  </HEADER>
+  <BODY>
+    <ITEM>
+      <careerStleNm>경력</careerStleNm>
+      <entNm>CLOTH AND PEOPLE VINA</entNm>
+      <lplcKscoNm>그외 기타 봉제의복 제조업</lplcKscoNm>
+      <rctntcBgnDe>2026-11-20</rctntcBgnDe>
+      <rctntcEndDe>2026-12-03</rctntcEndDe>
+      <rctntcKscoNm>영업관리 사무원</rctntcKscoNm>
+      <rctntcLang>베트남어(선택) 중, 영어(선택) 중</rctntcLang>
+      <rctntcNationNm>베트남</rctntcNationNm>
+      <rctntcNmprCo>1</rctntcNmprCo>
+      <rctntcOriginNm>KOTRA</rctntcOriginNm>
+      <rctntcSj>[KOTRA] 베트남, 옷감과 사람들, 원부자재 및 영업부 (1명)</rctntcSj>
+      <rctntcVisaNm>취업비자</rctntcVisaNm>
+    </ITEM>
+    <ITEM>
+      <careerStleNm>무관</careerStleNm>
+      <entNm>Sebang Lithium Battery Ohio LLC</entNm>
+      <lplcKscoNm>자동차 엔진용 부품 제조업</lplcKscoNm>
+      <rctntcBgnDe>2026-11-20</rctntcBgnDe>
+      <rctntcEndDe>2026-12-03</rctntcEndDe>
+      <rctntcKscoNm>자재 및 구매 관리자</rctntcKscoNm>
+      <rctntcLang>영어(필수) 상, 한국어(필수) 상</rctntcLang>
+      <rctntcNationNm>미국</rctntcNationNm>
+      <rctntcNmprCo>1</rctntcNmprCo>
+      <rctntcOriginNm>KOTRA</rctntcOriginNm>
+      <rctntcSj>[KOTRA] 미국, Sebang Lithium Battery America, Controls Engineer (1명)</rctntcSj>
+      <rctntcVisaNm>취업비자</rctntcVisaNm>
+    </ITEM>
+    <ITEM>
+      <careerStleNm>무관</careerStleNm>
+      <entNm>엔클로니</entNm>
+      <lplcKscoNm>그외 기타 특수목적용 기계 제조업</lplcKscoNm>
+      <rctntcBgnDe>2026-11-16</rctntcBgnDe>
+      <rctntcEndDe>2026-11-27</rctntcEndDe>
+      <rctntcKscoNm>그 외 행정 및 경영지원 관리자</rctntcKscoNm>
+      <rctntcLang>독일어(필수) 상, 한국어(필수) 상</rctntcLang>
+      <rctntcNationNm>독일</rctntcNationNm>
+      <rctntcNmprCo>1</rctntcNmprCo>
+      <rctntcOriginNm>한국산업인력공단</rctntcOriginNm>
+      <rctntcSj>독일 프랑크푸르트 법인, 독일지사 관리 및 영업지원 (Branch Management &amp; Sales Support) 채용의 건</rctntcSj>
+      <rctntcVisaNm>취업비자</rctntcVisaNm>
+    </ITEM>
+    <totalCount>5</totalCount>
+    <pageNo>1</pageNo>
+    <numOfRows>3</numOfRows>
+    <lastPageNo>2</lastPageNo>
+  </BODY>
+</WORLDJOB>

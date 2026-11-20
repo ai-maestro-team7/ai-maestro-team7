@@ -1,6 +1,7 @@
 """수집 배치 실행기. 출처마다 목록 → 정규화 → 상세 → 적재를 돌리고 결과를 `runs/{날짜}.json`에 남긴다.
 
-상세는 매핑표의 `detail.enabled`가 False면 부르지 않는다 (잡알리오는 목록에 내용이 다 온다).
+상세는 매핑표의 `detail.enabled`가 False거나 상세 API가 없으면 부르지 않는다
+(잡알리오는 목록에 내용이 다 오고, 지방공공기관·해외취업은 상세 API가 없다).
 
 한 출처가 실패해도 나머지는 계속한다. 인증키와 키가 든 URL은 결과·로그·저장 경로 어디에도 남기지 않는다.
 """
@@ -14,11 +15,25 @@ from ..config import OpportunityConfig
 from ..core import clock
 from ..models.posting import PostingSnapshot
 from ..ports import CatalogRepo, RawStore, Secrets
-from . import alio, work24, youthcenter
+from . import alio, klid, work24, worldjob, youthcenter
 from .field_maps import DETAIL_MAX_PER_RUN
 from .http import FetchError, HttpGet, KeyCache, default_http_get
-from .normalize import SkipRecord, normalize_alio, normalize_gangso, normalize_work24, normalize_youthcenter
-from .pipeline import expire_postings, upsert_companies, upsert_policies, upsert_postings
+from .normalize import (
+    SkipRecord,
+    normalize_alio,
+    normalize_gangso,
+    normalize_klid,
+    normalize_postings,
+    normalize_work24,
+    normalize_worldjob,
+    normalize_youthcenter,
+)
+from .pipeline import (
+    expire_postings,
+    upsert_companies,
+    upsert_policies,
+    upsert_postings,
+)
 
 log = logging.getLogger(__name__)
 
@@ -27,8 +42,11 @@ REGION_CODES_KEY = "seed/codes/work24_region_codes.json"  # {"지역코드 5자�
 POSTING_SOURCES = {
     "work24": (work24, normalize_work24),
     "alio": (alio, normalize_alio),
+    "klid": (klid, normalize_klid),
+    "worldjob": (worldjob, normalize_worldjob),
 }
-ALL_SOURCES = ("work24", "alio", "youthcenter", "work24_gangso")
+REHASH_ON_COLLISION = {"klid"}  # 공고 번호가 겹치면 내용 해시 ID로 바꾸는 출처
+ALL_SOURCES = ("work24", "alio", "klid", "worldjob", "youthcenter", "work24_gangso")
 
 
 def _load_seed_json(raw_store: RawStore, key: str) -> dict:
@@ -68,22 +86,19 @@ def _run_postings(name: str, config, catalog, raw_store, keys, *, when, day, htt
     module, normalize = POSTING_SOURCES[name]
     client = module.client(keys, raw_store, day=day, http_get=http_get, sleep=sleep)
     job_codes = _load_job_codes(raw_store) if name == "work24" else {}
-    # 잡알리오는 근무지가 여러 곳이면 부산을 먼저 본다 (`normalize.parse_alio_region`)
-    extra = {"first_sido": config.data.busan_sido} if name == "alio" else {}
-    detail_on = client.spec.get("detail", {}).get("enabled", True)
+    extra: dict = {}
+    if name == "alio":  # 잡알리오는 근무지가 여러 곳이면 부산을 먼저 본다 (`normalize.parse_alio_region`)
+        extra = {"first_sido": config.data.busan_sido}
+    elif name == "klid":  # 기관 주소의 시·군·구를 지역 표로 찾는다 (`normalize.parse_klid_region`)
+        extra = {"region_names": _load_seed_json(raw_store, REGION_CODES_KEY) or None}
+    detail_spec = client.spec.get("detail")
+    detail_on = bool(detail_spec) and detail_spec.get("enabled", True)
 
-    pages = client.fetch_list()
-    skipped: dict[str, int] = {}
-    snapshots: dict[str, PostingSnapshot] = {}
-    records: dict[str, dict] = {}
-    for record in pages.records:
-        try:
-            snap = normalize(record, as_of=when, job_codes=job_codes, **extra)
-        except SkipRecord as e:
-            skipped[e.reason] = skipped.get(e.reason, 0) + 1
-            continue
-        snapshots[snap.job_posting_id] = snap
-        records[snap.job_posting_id] = record
+    pages = module.fetch_all(client) if hasattr(module, "fetch_all") else client.fetch_list()
+    batch = normalize_postings(pages.records, normalize, rehash_on_collision=name in REHASH_ON_COLLISION,
+                               as_of=when, job_codes=job_codes, **extra)
+    skipped = dict(sorted(batch.skipped.items()))
+    snapshots, records = batch.snapshots, batch.records
 
     fetched = failed = 0
     for posting_id, snap in list(snapshots.items()) if detail_on else []:
@@ -111,6 +126,7 @@ def _run_postings(name: str, config, catalog, raw_store, keys, *, when, day, htt
     return {
         "status": _status(len(pages.records), len(snapshots), pages.failed_pages),
         "listed": len(pages.records), "normalized": len(snapshots), "skipped": skipped,
+        "duplicates": batch.duplicates, "rehashed": batch.rehashed,
         "pages": pages.pages, "failedPages": pages.failed_pages,
         "detailFetched": fetched, "detailFailed": failed, "warnings": pages.warnings,
         **stats, "_postingIds": list(snapshots),

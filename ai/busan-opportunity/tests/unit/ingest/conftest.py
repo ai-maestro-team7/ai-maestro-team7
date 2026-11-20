@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from opportunity.ingest.field_maps import WORK24
+from opportunity.ingest.field_maps import WORK24, WORLDJOB
 from opportunity.store.memory import MemoryCatalog, MemoryRawStore, MemorySecrets
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -16,7 +16,10 @@ SECRET_VALUES = {
     "WORK24_GANGSO_KEY": "W24-SECRET-AAAA1111",
     "DATA_GO_KR_SERVICE_KEY": "GOKR%2BSECRET%2FBBBB2222%3D%3D",  # 공공데이터포털은 URL 인코딩된 키를 준다
     "YOUTHCENTER_API_KEY": "YTH-SECRET-CCCC3333",
+    "BUSAN_PUBLIC_JOBS_KEY_ENCODED": "TEAM%2BSECRET%2FDDDD4444%3D%3D",  # 해외취업은 다른 계정 키다
 }
+KLID_NO_DATA = (b'<?xml version="1.0" encoding="UTF-8"?><response><openXmlEmployInfo-header><resultCode>3</resultCode>'
+                b'<resultMsg>NONOTEXISTDATA_ERROR</resultMsg></openXmlEmployInfo-header></response>')
 
 
 def fixture_bytes(name: str) -> bytes:
@@ -58,6 +61,11 @@ class FakeApi:
             if param(url, "region") == "26000":
                 return fixture_bytes("work24_gangso_region26000_p1.xml")
             return b"<smallGiantsList><total>0</total><startPage>1</startPage><display>100</display></smallGiantsList>"
+        if "openXmlEmployInfo" in url:  # 샘플이 없는 시·도는 "데이터 없음"(resultCode=3)을 준다
+            name = f"klid_sido_{param(url, 'sidoCd')}.xml"
+            return fixture_bytes(name) if (FIXTURES / name).exists() else KLID_NO_DATA
+        if "worldjob31/openApi31" in url:
+            return fixture_bytes(f"worldjob_p{param(url, 'pageNo')}.xml")
         raise AssertionError("가짜 API에 없는 주소")
 
     def count(self, needle: str) -> int:
@@ -97,6 +105,13 @@ def small_pages(monkeypatch):
     """고용24 목록을 페이지당 2건으로 줄여 두 페이지를 돌게 한다."""
     monkeypatch.setitem(WORK24["list"], "page_size", 2)
     return 2
+
+
+@pytest.fixture
+def worldjob_pages(monkeypatch):
+    """해외취업 목록을 샘플 페이지 크기(3건)에 맞춰 두 페이지를 돌게 한다."""
+    monkeypatch.setitem(WORLDJOB["list"], "page_size", 3)
+    return 3
 
 
 @pytest.fixture

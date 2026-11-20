@@ -4,6 +4,8 @@
 - 온통청년 청년정책, 고용24 청년일자리강소기업, 고용24 공통코드(지역·직종): 실제 응답을 받아 이 표를 맞췄다.
   원본은 `raw/{출처}/2026-11-20/`에 있다.
 - 잡알리오 채용공시(ALIO): 실제 응답(목록 563건, 상세 1건)을 받아 맞췄다.
+- 지방공공기관 채용정보(KLID, 한국지역정보개발원): 실제 응답(17개 시·도, 429건)을 받아 맞췄다.
+- 해외취업 모집공고(WORLDJOB, 한국산업인력공단): 실제 응답(477건, 5페이지)을 받아 맞췄다.
 - 고용24 채용정보(WORK24): 응답 미확인. 값은 응답을 보기 전에 넣은 임시 값이다.
 정규화 함수(`normalize.py`)는 이 표만 본다. 필드 이름을 코드 안에 박지 않는다.
 
@@ -28,6 +30,8 @@ SECRET_WORK24 = "WORK24_AUTH_KEY"
 SECRET_YOUTHCENTER = "YOUTHCENTER_API_KEY"
 SECRET_WORK24_GANGSO = "WORK24_GANGSO_KEY"  # 고용24는 서비스마다 인증키가 따로다
 SECRET_WORK24_CODES = "WORK24_CODES_KEY"
+# 해외취업 모집공고는 다른 팀원 계정으로 발급받아 공공데이터포털 키가 따로다 (URL 인코딩된 값)
+SECRET_DATA_GO_KR_TEAM = "BUSAN_PUBLIC_JOBS_KEY_ENCODED"
 
 # 응답 미확인 (개인회원 불가): 고용24 채용정보 목록 210L01·상세 210D01은 개인회원 키로 부르면
 # "개인회원은 사용할 수 없는 OPEN-API입니다" 오류가 온다 (2026-11-20). 아래 필드 이름은 임시 값이다.
@@ -234,7 +238,121 @@ WORK24_GANGSO = {
 GANGSO_BADGE_SOURCE = "고용노동부 청년일자리강소기업"
 COMPANY_ID_PREFIX = "biz"
 
-SOURCES = {"work24": WORK24, "alio": ALIO, "youthcenter": YOUTHCENTER, "work24_gangso": WORK24_GANGSO}
+# 지방공공기관 채용정보 (행정안전부·한국지역정보개발원 클린아이 잡플러스, 2026-11-20 응답 확인).
+# 시·도마다 따로 부른다 (sidoCd=007001~007017, 007002가 부산). 페이지 인자 없이 부르면 그 시·도 공고가 다 온다
+# (경기 111건이 한 번에 왔다). 그래서 페이지를 넘기지 않는다 (`page_param: None`).
+# 응답: response > openXmlEmployInfo-header{resultCode, resultMsg}, openXmlEmployInfo-body{items.item[], totalCount}.
+# 공고가 없는 시·도는 resultCode=3 "NONOTEXISTDATA_ERROR"가 오고 body가 없다 (007005).
+# 빈 칸은 글자 "null"이나 "-"로 온다 (WORK_PLACE·OFFICE_HOURS는 429건 모두 "null").
+KLID = {
+    "source": "klid",
+    "secret": SECRET_DATA_GO_KR,
+    "key_param": "serviceKey",
+    "list": {
+        "url": "https://apis.data.go.kr/B551982/openApiEmployInfo/openXmlEmployInfo",
+        "params": {"type": "xml"},
+        "page_param": None, "size_param": None, "page_size": None, "first_page": 1, "max_pages": 1,
+        "items_path": "response.openXmlEmployInfo-body.items.item",
+        "total_path": "response.openXmlEmployInfo-body.totalCount",
+        "result_code_path": "response.openXmlEmployInfo-header.resultCode",
+        "ok_codes": ("0",), "empty_codes": ("3",),
+    },
+    "region_param": "sidoCd",
+    "region_codes": tuple(f"0070{n:02d}" for n in range(1, 18)),  # 007001~007017
+    "fields": {
+        "external_id": "NO",                  # 클린아이 공고 번호 (80978). URL의 idx와 같다
+        "title": "ENT_TITLE",
+        "organization": "ENT_NAME",
+        "org_kind": "ENT_GB",                 # 지방출연기관 / 지방공단 / 지방공사 / 지방출자기관
+        "org_field": "ENT_KIND",              # 도시개발, 시설관리공단, 의료원 …
+        "sido_name": "SIDO_CD",               # 이름으로 온다 ("부산광역시", "전남광주통합특별시")
+        "status": "STATUS",                   # 모집중 / 모집예정 (2026-11-20 응답에는 이 두 값만 있다)
+        "job_name": "ENT_RECRUIT",            # NCS 대분류와 비슷한 이름 ("경영·회계·사무", "기타")
+        "headcount": "EMPLOY_NUM",
+        "career_name": "EMPLOY_GB",           # 신입 / 경력 / 신입+경력
+        "employment_name": "JOB_TYPE",        # 기간제 / 일반정규직 / 전문계약직 / 일반계약직 / 무기계약직 / 비상임 / 인턴
+        "position": "POSITION",
+        "salary_text": "YEARINCOME",          # "3200만원 이상", "1200만원 이하", "1억원 이상", "무급"
+        "work_place": "WORK_PLACE",
+        "address": "ADDRESS",                 # 기관 주소. 근무지 칸(WORK_PLACE)이 비어 있어 시·군·구는 이 값으로 찾는다
+        "duty": "DUTY_DETAIL",
+        "selection": "JUDGE_METHOD",
+        "local_yn": "LOCAL_YN",
+        "local_name": "LOCAL_NAME",
+        "local_reason": "LOCAL_REASON",
+        "licenses": ("ENT_LICENSE1", "ENT_LICENSE2", "ENT_LICENSE3", "ENT_LICENSE4"),  # 모두 쓴다 (첫 값만이 아니다)
+        "special": "SPECIAL_ITEM",            # 우대 (국가유공자, 장애인 …)
+        "documents_text": "EXHIBIT",          # 제출 서류
+        "opens_ymd": "PUB_DATE",
+        "closes_ymd": "PUB_END_DATE",         # "2026-11-25". "9999-09-09", "2400-03-19"처럼 먼 날도 온다
+        "url": "URL",                         # https://job.cleaneye.go.kr/user/ypCareersData.do?idx={NO}
+    },
+    # REFERENCE(전화번호), ACCUSATION(접수 방법, 담당자 메일이 섞여 온다), JOB_SEEK_ETC(홍보 글),
+    # RETIREMENT(정년, 34·73 같은 뜻을 알 수 없는 값), FILE_NAME1~3(공고문 파일 이름), UPD_DATE는 쓰지 않는다.
+}
+KLID_OPEN_STATUSES = {"모집중", "모집예정"}   # 이 상태만 넣는다 (그 밖은 SkipRecord "closed_status")
+KLID_NULL_TEXTS = {"null", "NULL", "-", "--", "없음", "해당없음", "해당 없음"}
+# 근무지 시·도 이름. `SIDO_ALIASES`에 없는 2026년 통합 시·도 이름만 더한다
+KLID_SIDO_ALIASES = {"전남광주통합특별시": "12", "전남광주": "12"}
+# 2026년 통합 전 시·도 코드 → 통합 시·도 코드. 기관 주소는 아직 "전라남도 무안군 …"처럼 옛 이름으로 온다
+KLID_MERGED_SIDO = {"46": "12", "29": "12"}
+KLID_EMPLOYMENT = {
+    "일반정규직": EmploymentType.FULL_TIME,
+    "정규직": EmploymentType.FULL_TIME,
+    "무기계약직": EmploymentType.CONTRACT,
+    "기간제": EmploymentType.CONTRACT,
+    "전문계약직": EmploymentType.CONTRACT,
+    "일반계약직": EmploymentType.CONTRACT,
+    "비정규직": EmploymentType.CONTRACT,
+    "인턴": EmploymentType.INTERN,
+    # "비상임"(비상임 이사·감사 20건)은 고용 형태로 옮길 수 없어 UNKNOWN으로 둔다
+}
+KLID_CAREER = {"신입": CareerType.NEW, "경력": CareerType.EXPERIENCED, "신입+경력": CareerType.ANY,
+               "무관": CareerType.ANY}
+KLID_JOB_NAME_BLANKS = {"기타"}  # 이 이름이면 직무 이름으로 공고 제목을 쓴다 (89건)
+KLID_ROLLING_MIN_DAYS = 365      # 마감일이 이만큼 넘게 남았으면 상시 채용으로 본다 (9999-09-09 등)
+KLID_HEADCOUNT_LABEL = "{n}명"
+
+# 해외취업 모집공고 (한국산업인력공단 월드잡플러스, 2026-11-20 응답 확인). 477건, 100건씩 5페이지다.
+# 응답: WORLDJOB > HEADER{ERR_CD, ERR_NM}, BODY{ITEM[], totalCount, pageNo, numOfRows, lastPageNo}.
+# 공고 번호와 원문 링크 필드가 없다. 그래서 ID는 내용 해시로 만들고 officialUrl은 비워 둔다.
+WORLDJOB = {
+    "source": "worldjob",
+    "secret": SECRET_DATA_GO_KR_TEAM,
+    "key_param": "serviceKey",
+    "list": {
+        "url": "https://apis.data.go.kr/B490007/worldjob31/openApi31",
+        "params": {},
+        "page_param": "pageNo", "size_param": "numOfRows", "page_size": 100, "first_page": 1, "max_pages": 30,
+        "items_path": "WORLDJOB.BODY.ITEM", "total_path": "WORLDJOB.BODY.totalCount",
+        "result_code_path": "WORLDJOB.HEADER.ERR_CD", "ok_codes": ("00",),
+        "empty_codes": ("03",),  # 추정: 공공데이터포털 공통 코드 03 NODATA_ERROR. 실제로 받아 보지는 못했다
+    },
+    "fields": {
+        "title": "rctntcSj",
+        "organization": "entNm",
+        "industry": "lplcKscoNm",         # 업종
+        "job_name": "rctntcKscoNm",       # 직종
+        "career_name": "careerStleNm",    # 무관 / 경력 / 신입
+        "opens_ymd": "rctntcBgnDe",
+        "closes_ymd": "rctntcEndDe",
+        "language": "rctntcLang",         # "영어(필수) 중상, 한국어(필수) 상"
+        "country": "rctntcNationNm",      # 일본, 미국 … "대한민국"도 6건 온다 (국내 박람회 공고)
+        "headcount": "rctntcNmprCo",
+        "origin": "rctntcOriginNm",       # 한국산업인력공단 / KOTRA / 해당사항 없음
+        "visa": "rctntcVisaNm",           # 취업비자 / 인턴비자 / 워킹홀리데이 / 기타 / 빈 값
+    },
+    # 공고 ID를 만들 때 쓰는 필드. 마감일(연장되면 바뀐다)과 언어·비자·인원은 넣지 않는다
+    "id_fields": ("organization", "title", "opens_ymd", "country", "job_name", "origin"),
+}
+WORLDJOB_BLANK_TEXTS = {"해당사항 없음", "해당 사항 없음", "없음", "-"}
+WORLDJOB_DOMESTIC_COUNTRIES = {"대한민국", "한국"}  # 해외 근무로 세지 않는다. 시·도를 몰라 근무지는 unknown이다
+WORLDJOB_CAREER = {"신입": CareerType.NEW, "경력": CareerType.EXPERIENCED, "무관": CareerType.ANY}
+WORLDJOB_ROLLING_MIN_DAYS = 365
+HASH_ID_LENGTH = 16  # 공고 번호가 없을 때 쓰는 내용 해시 길이
+
+SOURCES = {"work24": WORK24, "alio": ALIO, "youthcenter": YOUTHCENTER, "work24_gangso": WORK24_GANGSO,
+           "klid": KLID, "worldjob": WORLDJOB}
 
 # 온통청년 대분류 이름 → Policy.category. 여기 없는 이름은 원문 그대로 category에 둔다.
 CATEGORY_MAP = {"일자리": "JOB", "주거": "HOUSING"}
