@@ -41,7 +41,7 @@ resp = _polly_client().synthesize_speech(Text=text, TextType="text", OutputForma
                                          VoiceId="Seoyeon", Engine=POLLY_ENGINE, LanguageCode="ko-KR")
 return resp["AudioStream"].read()
 ```
-- `POLLY_ENGINE` 기본 `"neural"` (Seoyeon은 neural 지원). 수동 테스트에서 소리를 듣고 어색하거나 호출이 실패하면 `"standard"`로 바꾼다.
+- `POLLY_ENGINE`은 `"neural"`로 확정했다. 서울 리전 수동 확인에서 Seoyeon neural이 0.8초에 생성됐고 소리가 자연스러웠다.
 - 질문 최대 300자(1차 `QUESTION_MAX`)라 Polly 3,000자 한도 안이다.
 - 실패 → 로그 `stage=synthesize_question errorCode=AWS_SERVICE_ERROR durationMs=…` 후 `None` (결정 1).
 - 백엔드 `save_next_question`은 `if mp3 and UPLOAD_BUCKET`일 때만 S3에 올리므로 `None`이면 `audioUrl`이 null이 된다.
@@ -173,7 +173,7 @@ uv run --no-project --python 3.13 --with-requirements ai/interview/requirements-
 
 - Session 형식 변경: `answers[].delivery`가 새로 생긴다. 백엔드는 Session을 그대로 저장하므로 코드 변경은 없지만, 파트 경계를 넘는 데이터 형식 변경이라 백엔드 담당에게 리뷰를 요청하고 PR 링크를 팀 채널에 알린다 (AGENTS.md "파트", CONTRIBUTING "코드 리뷰").
 - 권한: 실행 역할에 이미 있음(`InterviewAI`, `S3Uploads`). 추가 요청 없음. Transcribe는 호출한 역할 권한으로 녹음을 읽고 결과를 쓴다.
-- 지원 녹음 형식: webm, ogg, mp4(m4a), wav, mp3, flac. 수동 테스트한 형식과 2분 녹음 변환 시간을 적는다 (C §11 미완료 항목). 변환 시간이 백엔드 대기 한도 240초와 Lambda 시간 제한 300초 안인지 함께 적는다.
+- 지원 녹음 형식: webm, ogg, mp4(m4a), wav, mp3, flac. 수동 확인은 m4a 녹음 2개(대본 읽기, 1분 남짓)로 했고 변환 시간을 적는다. 브라우저 녹음(webm)과 2분 답변의 변환 시간(백엔드 대기 한도 240초, Lambda 300초 안인지)은 **프론트 연동 때 확인**한다 (C §11 미완료 항목).
 - Transcribe 작업 기록은 계정에 90일 남는다(답변 원문은 우리 버킷에만 있고 백엔드가 지움). 지우려면 `transcribe:DeleteTranscriptionJob` 권한이 필요하므로 이번에는 하지 않는다.
 - `synthesize_question`이 None을 돌려주는 경우가 생기므로 프론트의 자막 + [답변 시작] 경로가 필요하다 (C F-04, 이미 명세에 있음).
 
@@ -191,6 +191,6 @@ uv run --no-project --python 3.13 --with-requirements ai/interview/requirements-
 | 1 | Polly 실패 시 None(결정 1)은 개발 가이드 초안(예외)과 다르다 | 면접이 끊기지 않는 쪽을 택함. 바꾸려면 Requirement 1.3만 고친다 |
 | 2 | 노션 6-②의 "답변 길이"가 녹음 길이인지 말한 구간인지 불명확 | 함수가 받는 값이 `words`뿐이라 Speech_Span으로 정함. 녹음 길이가 필요하면 백엔드가 `answer_result`에 넘겨야 함 |
 | 3 | Transcribe ko-KR이 숫자를 아라비아 숫자로 적어 한글 음절 수가 줄어든다 | 20% 미만이면 감수 (노션 6-② 메모와 같음). 수동 테스트에서 확인 |
-| 4 | neural 엔진이 서울 리전에서 Seoyeon을 지원하지 않으면 실패 → 늘 None | 수동 테스트에서 확인, 안 되면 `POLLY_ENGINE="standard"` |
+| 4 | neural 엔진이 서울 리전에서 Seoyeon을 지원하지 않으면 실패 → 늘 None | 해결: 수동 확인에서 neural 동작(0.8초, 자연스러움). `neural`로 확정 |
 | 5 | 수동 테스트용 녹음을 uploads 버킷에 올려야 함 | 경로는 `uploads/interview/manual-check/`로 하고 백엔드 담당에게 먼저 확인. 버킷 생성·권한 변경은 하지 않음 |
 | 6 | 노션 6-②·6-⑤ 값(15초, 0.2, 2초 등)은 저장소에 없다 | 설정 파일을 만들 때 노션 페이지와 한 번 더 대조하고 PR 참고 사항에 대조했다고 적는다 |

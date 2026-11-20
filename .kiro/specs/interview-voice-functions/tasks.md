@@ -39,9 +39,11 @@
   - 커밋: `feat: 음성 함수를 실제 구현으로 연결` (`782d65e`, 340 passed 1 skipped. 백엔드가 부르는 동작이 바뀌므로 `refactor`가 아님)
 
 - [ ] 6. 수동 확인 (실제 AWS, 사람이 실행)
-  - [ ] 6.1 `tests/test_voice_manual.py`를 만든다 (design §12). 기본 실행에서는 건너뛴다
+  - [x] 6.1 `tests/test_voice_manual.py`를 만든다 (design §12). 기본 실행에서는 건너뛴다. 녹음 형식은 키의 확장자로 정한다 (m4a 그대로)
   - [ ] 6.2 백엔드 담당에게 수동 테스트 경로(`uploads/interview/manual-check/`) 사용을 확인받는다
-  - [ ] 6.3 프론트에서 받은 webm 녹음 1개와 2분 녹음 1개로 실행한다 (`botocore[crt]` 포함, design §12). 변환 시간이 240초·300초 안인지, 발화 속도를 PR 참고 사항에 적는다. mp3를 들어 보고 Polly 엔진을 정한다
+  - [ ] 6.3 m4a 녹음 2개(대본 읽기, 1분 남짓)로 변환을 실행하고 변환 시간·발화 속도를 PR 참고 사항에 적는다 (`botocore[crt]` 포함, design §12)
+    - [x] Polly 엔진: `neural` 확정 (생성 0.8초, 자연스러움)
+    - webm 녹음과 2분 답변 변환 시간(240초·300초 안인지)은 녹음이 없어 PR에 "프론트 연동 때 확인"으로 적는다
     - _Requirements: 8.5_
   - 커밋: `test: 음성 함수 수동 확인 테스트 추가`
 
