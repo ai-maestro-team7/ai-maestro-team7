@@ -49,6 +49,9 @@ def lambda_handler(event, context):
         return part("mentoring_api").run_task(event)
     if "task" in event:
         return part("interview_api").run_task(event)
+    # B 정기 수집 (EventBridge Scheduler → 출처별 비동기 자기 호출)
+    if "oppBatch" in event:
+        return part("opportunities_api").run_batch(event)
     # B 알림 일정 (EventBridge Scheduler)
     if "oppSchedule" in event:
         return part("opportunities_api").run_schedule(event)
