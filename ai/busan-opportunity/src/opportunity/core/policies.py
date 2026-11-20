@@ -235,7 +235,8 @@ def _visible(deps: Deps, policy: Policy | None) -> bool:
 
 
 def _card(deps: Deps, user_id: str, policy: Policy, profile: BasicProfile, prefs: OppPrefs, as_of: datetime, *,
-          with_checklist: bool = False) -> PolicyCard:
+          with_checklist: bool = False, subscribed: set[str] | None = None) -> PolicyCard:
+    """subscribed: 이 사용자가 알림을 신청한 정책 ID. 목록에서는 한 번에 읽어 넘긴다 (정책마다 읽으면 수백 번 조회)."""
     judgement = judge_policy(policy, profile, prefs, as_of=as_of)
     timing = _timing(policy, as_of)
     bucket = _bucket(policy, judgement, profile, timing)
@@ -252,7 +253,8 @@ def _card(deps: Deps, user_id: str, policy: Policy, profile: BasicProfile, prefs
         stage=policy.stage, bucket=bucket, eligibility=judgement, benefit=policy.benefit, application=application,
         exclusive_with=list(policy.exclusive_with),
         alert_available=judgement.status != Status.NOT_ELIGIBLE and timing in (_UPCOMING, _NEXT),
-        alert_subscribed=deps.users.get_alert(user_id, policy.policy_id) is not None,
+        alert_subscribed=(policy.policy_id in subscribed if subscribed is not None
+                          else deps.users.get_alert(user_id, policy.policy_id) is not None),
         url=policy.url, source=str(policy.source), as_of=policy.as_of,
         checklist=list(policy.checklist) if with_checklist else None,
     )
@@ -294,10 +296,11 @@ def match_policies(deps: Deps, user_id: str, *, stage: PolicyStage | None = None
     ctx = load_context(deps, user_id, as_of)
     buckets: dict[PolicyBucket, list[PolicyCard]] = {b: [] for b in PolicyBucket}
     totals = PolicyTotals(note=copy_rules.POLICY_TOTAL_NOTE)
+    subscribed = {alert.policy_id for alert in deps.users.list_alerts(user_id)}  # 알림 신청 여부는 한 번만 읽는다
     for policy in _user_policies(deps, ctx.profile):
         if stage is not None and policy.stage != stage:
             continue
-        card = _card(deps, user_id, policy, ctx.profile, ctx.prefs, ctx.as_of)
+        card = _card(deps, user_id, policy, ctx.profile, ctx.prefs, ctx.as_of, subscribed=subscribed)
         buckets[card.bucket].append(card)
         # 합계: 지금 자격이 맞고 신청할 길이 있는(접어 두지 않은) 정책만
         amount = _public_amount(policy)

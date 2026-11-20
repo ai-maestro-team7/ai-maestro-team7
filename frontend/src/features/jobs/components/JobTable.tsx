@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { type Column, DataTable, DataTableSkeleton, TableCell, TableRow } from "@/components/ui/DataTable";
 import { cn } from "@/lib/cn";
-import { deadlineLines, jobDetailHref, MATCH_LABELS, matchReason, ORG_TYPE_LABELS } from "../lib";
+import { deadlineLines, displayTitle, jobDetailHref, MATCH_LABELS, matchReason, ORG_TYPE_LABELS } from "../lib";
 import type { PostingCard } from "../types";
 import { SaveToggle } from "./SaveToggle";
 
@@ -47,14 +47,18 @@ export function JobRow({ job, asOf }: { job: PostingCard; asOf: string }) {
         {/* after:inset-0 으로 행 전체를 링크 영역으로 넓힌다 */}
         <Link
           href={jobDetailHref(job.jobPostingId)}
+          title={job.title}
           className="truncate text-body font-bold text-grey-900 after:absolute after:inset-0 after:content-['']"
         >
-          {job.title}
+          {displayTitle(job.title)}
         </Link>
-        <span className="truncate text-small text-grey-600">{subline(job)}</span>
+        <span className="truncate text-small text-grey-600" title={subline(job)}>
+          {subline(job)}
+        </span>
       </TableCell>
-      <TableCell className={cn(COLUMNS.place, "text-body text-grey-800")}>
-        {job.workRegion.label} · {ORG_TYPE_LABELS[job.orgType]}
+      <TableCell className={cn(COLUMNS.place, "flex flex-col")}>
+        <span className="text-body break-keep text-grey-800">{job.workRegion.label}</span>
+        <span className="text-small text-grey-600">{ORG_TYPE_LABELS[job.orgType]}</span>
       </TableCell>
       <TableCell className={cn(COLUMNS.deadline, "flex flex-col")}>
         <span className="text-body text-grey-800">{deadline.main}</span>
@@ -67,7 +71,9 @@ export function JobRow({ job, asOf }: { job: PostingCard; asOf: string }) {
         {job.regionalTalent === "LIKELY" ? (
           <span className="truncate text-small font-medium text-blue-500">지역 혜택 대상일 수 있음</span>
         ) : (
-          <span className="truncate text-small text-grey-600">{matchReason(job.facts)}</span>
+          <span className="truncate text-small text-grey-600" title={matchReason(job.facts)}>
+            {matchReason(job.facts)}
+          </span>
         )}
       </TableCell>
       <TableCell className={COLUMNS.save}>
