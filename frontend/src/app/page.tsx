@@ -2,9 +2,9 @@ import { Suspense } from "react";
 import { PageContainer } from "@/components/layout/PageContainer";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SectionHeader } from "@/components/ui/SectionHeader";
+import { ChatPanel } from "@/features/chat/components/ChatPanel";
 import { RecommendedJobs } from "@/features/jobs/components/RecommendedJobs";
 import { ContinueList } from "@/features/mentor/components/ContinueList";
-import { MentorPanel } from "@/features/mentor/components/MentorPanel";
 import { continueItems } from "@/features/mentor/data";
 import { OpenPolicies } from "@/features/policies/components/OpenPolicies";
 
@@ -14,7 +14,8 @@ export default function HomePage() {
       <PageHeader title="부산 취업 준비" />
 
       <div className="flex w-full flex-col gap-12 lg:flex-row lg:items-start">
-        <MentorPanel />
+        {/* 홈의 입구는 채팅 Agent (D-39). 조건·이력서로 공고와 청년정책을 함께 찾는다 */}
+        <ChatPanel />
         <ContinueList items={continueItems} />
       </div>
 

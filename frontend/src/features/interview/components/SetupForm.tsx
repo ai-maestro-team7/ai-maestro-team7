@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useMemo, useState, useSyncExternalStore } from "react";
 import { TwoColumn } from "@/components/layout/PageContainer";
 import { Button } from "@/components/ui/Button";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -9,6 +9,7 @@ import { Panel } from "@/components/ui/Panel";
 import { RadioList } from "@/components/ui/RadioList";
 import { TextArea } from "@/components/ui/TextArea";
 import { TextField } from "@/components/ui/TextField";
+import { parseHandoff, readHandoffRaw, subscribeHandoff } from "@/features/chat/lib";
 import { interviewDefaults, interviewQuestions, MODE_OPTIONS } from "../data";
 import { interviewQuery, modeLabel, parseMode, readJob } from "../lib";
 import type { InterviewMode } from "../types";
@@ -20,7 +21,12 @@ export function SetupForm() {
   const router = useRouter();
   const params = useSearchParams();
   const [job, setJob] = useState(() => readJob(params.get("job")));
-  const [coverLetter, setCoverLetter] = useState<string>(interviewDefaults.coverLetter);
+  // 채팅에서 넘어왔으면 넘겨받은 자소서를 채운다 (개발계획서4 §10). 서버 렌더에는 값이 없다
+  const handoffRaw = useSyncExternalStore(subscribeHandoff, readHandoffRaw, () => null);
+  const handoff = useMemo(() => parseHandoff(handoffRaw), [handoffRaw]);
+  const [editedCoverLetter, setCoverLetter] = useState<string | null>(null);
+  const coverLetter = editedCoverLetter ?? handoff?.coverLetter ?? (handoff?.documentId ? "" : interviewDefaults.coverLetter);
+  const savedDocument = handoff?.documentId ? (handoff.documentTitle ?? "저장된 자기소개서") : null;
   const [mode, setMode] = useState<InterviewMode>(() => parseMode(params.get("mode")));
   const [consent, setConsent] = useState(true);
   const [errors, setErrors] = useState<Errors>({});
@@ -28,7 +34,7 @@ export function SetupForm() {
   function validate(nextMode: InterviewMode): Errors {
     const next: Errors = {};
     if (!job.trim()) next.job = "희망 직무를 입력해 주세요.";
-    if (!coverLetter.trim()) next.coverLetter = "자기소개서를 입력해 주세요.";
+    if (!coverLetter.trim() && !savedDocument) next.coverLetter = "자기소개서를 입력해 주세요.";
     if (nextMode === "camera" && !consent) next.consent = "음성 + 카메라로 진행하려면 카메라 분석에 동의해 주세요.";
     return next;
   }
@@ -70,6 +76,11 @@ export function SetupForm() {
             onChange={(event) => setJob(event.target.value)}
             error={errors.job}
           />
+          {savedDocument && (
+            <p className="text-small text-grey-600">
+              채팅에서 고른 ‘{savedDocument}’로 질문을 만들어요. 다른 자기소개서를 쓰려면 아래에 붙여 넣으세요.
+            </p>
+          )}
           <TextArea
             id="interview-cover-letter"
             label="자기소개서"

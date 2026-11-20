@@ -173,10 +173,10 @@ export function errorMessage(error: unknown): string {
   return "서버에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요.";
 }
 
-export function createTextDocument(text: string): Promise<CreateDocumentResponse> {
+export function createTextDocument(text: string, title = "직무 진단 이력서"): Promise<CreateDocumentResponse> {
   return post(
     "/api/v1/mentoring/documents/text",
-    { text, documentType: "RESUME", title: "직무 진단 이력서" },
+    { text, documentType: "RESUME", title },
     "document-text",
   );
 }
