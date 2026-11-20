@@ -28,6 +28,7 @@ KB_EMBEDDING_MODEL_ID=amazon.titan-embed-text-v2:0
 KB_EMBEDDING_DIM=1024
 # Bedrock 모델 (docs/team-guide.md). 코드에는 환경변수로만 넣는다
 MODEL_ID=${MODEL_ID:-global.anthropic.claude-haiku-5-5}
+CHAT_MODEL_ID=${CHAT_MODEL_ID:-global.anthropic.claude-sonnet-5-5}  # 채팅 Agent 전용 (docs/개발계획서4.md §11)
 EMBEDDING_MODEL_ID=${EMBEDDING_MODEL_ID:-global.cohere.embed-v4:0}  # 서울 리전은 global. 프로필로만 호출 가능
 
 # B 알림 일정: EventBridge Scheduler가 이 역할로 Lambda를 부른다 (infra/setup-role.sh 가 만든다)
