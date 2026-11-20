@@ -16,6 +16,14 @@ DEFAULT_FEEDBACK_MAX_TOKENS = 2048
 FEEDBACK_MAX_TURNS = 6            # 모델 호출 + 툴 실행 한 번이 한 턴
 FEEDBACK_MAX_TOTAL_TOKENS = 30000  # 한 번 실행의 입력+출력 토큰 합
 FEEDBACK_MAX_TOOL_CALLS = 12       # 넘으면 툴이 "지금까지 정보로 답하라"를 돌려준다
+# 꼬리질문 판단 에이전트 상한 (follow-up design §4.4, #109). 기본 답변마다 사용자가 기다리는 시간을 묶는다
+FOLLOW_UP_MAX_TURNS = 4             # 툴 2~3개를 한 턴에 같이 부르고 답을 쓰면 2~3턴
+FOLLOW_UP_MAX_TOOL_CALLS = 4        # 툴 3개 + 키워드 다시 찾기 1번
+FOLLOW_UP_MAX_TOTAL_TOKENS = 12000  # 자소서(최대 5,000자)·이전 답변이 턴마다 다시 들어간다
+DEFAULT_FOLLOW_UP_MAX_TOKENS = 1024  # 출력은 판단 JSON 하나
+# 이전 답변 툴이 돌려주는 양 (기본 2 + 꼬리 2 + 여유)
+FOLLOW_UP_PREVIOUS_MAX = 5
+FOLLOW_UP_ANSWER_MAX_CHARS = 500
 # 피드백 문장에 쓰지 않는 표현 (제품 원칙 4, AGENTS.md "문구"). "떨어지다"는 일반 표현이라 넣지 않는다
 FEEDBACK_BANNED_WORDS = ("합격", "불합격", "확률")
 
@@ -95,3 +103,8 @@ def max_tokens() -> int:
 def feedback_max_tokens() -> int:
     """피드백 에이전트(C-2)의 호출당 출력 상한. 질문 3개 피드백 JSON이 1024를 넘을 수 있다 (report design §6.5)."""
     return _positive_int_env("INTERVIEW_FEEDBACK_MAX_TOKENS", DEFAULT_FEEDBACK_MAX_TOKENS)
+
+
+def follow_up_max_tokens() -> int:
+    """꼬리질문 판단 에이전트의 호출당 출력 상한 (#109)."""
+    return _positive_int_env("INTERVIEW_FOLLOW_UP_MAX_TOKENS", DEFAULT_FOLLOW_UP_MAX_TOKENS)

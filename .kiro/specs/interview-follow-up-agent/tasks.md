@@ -24,13 +24,15 @@
     - _Requirements: 4.1~4.4, 5.1~5.5, 6.1~6.3, 7.1~7.3_
   - 커밋: `feat: 꼬리질문 길이 제한과 판단 실패 시 꼬리질문 없이 진행` (617 passed 5 skipped)
 
-- [ ] 3. 판단 에이전트
-  - [ ] 3.1 `llm.py` `run_with_tools(max_tokens)`, `call_json_with_tools(max_tokens)`, `settings` 상한·`follow_up_max_tokens()` (design §4.4·§8)
-  - [ ] 3.2 `follow_up.py` `FollowUpContext`, `build_follow_up_context`, `make_follow_up_tools`, `judge_follow_up` 에이전트 (design §4)
-  - [ ] 3.3 `prompts/b_follow_up_v2.md`, `prompting.follow_up_prompt(question_type)`, `versions` B-v2 (design §7)
-  - [ ] 3.4 `fakes.FakeLLM.run_with_tools`, `test_follow_up.py`, `test_llm.py`·`test_prompting.py`·`test_flow.py`·`test_settings.py`·`test_logging.py` 수정
+- [x] 3. 판단 에이전트
+  - [x] 3.1 `llm.py` `run_with_tools(max_tokens)`, `call_json_with_tools(max_tokens)`, `settings` 상한·`follow_up_max_tokens()` (design §4.4·§8)
+  - [x] 3.2 `follow_up.py` `FollowUpContext`, `build_follow_up_context`, `make_follow_up_tools`, `judge_follow_up` 에이전트 (design §4)
+  - [x] 3.3 `prompts/b_follow_up_v2.md`, `prompting.follow_up_prompt(question_type)`, `versions` B-v2 (design §7)
+  - [x] 3.4 `fakes.FakeLLM.run_with_tools`, `test_follow_up.py`, `test_llm.py`·`test_prompting.py`·`test_flow.py`·`test_settings.py` 수정
+    - 로그 원문 확인은 `test_follow_up.py`에 넣어 `test_logging.py`는 바꾸지 않았다
+    - `build_follow_up_context`는 질문 문장을 인자로 따로 받는다 (`pending.text`, 기본 질문 문장과 같음)
     - _Requirements: 1.2~1.7, 2.1~2.5, 3.1~3.6, 8.1~8.2_
-  - 커밋: `feat: 꼬리질문 판단을 툴 쓰는 에이전트로 보강`
+  - 커밋: `feat: 꼬리질문 판단을 툴 쓰는 에이전트로 보강` (641 passed 5 skipped)
 
 - [ ] 4. 수동 확인 준비 (실행은 나중, 사람이)
   - [ ] 4.1 `test_bedrock_manual.py`에 꼬리질문 판단 테스트 추가 (`RUN_BEDROCK=1`일 때만)

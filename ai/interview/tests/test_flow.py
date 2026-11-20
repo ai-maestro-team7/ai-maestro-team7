@@ -43,7 +43,7 @@ def test_start_initial_session():
     assert session["answers"] == [] and session["baseline"] is None
     assert session["scoringVersion"] == "v2.0"
     assert session["modelId"] == "test-model"
-    assert session["promptVersion"] == "A-v2/B-v1"
+    assert session["promptVersion"] == "A-v2/B-v2"
     assert [q["questionId"] for q in session["questions"]] == ["q1", "q2", "q3"]
     assert result["nextQuestion"] == {"questionId": "q1", "answerId": "a-q1-1",
                                       "text": session["questions"][0]["question"], "isFollowUp": False}
@@ -381,10 +381,15 @@ def test_follow_up_prompt_uses_question_and_answer():
     session = initial_session()
     fake = FakeLLM([SUFFICIENT])
     interview.process_answer(session, answer("a-q1-1", ABSTRACT_TEXT), llm=fake)
-    user = fake.calls[0]["user"]
+    call = fake.calls[0]
+    user = call["user"]
     assert "<question>\n" + session["questions"][0]["question"] + "\n</question>" in user
     assert "<answer>\n" + ABSTRACT_TEXT + "\n</answer>" in user
     assert "<job>\n데이터 분석\n</job>" in user
+    assert "<question_type>\n" + session["questions"][0]["questionType"] + "\n</question_type>" in user
+    # 꼬리질문 판단은 툴 3개를 쓰는 에이전트로 부른다 (#109)
+    assert call["tools"] == ["find_resume_passages", "get_previous_answers", "get_remaining_questions"]
+    assert call["limits"] == {"turns": 4, "total_tokens": 12000} and call["max_tokens"] == 1024
 
 
 # ---------------------------------------------------------------- 전달력 (2차)
