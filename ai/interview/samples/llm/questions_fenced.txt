@@ -1,0 +1,7 @@
+```json
+{"questions": [
+  {"questionType": "experience", "question": "B기관 인턴에서 반복 집계 작업을 스크립트로 바꾼 과정을 설명해 주세요."},
+  {"questionType": "knowledge", "question": "대시보드를 만들 때 어떤 지표를 먼저 보여 줘야 하는지 설명해 주세요."},
+  {"questionType": "situation", "question": "데이터에 누락 값이 많아 결론을 내기 어렵다면 어떻게 하시겠어요?"}
+]}
+```

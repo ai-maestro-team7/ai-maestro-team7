@@ -1,0 +1,30 @@
+{
+  "session": {
+    "sessionId": "6f1c2a9e-0000-4000-8000-000000000001",
+    "job": "데이터 분석",
+    "interviewType": "MIXED",
+    "cameraConsent": true,
+    "resumeText": "저는 부산의 A대학교 통계학과 4학년으로, 데이터를 근거로 문제를 정의하고 해결하는 데이터 분석가를 목표로 하고 있습니다. (samples/resume_data_analysis.txt 앞부분)",
+    "profile": {
+      "projects": ["공공데이터 활용 부산 관광 수요 분석 프로젝트"],
+      "skills": ["Python", "SQL", "데이터 시각화"],
+      "needsConfirmation": ["실무 데이터 파이프라인 경험"],
+      "profileId": "profile-demo-1",
+      "profileVersion": 2
+    },
+    "scoringVersion": "v1.0",
+    "modelId": "global.anthropic.claude-haiku-5-5",
+    "promptVersion": "A-v1/B-v1",
+    "questions": [
+      {"questionId": "q1", "questionType": "experience", "question": "부산 관광 수요 분석 프로젝트에서 관광지 이름이 자료마다 달랐던 문제를 어떻게 해결했는지 설명해 주세요."},
+      {"questionId": "q2", "questionType": "knowledge", "question": "서로 다른 출처의 데이터를 합칠 때 누락 값과 형식 차이를 처리하는 방법을 설명해 주세요."},
+      {"questionId": "q3", "questionType": "situation", "question": "분석 결과가 팀의 예상과 다르게 나왔을 때 어떻게 하시겠어요?"}
+    ],
+    "currentIndex": 0,
+    "followUpUsed": false,
+    "currentQuestion": {"questionId": "q1", "answerId": "a-q1-1", "text": "부산 관광 수요 분석 프로젝트에서 관광지 이름이 자료마다 달랐던 문제를 어떻게 해결했는지 설명해 주세요.", "isFollowUp": false},
+    "answers": [],
+    "baseline": null
+  },
+  "nextQuestion": {"questionId": "q1", "answerId": "a-q1-1", "text": "부산 관광 수요 분석 프로젝트에서 관광지 이름이 자료마다 달랐던 문제를 어떻게 해결했는지 설명해 주세요.", "isFollowUp": false}
+}

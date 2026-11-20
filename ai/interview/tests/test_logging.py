@@ -1,0 +1,86 @@
+"""로그와 표준 출력에 자소서·답변·질문·profile 원문이 남지 않는지 확인한다 (Requirement 12)."""
+
+import ast
+import logging
+from pathlib import Path
+
+import pytest
+
+import interview
+from conftest import sample_json, sample_text
+from fakes import FakeLLM
+
+PACKAGE_DIR = Path(interview.__file__).resolve().parent
+RESUME = sample_text("resume_data_analysis.txt")
+PROFILE = sample_json("profile_data_analysis.json")
+QUESTIONS = sample_json("llm/questions_ok.json")["questions"]
+ANSWER_TEXT = sample_json("answers/normal_q1.json")["transcription"]["text"]
+FOLLOW_UP_TEXT = sample_json("llm/follow_up_needed.json")["followUpQuestions"][0]
+
+SECRETS = [
+    "공공데이터 포털의 관광지 입장객 통계",  # 자소서
+    "A대학교 통계학과",                      # 자소서
+    "이름을 짝지은 대응표",                  # 답변
+    QUESTIONS[0]["question"],                # 질문
+    FOLLOW_UP_TEXT,                          # 꼬리질문
+    "실무 데이터 파이프라인 경험",            # profile
+]
+
+
+@pytest.fixture(autouse=True)
+def env(monkeypatch):
+    monkeypatch.setenv("MODEL_ID", "test-model")
+
+
+def answer(answer_id, text):
+    return {"answerId": answer_id, "timeLimitReached": False,
+            "transcription": {"status": "COMPLETED", "text": text, "words": []}}
+
+
+def assert_clean(text):
+    for secret in SECRETS:
+        assert secret not in text, f"원문이 남았다: {secret[:10]}"
+
+
+def test_full_flow_logs_and_stdout_have_no_raw_text(caplog, capsys):
+    with caplog.at_level(logging.DEBUG):
+        result = interview.start_interview("iv-1", "데이터 분석", RESUME, "MIXED", True, PROFILE,
+                                           llm=FakeLLM([sample_text("llm/questions_ok.json")]))
+        out = interview.process_answer(result["session"], answer("a-q1-1", ANSWER_TEXT),
+                                       llm=FakeLLM([sample_text("llm/follow_up_needed.json")]))
+        interview.process_answer(out["session"], answer("a-q1-2", ANSWER_TEXT), llm=FakeLLM([]))
+    assert "stage=start_interview" in caplog.text and "stage=process_answer" in caplog.text
+    assert_clean(caplog.text)
+    captured = capsys.readouterr()
+    assert captured.out == "" and captured.err == ""
+
+
+def test_failure_paths_have_no_raw_text(caplog):
+    with caplog.at_level(logging.DEBUG):
+        # 입력 검사 실패: 자소서는 정상, job만 틀림
+        with pytest.raises(interview.InterviewError):
+            interview.start_interview("iv-1", "", RESUME, "MIXED", True, PROFILE, llm=FakeLLM([]))
+        # LLM 출력이 원문을 담은 채 형식이 틀림 (2번)
+        bad = '{"questions": "' + RESUME[:40] + '"}'
+        with pytest.raises(interview.InterviewError) as exc:
+            interview.start_interview("iv-1", "데이터 분석", RESUME, "MIXED", True, PROFILE, llm=FakeLLM([bad, bad]))
+        # 모델 호출 예외 메시지에 원문이 들어 있어도 로그에는 예외 종류만
+        with pytest.raises(interview.InterviewError):
+            interview.start_interview("iv-1", "데이터 분석", RESUME, "MIXED", True, PROFILE,
+                                      llm=FakeLLM([RuntimeError(RESUME)]))
+    assert "errorCode=INVALID_INPUT" in caplog.text and "errorCode=AI_OUTPUT_INVALID" in caplog.text
+    assert "errorType=RuntimeError" in caplog.text
+    assert_clean(caplog.text)
+    assert_clean(str(exc.value))
+    assert_clean(repr(exc.value))
+
+
+def test_no_print_in_package_source():
+    found = []
+    for path in PACKAGE_DIR.rglob("*.py"):
+        if "tests" in path.relative_to(PACKAGE_DIR).parts:
+            continue
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == "print":
+                found.append(path.name)
+    assert found == []
