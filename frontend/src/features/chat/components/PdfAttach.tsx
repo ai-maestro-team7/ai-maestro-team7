@@ -18,9 +18,12 @@ import { cn } from "@/lib/cn";
 export function PdfDropZone({
   disabled,
   onReady,
+  onProcessingChange,
   children,
 }: {
   disabled: boolean;
+  /** 고르기·올리기·글자 찾기 중이면 true. 채팅이 그동안 보내기를 막는다 */
+  onProcessingChange: (processing: boolean) => void;
   onReady: (documentId: string, fileName: string, kind: DocKind) => void;
   children: ReactNode;
 }) {
@@ -41,6 +44,7 @@ export function PdfDropZone({
     const problem = attachmentError(file);
     setError(problem);
     setPicked(problem ? null : file);
+    onProcessingChange(!problem);
   }
 
   async function upload(file: File, kind: DocKind) {
@@ -49,9 +53,11 @@ export function PdfDropZone({
     try {
       const created = await createPdfDocument(file, kind);
       await poll(() => getDocument(created.documentId));
+      onProcessingChange(false); // 끝난 뒤에 보내야 send가 막히지 않는다
       onReady(created.documentId, file.name, kind);
     } catch (e) {
       setError(errorMessage(e));
+      onProcessingChange(false);
     } finally {
       setUploading(null);
     }
@@ -111,7 +117,14 @@ export function PdfDropZone({
           <span>‘{picked.name}’은</span>
           <Chip onClick={() => void upload(picked, "RESUME")}>이력서예요</Chip>
           <Chip onClick={() => void upload(picked, "COVER_LETTER")}>자기소개서예요</Chip>
-          <Chip onClick={() => setPicked(null)}>취소</Chip>
+          <Chip
+            onClick={() => {
+              setPicked(null);
+              onProcessingChange(false);
+            }}
+          >
+            취소
+          </Chip>
         </div>
       )}
       {uploading && (

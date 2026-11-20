@@ -4,7 +4,7 @@ import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Chip } from "@/components/ui/Chip";
 import { loginHref } from "@/features/auth/lib";
-import { useUsername } from "@/features/auth/useUsername";
+import { useSessionOwner } from "@/features/auth/useSessionOwner";
 import { ApiError } from "@/lib/api";
 import { getChatSession, sendChat, waitForReply } from "../api";
 import { asOfLabel, readChatSessionId, saveChatSessionId } from "../lib";
@@ -31,18 +31,39 @@ function errorText(error: unknown): string {
  * 카드·버튼은 서버가 도구 결과로 만든 것만 그린다.
  */
 export function ChatPanel() {
-  const username = useUsername();
+  const owner = useSessionOwner();
+  if (!owner) {
+    return (
+      <section aria-labelledby="chat-title" className="flex min-w-0 flex-1 flex-col gap-3.5">
+        <ChatTitle />
+        <div className="flex flex-col items-start gap-3 rounded-field border border-grey-200 p-5">
+          <p className="text-body text-grey-900">
+            로그인하면 채팅으로 조건을 말하거나 이력서를 붙여 부산 채용공고와 청년정책을 함께 찾을 수 있어요.
+          </p>
+          <Button href={loginHref("/")} size="M">
+            로그인
+          </Button>
+        </div>
+      </section>
+    );
+  }
+  // 사용자가 바뀌면(다른 탭에서 계정 변경 포함) 대화 상태를 통째로 새로 만든다. 언마운트 때 진행 중인 요청도 끊는다
+  return <Conversation key={owner} />;
+}
+
+function Conversation() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [resumeOpen, setResumeOpen] = useState(false);
+  // 서류를 올려 글자·역량을 찾는 중. 이때 보내면 끝난 서류가 대화에 붙지 못하므로 보내기를 막는다
+  const [docBusy, setDocBusy] = useState(false);
+  const locked = busy || docBusy;
   const abort = useRef<AbortController | null>(null);
-  const lastQuestion = useRef<{ text: string; attachments?: { documentId: string }[] } | null>(null);
 
   // 새로 고침 뒤 같은 대화를 다시 그린다 (대화 ID만 탭에 기억)
   useEffect(() => {
-    if (!username) return;
     const saved = readChatSessionId();
     if (!saved) return;
     let active = true;
@@ -71,14 +92,13 @@ export function ChatPanel() {
       active = false;
       controller.abort();
     };
-  }, [username]);
+  }, []);
 
   useEffect(() => () => abort.current?.abort(), []);
 
   async function send(text: string, attachments?: { documentId: string }[]) {
     const message = text.trim();
     if (!message || busy) return;
-    lastQuestion.current = { text: message, attachments };
     setBusy(true);
     setDraft("");
     setMessages((prev) => [
@@ -126,6 +146,16 @@ export function ChatPanel() {
     setBusy(false);
   }
 
+  /** 실패한 답 바로 앞의 사용자 메시지를 다시 보낸다. 새로 고침 뒤 복원한 대화에서도 동작한다 */
+  function retry(failedId: string) {
+    const index = messages.findIndex((m) => m.messageId === failedId);
+    const question = messages
+      .slice(0, index)
+      .reverse()
+      .find((m) => m.role === "USER" && m.content);
+    if (question?.content) void send(question.content, question.attachments);
+  }
+
   function onResumeReady(documentId: string) {
     setResumeOpen(false);
     void send("이력서를 올렸어요. 이력서로 맞는 공고와 청년정책 찾아 줘", [{ documentId }]);
@@ -134,22 +164,6 @@ export function ChatPanel() {
   function onPdfReady(documentId: string, fileName: string, kind: "RESUME" | "COVER_LETTER") {
     const what = kind === "COVER_LETTER" ? "자기소개서" : "이력서";
     void send(`${what} ‘${fileName}’을 올렸어요. 내 서류로 맞는 공고와 청년정책 찾아 줘`, [{ documentId }]);
-  }
-
-  if (!username) {
-    return (
-      <section aria-labelledby="chat-title" className="flex min-w-0 flex-1 flex-col gap-3.5">
-        <ChatTitle />
-        <div className="flex flex-col items-start gap-3 rounded-field border border-grey-200 p-5">
-          <p className="text-body text-grey-900">
-            로그인하면 채팅으로 조건을 말하거나 이력서를 붙여 부산 채용공고와 청년정책을 함께 찾을 수 있어요.
-          </p>
-          <Button href={loginHref("/")} size="M">
-            로그인
-          </Button>
-        </div>
-      </section>
-    );
   }
 
   const last = messages[messages.length - 1];
@@ -170,9 +184,9 @@ export function ChatPanel() {
                 <AssistantMessage
                   message={m}
                   latest={m === last}
-                  busy={busy}
+                  busy={locked}
                   onAsk={(text) => void send(text)}
-                  onRetry={() => lastQuestion.current && void send(lastQuestion.current.text, lastQuestion.current.attachments)}
+                  onRetry={() => retry(m.messageId)}
                 />
               )}
             </li>
@@ -181,25 +195,25 @@ export function ChatPanel() {
       )}
 
       {resumeOpen ? (
-        <ResumeForm onReady={onResumeReady} onCancel={() => setResumeOpen(false)} />
+        <ResumeForm onReady={onResumeReady} onCancel={() => setResumeOpen(false)} onProcessingChange={setDocBusy} />
       ) : (
-        <PdfDropZone disabled={busy} onReady={onPdfReady}>
-          <AskBox value={draft} onChange={setDraft} onSubmit={() => void send(draft)} disabled={busy} />
+        <PdfDropZone disabled={busy} onReady={onPdfReady} onProcessingChange={setDocBusy}>
+          <AskBox value={draft} onChange={setDraft} onSubmit={() => void send(draft)} disabled={locked} />
         </PdfDropZone>
       )}
       <div className="flex flex-wrap items-center gap-2">
         {messages.length === 0 && EXAMPLES.map((example) => (
-          <Chip key={example} onClick={() => void send(example)} disabled={busy}>
+          <Chip key={example} onClick={() => void send(example)} disabled={locked}>
             {example}
           </Chip>
         ))}
         {!resumeOpen && (
-          <Chip onClick={() => setResumeOpen(true)} disabled={busy}>
+          <Chip onClick={() => setResumeOpen(true)} disabled={locked}>
             이력서 붙여넣고 찾기
           </Chip>
         )}
         {messages.length > 0 && (
-          <Chip onClick={reset} disabled={busy}>
+          <Chip onClick={reset} disabled={locked}>
             새 대화
           </Chip>
         )}

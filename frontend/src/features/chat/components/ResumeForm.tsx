@@ -12,7 +12,16 @@ const MAX_CHARS = 30_000;
  * 이력서 붙여넣기. A 문서 API로 저장하고 역량 추출이 끝나면 문서 ID를 넘긴다.
  * 이력서 원문은 채팅 메시지로 보내지 않는다 (개발계획서4 §2.2).
  */
-export function ResumeForm({ onReady, onCancel }: { onReady: (documentId: string) => void; onCancel: () => void }) {
+export function ResumeForm({
+  onReady,
+  onCancel,
+  onProcessingChange,
+}: {
+  onReady: (documentId: string) => void;
+  onCancel: () => void;
+  /** 저장·글자 찾기 중이면 true. 채팅이 그동안 보내기를 막는다 */
+  onProcessingChange: (processing: boolean) => void;
+}) {
   const [text, setText] = useState("");
   const [state, setState] = useState<"edit" | "reading">("edit");
   const [error, setError] = useState<string>();
@@ -25,13 +34,16 @@ export function ResumeForm({ onReady, onCancel }: { onReady: (documentId: string
     }
     setError(undefined);
     setState("reading");
+    onProcessingChange(true);
     try {
       const created = await createTextDocument(trimmed, "채팅 이력서");
       await poll(() => getDocument(created.documentId));
+      onProcessingChange(false);
       onReady(created.documentId);
     } catch (e) {
       setError(errorMessage(e));
       setState("edit");
+      onProcessingChange(false);
     }
   }
 
