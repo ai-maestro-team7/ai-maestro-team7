@@ -4,12 +4,17 @@
     {
       "Sid": "GitHubActionsMainOnly",
       "Effect": "Allow",
-      "Principal": { "Federated": "arn:aws:iam::${ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com" },
+      "Principal": {
+        "Federated": "arn:aws:iam::${ACCOUNT_ID}:oidc-provider/token.actions.githubusercontent.com"
+      },
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
         "StringEquals": {
           "token.actions.githubusercontent.com:aud": "sts.amazonaws.com",
-          "token.actions.githubusercontent.com:sub": "repo:ai-maestro-team7/ai-maestro-team7:ref:refs/heads/main"
+          "token.actions.githubusercontent.com:sub": [
+            "repo:ai-maestro-team7/ai-maestro-team7:ref:refs/heads/main",
+            "repo:ai-maestro-team7@358948416/ai-maestro-team7@1464824701:ref:refs/heads/main"
+          ]
         }
       }
     }
