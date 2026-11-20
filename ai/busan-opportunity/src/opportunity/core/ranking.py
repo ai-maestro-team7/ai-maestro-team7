@@ -26,6 +26,10 @@ from .texts import profile_text
 
 REGION_ALL, REGION_BUSAN, REGION_CAPITAL, REGION_OVERSEAS = "ALL", "BUSAN", "CAPITAL", "OVERSEAS"
 
+# 데이터 범위 (개발계획서4 §9.1). OFFICIAL = 공공 API로 모은 공고, TEAM = 팀이 넣어 둔 공고(지금은 시연용 DEMO)
+SCOPE_ALL, SCOPE_OFFICIAL, SCOPE_TEAM = "ALL", "OFFICIAL", "TEAM"
+SCOPES = (SCOPE_ALL, SCOPE_OFFICIAL, SCOPE_TEAM)
+
 # 직무 일치의 근거. 사실 문구를 고를 때 쓴다 (facts.job_fact)
 BASIS_WORK24, BASIS_NAME, BASIS_NCS = facts.BASIS_WORK24, facts.BASIS_NAME, facts.BASIS_NCS
 BASIS_NCS_MAJOR_NAME = facts.BASIS_NCS_MAJOR_NAME
@@ -329,6 +333,19 @@ def _keyword_ok(posting: PostingLatest, keyword: str | None) -> bool:
     return any(needle in (text or "").lower() for text in (posting.title, posting.organization, posting.job.name))
 
 
+def is_team_data(posting: PostingLatest) -> bool:
+    """팀이 넣어 둔 공고인지. 지금은 시연용(sourceType=DEMO)만이다. 크롤링 데이터를 넣으면 여기 한 곳만 고친다."""
+    return posting.is_sample
+
+
+def _scope_ok(posting: PostingLatest, scope: str) -> bool:
+    if scope == SCOPE_OFFICIAL:
+        return not is_team_data(posting)
+    if scope == SCOPE_TEAM:
+        return is_team_data(posting)
+    return True
+
+
 def _organization_ok(posting: PostingLatest, organization: str | None) -> bool:
     """기관·회사 이름에 들어 있는지. 대소문자·공백·가운뎃점은 무시한다 (개발계획서4 §9)."""
     needle = _norm(organization)
@@ -434,7 +451,8 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
                     job_codes: list[str] | None = None, keyword: str | None = None, cursor: str | None = None,
                     limit: int = 20, as_of: str | date | datetime | None = None, job_name: str | None = None,
                     query_terms: Sequence[str] | None = None, min_salary: int | None = None,
-                    career_type: str | CareerType | None = None, organization: str | None = None) -> FeedResponse:
+                    career_type: str | CareerType | None = None, organization: str | None = None,
+                    scope: str | None = None) -> FeedResponse:
     """전국 공고를 찾아 정렬한다. 후보는 벡터 질의 두 번(부산, 전국)으로 모은다. 이 경로에 LLM은 없다.
 
     sort가 None이면 사용자 설정을 쓴다. BUSAN_FIRST와 MATCH는 공고 집합이 같고 순서만 다르다 (T-01).
@@ -443,6 +461,7 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
 
     대화 조건 (개발계획서4 §9): job_name은 이번 검색에만 희망 직무로 쓰고 저장하지 않는다. query_terms는 질의 글에만
     넣는다. min_salary(만 원/년)·career_type·organization은 거르기만 하고 적합도·정렬 계산은 그대로다.
+    scope는 OFFICIAL(공공 API로 모은 공고만)·TEAM(팀이 넣어 둔 공고만)·ALL(기본, 둘 다)이다 (§9.1).
     """
     cfg = deps.config
     region = (region or REGION_ALL).strip().upper()
@@ -450,6 +469,9 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
     if limit < 1:
         raise invalid_input("limit은 1 이상이어야 해요.", field="limit")
     career = _check_conditions(min_salary, career_type)
+    scope = (scope or SCOPE_ALL).strip().upper()
+    if scope not in SCOPES:
+        raise invalid_input("scope 값이 올바르지 않아요.", field="scope", allowed=list(SCOPES))
     offset = _decode_cursor(cursor)
     has_job_name = bool((job_name or "").strip())
     ctx = load_context(deps, user_id, as_of, require_jobs=not has_job_name)
@@ -474,7 +496,7 @@ def search_postings(deps: Deps, user_id: str, *, region: str = "ALL", sort: Sort
         if not (is_open(posting, ctx.as_of) and _in_region(posting, region, sidos)
                 and _job_code_ok(posting, job_codes) and _keyword_ok(posting, keyword)
                 and _organization_ok(posting, organization) and _salary_ok(posting, min_salary)
-                and _career_ok(posting, career)):
+                and _career_ok(posting, career) and _scope_ok(posting, scope)):
             continue
         match, result = score_posting(deps, ctx, posting, similarity[pid])
         rank = rank_score(cfg, match.score, is_busan=is_busan_posting(cfg, posting), sort=sort)

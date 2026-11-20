@@ -23,6 +23,7 @@ from pydantic import Field, ValidationError
 from ..config import get_config
 from ..core import clock
 from ..core.alternatives import find_busan_alternatives
+from ..core.companies import find_companies
 from ..core.compare import compare_postings
 from ..core import regions
 from ..core.copy_rules import MATCH_LEVEL_LABEL, MATCH_NOT_PROBABILITY, career_label, deadline_label, salary_label
@@ -210,16 +211,24 @@ def resolve_region(value: str | None) -> str:
 def agent_feed(deps: Deps, user_id: str, *, keyword: str | None = None, region: str | None = "ALL",
                limit: int | None = None, job_name: str | None = None, query_terms: list[str] | None = None,
                min_salary: int | None = None, career_type: str | None = None,
-               organization: str | None = None) -> AgentFeed:
+               organization: str | None = None, scope: str | None = None) -> AgentFeed:
     """줄인 공고 목록 (최대 agent.maxPostings개). 대화 조건은 `search_postings`가 거른다 (개발계획서4 §9)."""
     cap = deps.config.agent.max_postings
     size = min(limit or cap, cap)
     feed = search_postings(deps, user_id, region=resolve_region(region), keyword=keyword, limit=size,
                            job_name=job_name, query_terms=query_terms, min_salary=min_salary,
-                           career_type=career_type, organization=organization)
+                           career_type=career_type, organization=organization, scope=scope)
     as_of = _as_of(deps, user_id)
     return AgentFeed(items=[_posting(card, as_of) for card in feed.items[:size]], ranking_basis=feed.ranking.basis,
                      empty_message=feed.empty_message, data_as_of=feed.data_as_of, stale=feed.stale)
+
+
+def agent_company_lookup(deps: Deps, name: str, *, limit: int = 3) -> list[dict]:
+    """회사 이름으로 우리 기업 데이터를 찾는다. 회사 정보만이고 채용 여부는 없다 (B-D01)."""
+    rows = [{"name": c.name, "industry": c.industry, "district": c.district, "mainProduct": c.main_product,
+             "badges": _badges(c.badges), "facts": c.facts, "source": c.source, "asOf": c.as_of}
+            for c in find_companies(deps, name, limit=limit)]
+    return [{k: v for k, v in row.items() if v not in (None, "", [])} for row in rows]
 
 
 def agent_policy_list(deps: Deps, user_id: str, *, stage: PolicyStage | str | None = None) -> AgentPolicies:

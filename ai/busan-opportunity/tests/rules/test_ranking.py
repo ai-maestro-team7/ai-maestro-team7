@@ -517,3 +517,17 @@ def test_commute_needs_residence(deps, as_of):
     profile = deps.users.get_basic_profile("demo1").model_copy(update={"residence_sigungu": None})
     deps.users.profiles["demo1"] = profile
     assert all(c.commute_minutes is None for c in feed(deps, as_of).items)
+
+
+def test_scope_splits_official_and_team_data(deps, as_of):
+    _set_latest(deps, w.SEOUL_DATA, is_sample=False)  # 공공 API로 모은 공고 하나
+    every = feed(deps, as_of).items
+    official = feed(deps, as_of, scope="official").items
+    team = feed(deps, as_of, scope="TEAM").items
+    assert ids(feed(deps, as_of, scope="OFFICIAL")) == [w.SEOUL_DATA] and all(c.is_sample for c in team)
+    assert w.SEOUL_DATA not in ids_of(team) and official
+    assert sorted(ids_of(official) | ids_of(team)) == sorted(ids_of(every))
+    assert ranking.is_team_data(deps.catalog.get_latest(w.BUSAN_DATA)) is deps.catalog.get_latest(w.BUSAN_DATA).is_sample
+    with pytest.raises(OppError) as e:
+        feed(deps, as_of, scope="CRAWLED")
+    assert e.value.code == "INVALID_INPUT"

@@ -300,3 +300,16 @@ def test_schema_file_is_up_to_date():
     assert set(on_disk["paths"]) == set(PATHS.values())
     assert all(op.get("description") for path in on_disk["paths"].values() for op in path.values())
     assert "/agent/saved" not in on_disk["paths"]  # P1
+
+
+def test_agent_company_lookup_is_compact(deps):
+    rows = agent_handler.agent_company_lookup(deps, "가상")
+    assert len(rows) <= 3
+    for row in rows:
+        assert row["source"] and row["asOf"] and None not in row.values()
+        assert "openPostings" not in row  # 채용 여부는 주지 않는다
+
+
+def test_agent_feed_passes_scope(deps, fake_feed, seen):
+    agent_handler.agent_feed(deps, "demo1", scope="OFFICIAL")
+    assert seen["scope"] == "OFFICIAL"
