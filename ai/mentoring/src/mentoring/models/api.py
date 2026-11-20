@@ -5,6 +5,15 @@ from .base import RequestModel
 from .enums import ConfirmAction, DocumentType
 
 
+class UploadUrlRequest(RequestModel):
+    """POST /documents/upload-url (개발계획서1 §6.2)"""
+    file_name: str
+    content_type: str
+    size_bytes: int
+    document_type: DocumentType = DocumentType.RESUME
+    workspace_id: str | None = None
+
+
 class TextDocumentRequest(RequestModel):
     """POST /documents/text"""
     text: str

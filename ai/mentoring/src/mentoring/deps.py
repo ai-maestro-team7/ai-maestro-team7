@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 
 from .config import MentoringConfig
-from .ports import Llm, ObjectStore, ReferenceLookup, TaskDispatcher, UserRepo
+from .ports import DocumentExtractor, Llm, ObjectStore, ReferenceLookup, TaskDispatcher, UserRepo
 from .text_tools import TextTools
 
 KST = timezone(timedelta(hours=9))
@@ -31,6 +31,8 @@ class Deps:
     # 개인 문서 경로 users/{hashedUserId}/ 의 해시. 방식은 백엔드와 정한다 (BE-6, 미결정 M-1)
     hash_user_id: Callable[[str], str]
     reference: ReferenceLookup | None = None  # 없으면 NCS 능력단위 코드를 붙이지 않는다
+    extractor: DocumentExtractor | None = None  # 없으면 PDF 업로드 완료를 받지 않는다 (텍스트 입력만)
+    metrics_sink: Callable[[str], None] | None = None  # EMF 한 줄을 받을 곳. 없으면 stdout
     now: Callable[[], datetime] = field(default=now_kst)
     new_id: Callable[[str], str] = field(default=new_id)
 
