@@ -39,7 +39,7 @@ SIMULATED = "시뮬레이션"
 SAMPLE_DATA = "데모 데이터"
 
 LOCAL_LIFE_TITLE = "이 동네에서 일하면"
-COMMUTE_LABEL = "집에서 대중교통 약 {minutes}분"
+COMMUTE_LABEL = "대중교통 약 {minutes}분 (사는 구청에서 근무지 구청까지)"  # 집 주소가 아니라 구청 사이 시간이다
 OVERSEAS_LABEL = "해외 근무 · {country}"
 MOVE_NEEDED = "이사가 필요한 거리예요"
 
