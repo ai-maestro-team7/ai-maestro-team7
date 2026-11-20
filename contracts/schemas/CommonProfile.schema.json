@@ -1,0 +1,298 @@
+{
+  "$defs": {
+    "DesiredJob": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "work24Code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Work24Code"
+        },
+        "ncsCode": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ncscode"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "DesiredJob",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "birthYear": {
+      "anyOf": [
+        {
+          "maximum": 2015,
+          "minimum": 1950,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Birthyear"
+    },
+    "residenceSido": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Residencesido"
+    },
+    "residenceSigungu": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Residencesigungu"
+    },
+    "residenceSince": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Residencesince"
+    },
+    "universityRegion": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Universityregion"
+    },
+    "graduationStatus": {
+      "anyOf": [
+        {
+          "enum": [
+            "ENROLLED",
+            "GRADUATING",
+            "GRADUATED"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Graduationstatus"
+    },
+    "educationLevel": {
+      "anyOf": [
+        {
+          "enum": [
+            "HIGH_SCHOOL",
+            "ASSOCIATE",
+            "BACHELOR",
+            "MASTER",
+            "DOCTOR"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Educationlevel"
+    },
+    "major": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Major"
+    },
+    "careerYears": {
+      "anyOf": [
+        {
+          "maximum": 50,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Careeryears"
+    },
+    "employmentStatus": {
+      "anyOf": [
+        {
+          "enum": [
+            "UNEMPLOYED",
+            "EMPLOYED",
+            "PART_TIME",
+            "STUDENT"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Employmentstatus"
+    },
+    "monthlyIncome": {
+      "anyOf": [
+        {
+          "maximum": 100000000,
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Monthlyincome"
+    },
+    "householdIncomeLevel": {
+      "anyOf": [
+        {
+          "enum": [
+            "under_100",
+            "under_150",
+            "over_150",
+            "unknown"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Householdincomelevel"
+    },
+    "desiredJobs": {
+      "anyOf": [
+        {
+          "items": {
+            "$ref": "#/$defs/DesiredJob"
+          },
+          "maxItems": 3,
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Desiredjobs"
+    },
+    "desiredRegion": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Desiredregion"
+    },
+    "priorities": {
+      "anyOf": [
+        {
+          "items": {
+            "enum": [
+              "SALARY",
+              "GROWTH",
+              "STABILITY",
+              "WORK_LIFE",
+              "HOUSING",
+              "LOCATION"
+            ],
+            "type": "string"
+          },
+          "maxItems": 3,
+          "type": "array"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Priorities"
+    },
+    "talentPoolConsent": {
+      "anyOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Talentpoolconsent"
+    }
+  },
+  "title": "CommonProfile",
+  "type": "object",
+  "x-schemaVersion": "1.0",
+  "x-owner": "BACKEND",
+  "x-consumers": [
+    "A",
+    "B",
+    "C",
+    "FRONTEND"
+  ],
+  "x-sources": [
+    "B §10.3",
+    "db-schema §2.1",
+    "D-08"
+  ]
+}

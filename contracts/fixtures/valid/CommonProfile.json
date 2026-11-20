@@ -1,0 +1,77 @@
+{
+  "contract": "CommonProfile",
+  "schemaVersion": "1.0",
+  "examples": [
+    {
+      "name": "persona-1-seoul-weighing",
+      "data": {
+        "birthYear": 2003,
+        "residenceSido": "26",
+        "residenceSigungu": "26290",
+        "universityRegion": "26",
+        "graduationStatus": "ENROLLED",
+        "major": "통계",
+        "desiredJobs": [
+          {
+            "name": "데이터 분석",
+            "ncsCode": "20010105"
+          }
+        ],
+        "employmentStatus": "UNEMPLOYED",
+        "priorities": [
+          "SALARY",
+          "GROWTH"
+        ]
+      }
+    },
+    {
+      "name": "persona-2-stay-busan",
+      "data": {
+        "birthYear": 1999,
+        "residenceSido": "26",
+        "residenceSigungu": "26380",
+        "universityRegion": "26",
+        "graduationStatus": "GRADUATED",
+        "major": "경영",
+        "desiredJobs": [
+          {
+            "name": "사무·회계"
+          }
+        ],
+        "employmentStatus": "UNEMPLOYED",
+        "priorities": [
+          "STABILITY",
+          "WORK_LIFE"
+        ]
+      }
+    },
+    {
+      "name": "persona-3-public-institution",
+      "data": {
+        "birthYear": 2001,
+        "residenceSido": "26",
+        "residenceSigungu": "26410",
+        "universityRegion": "26",
+        "graduationStatus": "GRADUATING",
+        "major": "경제",
+        "desiredJobs": [
+          {
+            "name": "공공기관 금융·행정"
+          }
+        ],
+        "employmentStatus": "UNEMPLOYED"
+      }
+    },
+    {
+      "name": "empty",
+      "data": {}
+    },
+    {
+      "name": "delete-fields-with-null",
+      "data": {
+        "major": null,
+        "priorities": null
+      }
+    }
+  ]
+}

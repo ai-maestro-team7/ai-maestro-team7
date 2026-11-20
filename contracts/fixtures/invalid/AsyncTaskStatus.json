@@ -1,0 +1,76 @@
+{
+  "contract": "AsyncTaskStatus",
+  "schemaVersion": "1.0",
+  "examples": [
+    {
+      "name": "lowercase-status",
+      "context": {
+        "part": "C"
+      },
+      "stage": "validate",
+      "expectedErrorFields": [
+        "status"
+      ],
+      "data": {
+        "sessionId": "iv-demo-001",
+        "status": "pending"
+      }
+    },
+    {
+      "name": "failed-without-error",
+      "context": {
+        "part": "B"
+      },
+      "stage": "validate",
+      "expectedErrorFields": [
+        "error"
+      ],
+      "data": {
+        "jobId": "job-demo-001",
+        "status": "FAILED"
+      }
+    },
+    {
+      "name": "unknown-stage",
+      "context": {
+        "part": "C"
+      },
+      "stage": "validate",
+      "expectedErrorFields": [
+        "stage"
+      ],
+      "data": {
+        "sessionId": "iv-demo-001",
+        "status": "PROCESSING",
+        "stage": "DONE"
+      }
+    },
+    {
+      "name": "missing-id",
+      "context": {
+        "part": "C"
+      },
+      "stage": "validate",
+      "expectedErrorFields": [
+        "sessionId"
+      ],
+      "data": {
+        "status": "PENDING"
+      }
+    },
+    {
+      "name": "other-part-extension",
+      "context": {
+        "part": "B"
+      },
+      "stage": "validate",
+      "expectedErrorFields": [
+        "status"
+      ],
+      "data": {
+        "jobId": "job-demo-001",
+        "status": "PARTIAL_SUCCESS"
+      }
+    }
+  ]
+}

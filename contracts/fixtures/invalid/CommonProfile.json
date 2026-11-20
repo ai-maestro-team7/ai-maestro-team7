@@ -1,0 +1,71 @@
+{
+  "contract": "CommonProfile",
+  "schemaVersion": "1.0",
+  "examples": [
+    {
+      "name": "real-name-field",
+      "stage": "validate",
+      "expectedErrorFields": [
+        "name"
+      ],
+      "data": {
+        "name": "홍길동",
+        "birthYear": 2003
+      }
+    },
+    {
+      "name": "birth-year-string",
+      "stage": "validate",
+      "expectedErrorFields": [
+        "birthYear"
+      ],
+      "data": {
+        "birthYear": "2003"
+      }
+    },
+    {
+      "name": "too-many-desired-jobs",
+      "stage": "validate",
+      "expectedErrorFields": [
+        "desiredJobs"
+      ],
+      "data": {
+        "desiredJobs": [
+          {
+            "name": "데이터 분석"
+          },
+          {
+            "name": "회계"
+          },
+          {
+            "name": "인사"
+          },
+          {
+            "name": "마케팅"
+          }
+        ]
+      }
+    },
+    {
+      "name": "snake-case-key",
+      "stage": "validate",
+      "expectedErrorFields": [
+        "birth_year"
+      ],
+      "data": {
+        "birth_year": 2003
+      }
+    },
+    {
+      "name": "user-id-in-body",
+      "stage": "validate",
+      "expectedErrorFields": [
+        "userId"
+      ],
+      "data": {
+        "userId": "someone-else",
+        "major": "통계"
+      }
+    }
+  ]
+}

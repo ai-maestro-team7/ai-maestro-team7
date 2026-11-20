@@ -1,0 +1,79 @@
+{
+  "contract": "CareerProfileSummary",
+  "schemaVersion": "1.0",
+  "examples": [
+    {
+      "name": "raw-resume",
+      "stage": "validate",
+      "expectedErrorFields": [
+        "resumeText"
+      ],
+      "data": {
+        "projects": [
+          "캡스톤 디자인 - 예약 API 서버"
+        ],
+        "skills": [
+          "Python",
+          "MySQL"
+        ],
+        "needsConfirmation": [
+          "대용량 트래픽 경험"
+        ],
+        "resumeText": "이력서 원문"
+      }
+    },
+    {
+      "name": "strengths-field",
+      "stage": "validate",
+      "expectedErrorFields": [
+        "strengths"
+      ],
+      "data": {
+        "projects": [
+          "캡스톤 디자인 - 예약 API 서버"
+        ],
+        "skills": [
+          "Python",
+          "MySQL"
+        ],
+        "needsConfirmation": [
+          "대용량 트래픽 경험"
+        ],
+        "strengths": [
+          "문제 해결"
+        ]
+      }
+    },
+    {
+      "name": "blank-skill",
+      "stage": "validate",
+      "expectedErrorFields": [
+        "skills[0]"
+      ],
+      "data": {
+        "projects": [
+          "캡스톤 디자인 - 예약 API 서버"
+        ],
+        "skills": [
+          ""
+        ],
+        "needsConfirmation": [
+          "대용량 트래픽 경험"
+        ]
+      }
+    },
+    {
+      "name": "projects-missing",
+      "stage": "validate",
+      "expectedErrorFields": [
+        "projects"
+      ],
+      "data": {
+        "skills": [
+          "Python"
+        ],
+        "needsConfirmation": []
+      }
+    }
+  ]
+}

@@ -1,0 +1,64 @@
+{
+  "contract": "CareerProfileSummary",
+  "schemaVersion": "1.0",
+  "examples": [
+    {
+      "name": "c-spec-example",
+      "data": {
+        "projects": [
+          "캡스톤 디자인 - 예약 API 서버"
+        ],
+        "skills": [
+          "Python",
+          "MySQL"
+        ],
+        "needsConfirmation": [
+          "대용량 트래픽 경험"
+        ]
+      }
+    },
+    {
+      "name": "c-spec-example-with-profile",
+      "data": {
+        "projects": [
+          "캡스톤 디자인 - 예약 API 서버"
+        ],
+        "skills": [
+          "Python",
+          "MySQL"
+        ],
+        "needsConfirmation": [
+          "대용량 트래픽 경험"
+        ],
+        "profileId": "profile-demo",
+        "profileVersion": 1
+      }
+    },
+    {
+      "name": "data-analysis-demo",
+      "data": {
+        "projects": [
+          "공공데이터 활용 부산 관광 수요 분석 프로젝트"
+        ],
+        "skills": [
+          "Python",
+          "SQL",
+          "데이터 시각화"
+        ],
+        "needsConfirmation": [
+          "실무 데이터 파이프라인 경험"
+        ],
+        "profileId": "profile-demo-1",
+        "profileVersion": 2
+      }
+    },
+    {
+      "name": "empty-lists",
+      "data": {
+        "projects": [],
+        "skills": [],
+        "needsConfirmation": []
+      }
+    }
+  ]
+}

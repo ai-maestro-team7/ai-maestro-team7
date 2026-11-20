@@ -1,0 +1,417 @@
+{
+  "contract": "PostingForAnalysis",
+  "schemaVersion": "1.0",
+  "examples": [
+    {
+      "name": "empty-source-quote",
+      "stage": "validate",
+      "expectedErrorFields": [
+        "requirements[0].sourceQuote"
+      ],
+      "data": {
+        "jobPostingId": "job-demo-busan-001",
+        "snapshotId": "20261120-10c26293",
+        "title": "데이터 분석 신입",
+        "organization": "가상 데이터랩 부산",
+        "job": {
+          "name": "데이터 분석",
+          "ncsCodes": [
+            "20010105"
+          ]
+        },
+        "requirements": [
+          {
+            "requirementId": "req-1",
+            "name": "SQL 데이터 추출",
+            "kind": "REQUIRED_SKILL",
+            "weight": 1.0,
+            "sourceQuote": "",
+            "extractedBy": "LLM"
+          },
+          {
+            "requirementId": "req-2",
+            "name": "Python 분석",
+            "kind": "REQUIRED_SKILL",
+            "weight": 1.0,
+            "sourceQuote": "Python 기반 데이터 분석 가능자",
+            "extractedBy": "LLM"
+          },
+          {
+            "requirementId": "req-3",
+            "name": "시각화 도구",
+            "kind": "PREFERRED_SKILL",
+            "weight": 1.0,
+            "sourceQuote": "Tableau 등 시각화 도구 사용 경험 우대",
+            "extractedBy": "LLM"
+          }
+        ],
+        "eligibilityRules": [
+          {
+            "ruleId": "rule-1",
+            "type": "CERTIFICATE",
+            "value": "ADsP",
+            "sourceQuote": "데이터분석 준전문가(ADsP) 소지자 우대",
+            "extractedBy": "LLM"
+          }
+        ],
+        "careerType": "NEW",
+        "educationMin": "BACHELOR",
+        "officialUrl": "https://example.com/postings/job-demo-busan-001",
+        "checkedAt": "2026-11-20T04:30:00+09:00",
+        "updatedAt": "2026-11-20T04:30:00+09:00",
+        "workRegion": {
+          "sido": "26",
+          "sigungu": "26350",
+          "label": "부산 해운대구",
+          "unknown": false
+        },
+        "sourceType": "DEMO",
+        "isExpired": false,
+        "closesAt": "2026-12-04",
+        "jobDescription": "사내 서비스 이용 데이터를 분석해 지표 보고서를 작성합니다."
+      }
+    },
+    {
+      "name": "unknown-extractor",
+      "stage": "validate",
+      "expectedErrorFields": [
+        "requirements[0].extractedBy"
+      ],
+      "data": {
+        "jobPostingId": "job-demo-busan-001",
+        "snapshotId": "20261120-10c26293",
+        "title": "데이터 분석 신입",
+        "organization": "가상 데이터랩 부산",
+        "job": {
+          "name": "데이터 분석",
+          "ncsCodes": [
+            "20010105"
+          ]
+        },
+        "requirements": [
+          {
+            "requirementId": "req-1",
+            "name": "SQL 데이터 추출",
+            "kind": "REQUIRED_SKILL",
+            "weight": 1.0,
+            "sourceQuote": "SQL을 활용한 데이터 추출 및 가공 경험",
+            "extractedBy": "GPT"
+          },
+          {
+            "requirementId": "req-2",
+            "name": "Python 분석",
+            "kind": "REQUIRED_SKILL",
+            "weight": 1.0,
+            "sourceQuote": "Python 기반 데이터 분석 가능자",
+            "extractedBy": "LLM"
+          },
+          {
+            "requirementId": "req-3",
+            "name": "시각화 도구",
+            "kind": "PREFERRED_SKILL",
+            "weight": 1.0,
+            "sourceQuote": "Tableau 등 시각화 도구 사용 경험 우대",
+            "extractedBy": "LLM"
+          }
+        ],
+        "eligibilityRules": [
+          {
+            "ruleId": "rule-1",
+            "type": "CERTIFICATE",
+            "value": "ADsP",
+            "sourceQuote": "데이터분석 준전문가(ADsP) 소지자 우대",
+            "extractedBy": "LLM"
+          }
+        ],
+        "careerType": "NEW",
+        "educationMin": "BACHELOR",
+        "officialUrl": "https://example.com/postings/job-demo-busan-001",
+        "checkedAt": "2026-11-20T04:30:00+09:00",
+        "updatedAt": "2026-11-20T04:30:00+09:00",
+        "workRegion": {
+          "sido": "26",
+          "sigungu": "26350",
+          "label": "부산 해운대구",
+          "unknown": false
+        },
+        "sourceType": "DEMO",
+        "isExpired": false,
+        "closesAt": "2026-12-04",
+        "jobDescription": "사내 서비스 이용 데이터를 분석해 지표 보고서를 작성합니다."
+      }
+    },
+    {
+      "name": "known-region-without-sido",
+      "stage": "validate",
+      "expectedErrorFields": [
+        "workRegion.sido"
+      ],
+      "data": {
+        "jobPostingId": "job-demo-busan-001",
+        "snapshotId": "20261120-10c26293",
+        "title": "데이터 분석 신입",
+        "organization": "가상 데이터랩 부산",
+        "job": {
+          "name": "데이터 분석",
+          "ncsCodes": [
+            "20010105"
+          ]
+        },
+        "requirements": [
+          {
+            "requirementId": "req-1",
+            "name": "SQL 데이터 추출",
+            "kind": "REQUIRED_SKILL",
+            "weight": 1.0,
+            "sourceQuote": "SQL을 활용한 데이터 추출 및 가공 경험",
+            "extractedBy": "LLM"
+          },
+          {
+            "requirementId": "req-2",
+            "name": "Python 분석",
+            "kind": "REQUIRED_SKILL",
+            "weight": 1.0,
+            "sourceQuote": "Python 기반 데이터 분석 가능자",
+            "extractedBy": "LLM"
+          },
+          {
+            "requirementId": "req-3",
+            "name": "시각화 도구",
+            "kind": "PREFERRED_SKILL",
+            "weight": 1.0,
+            "sourceQuote": "Tableau 등 시각화 도구 사용 경험 우대",
+            "extractedBy": "LLM"
+          }
+        ],
+        "eligibilityRules": [
+          {
+            "ruleId": "rule-1",
+            "type": "CERTIFICATE",
+            "value": "ADsP",
+            "sourceQuote": "데이터분석 준전문가(ADsP) 소지자 우대",
+            "extractedBy": "LLM"
+          }
+        ],
+        "careerType": "NEW",
+        "educationMin": "BACHELOR",
+        "officialUrl": "https://example.com/postings/job-demo-busan-001",
+        "checkedAt": "2026-11-20T04:30:00+09:00",
+        "updatedAt": "2026-11-20T04:30:00+09:00",
+        "workRegion": {
+          "label": "부산 해운대구",
+          "unknown": false
+        },
+        "sourceType": "DEMO",
+        "isExpired": false,
+        "closesAt": "2026-12-04",
+        "jobDescription": "사내 서비스 이용 데이터를 분석해 지표 보고서를 작성합니다."
+      }
+    },
+    {
+      "name": "empty-job-name",
+      "stage": "validate",
+      "expectedErrorFields": [
+        "job.name"
+      ],
+      "data": {
+        "jobPostingId": "job-demo-busan-001",
+        "snapshotId": "20261120-10c26293",
+        "title": "데이터 분석 신입",
+        "organization": "가상 데이터랩 부산",
+        "job": {
+          "name": "",
+          "ncsCodes": [
+            "20010105"
+          ]
+        },
+        "requirements": [
+          {
+            "requirementId": "req-1",
+            "name": "SQL 데이터 추출",
+            "kind": "REQUIRED_SKILL",
+            "weight": 1.0,
+            "sourceQuote": "SQL을 활용한 데이터 추출 및 가공 경험",
+            "extractedBy": "LLM"
+          },
+          {
+            "requirementId": "req-2",
+            "name": "Python 분석",
+            "kind": "REQUIRED_SKILL",
+            "weight": 1.0,
+            "sourceQuote": "Python 기반 데이터 분석 가능자",
+            "extractedBy": "LLM"
+          },
+          {
+            "requirementId": "req-3",
+            "name": "시각화 도구",
+            "kind": "PREFERRED_SKILL",
+            "weight": 1.0,
+            "sourceQuote": "Tableau 등 시각화 도구 사용 경험 우대",
+            "extractedBy": "LLM"
+          }
+        ],
+        "eligibilityRules": [
+          {
+            "ruleId": "rule-1",
+            "type": "CERTIFICATE",
+            "value": "ADsP",
+            "sourceQuote": "데이터분석 준전문가(ADsP) 소지자 우대",
+            "extractedBy": "LLM"
+          }
+        ],
+        "careerType": "NEW",
+        "educationMin": "BACHELOR",
+        "officialUrl": "https://example.com/postings/job-demo-busan-001",
+        "checkedAt": "2026-11-20T04:30:00+09:00",
+        "updatedAt": "2026-11-20T04:30:00+09:00",
+        "workRegion": {
+          "sido": "26",
+          "sigungu": "26350",
+          "label": "부산 해운대구",
+          "unknown": false
+        },
+        "sourceType": "DEMO",
+        "isExpired": false,
+        "closesAt": "2026-12-04",
+        "jobDescription": "사내 서비스 이용 데이터를 분석해 지표 보고서를 작성합니다."
+      }
+    },
+    {
+      "name": "organization-missing",
+      "stage": "validate",
+      "expectedErrorFields": [
+        "organization"
+      ],
+      "data": {
+        "jobPostingId": "job-demo-busan-001",
+        "snapshotId": "20261120-10c26293",
+        "title": "데이터 분석 신입",
+        "job": {
+          "name": "데이터 분석",
+          "ncsCodes": [
+            "20010105"
+          ]
+        },
+        "requirements": [
+          {
+            "requirementId": "req-1",
+            "name": "SQL 데이터 추출",
+            "kind": "REQUIRED_SKILL",
+            "weight": 1.0,
+            "sourceQuote": "SQL을 활용한 데이터 추출 및 가공 경험",
+            "extractedBy": "LLM"
+          },
+          {
+            "requirementId": "req-2",
+            "name": "Python 분석",
+            "kind": "REQUIRED_SKILL",
+            "weight": 1.0,
+            "sourceQuote": "Python 기반 데이터 분석 가능자",
+            "extractedBy": "LLM"
+          },
+          {
+            "requirementId": "req-3",
+            "name": "시각화 도구",
+            "kind": "PREFERRED_SKILL",
+            "weight": 1.0,
+            "sourceQuote": "Tableau 등 시각화 도구 사용 경험 우대",
+            "extractedBy": "LLM"
+          }
+        ],
+        "eligibilityRules": [
+          {
+            "ruleId": "rule-1",
+            "type": "CERTIFICATE",
+            "value": "ADsP",
+            "sourceQuote": "데이터분석 준전문가(ADsP) 소지자 우대",
+            "extractedBy": "LLM"
+          }
+        ],
+        "careerType": "NEW",
+        "educationMin": "BACHELOR",
+        "officialUrl": "https://example.com/postings/job-demo-busan-001",
+        "checkedAt": "2026-11-20T04:30:00+09:00",
+        "updatedAt": "2026-11-20T04:30:00+09:00",
+        "workRegion": {
+          "sido": "26",
+          "sigungu": "26350",
+          "label": "부산 해운대구",
+          "unknown": false
+        },
+        "sourceType": "DEMO",
+        "isExpired": false,
+        "closesAt": "2026-12-04",
+        "jobDescription": "사내 서비스 이용 데이터를 분석해 지표 보고서를 작성합니다."
+      }
+    },
+    {
+      "name": "duplicate-requirement-id",
+      "stage": "validate",
+      "expectedErrorFields": [
+        "requirements[1].requirementId"
+      ],
+      "data": {
+        "jobPostingId": "job-demo-busan-001",
+        "snapshotId": "20261120-10c26293",
+        "title": "데이터 분석 신입",
+        "organization": "가상 데이터랩 부산",
+        "job": {
+          "name": "데이터 분석",
+          "ncsCodes": [
+            "20010105"
+          ]
+        },
+        "requirements": [
+          {
+            "requirementId": "req-1",
+            "name": "SQL 데이터 추출",
+            "kind": "REQUIRED_SKILL",
+            "weight": 1.0,
+            "sourceQuote": "SQL을 활용한 데이터 추출 및 가공 경험",
+            "extractedBy": "LLM"
+          },
+          {
+            "requirementId": "req-1",
+            "name": "Python 분석",
+            "kind": "REQUIRED_SKILL",
+            "weight": 1.0,
+            "sourceQuote": "Python 기반 데이터 분석 가능자",
+            "extractedBy": "LLM"
+          },
+          {
+            "requirementId": "req-3",
+            "name": "시각화 도구",
+            "kind": "PREFERRED_SKILL",
+            "weight": 1.0,
+            "sourceQuote": "Tableau 등 시각화 도구 사용 경험 우대",
+            "extractedBy": "LLM"
+          }
+        ],
+        "eligibilityRules": [
+          {
+            "ruleId": "rule-1",
+            "type": "CERTIFICATE",
+            "value": "ADsP",
+            "sourceQuote": "데이터분석 준전문가(ADsP) 소지자 우대",
+            "extractedBy": "LLM"
+          }
+        ],
+        "careerType": "NEW",
+        "educationMin": "BACHELOR",
+        "officialUrl": "https://example.com/postings/job-demo-busan-001",
+        "checkedAt": "2026-11-20T04:30:00+09:00",
+        "updatedAt": "2026-11-20T04:30:00+09:00",
+        "workRegion": {
+          "sido": "26",
+          "sigungu": "26350",
+          "label": "부산 해운대구",
+          "unknown": false
+        },
+        "sourceType": "DEMO",
+        "isExpired": false,
+        "closesAt": "2026-12-04",
+        "jobDescription": "사내 서비스 이용 데이터를 분석해 지표 보고서를 작성합니다."
+      }
+    }
+  ]
+}

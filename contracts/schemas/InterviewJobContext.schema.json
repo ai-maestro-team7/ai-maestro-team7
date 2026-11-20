@@ -1,0 +1,25 @@
+{
+  "additionalProperties": false,
+  "description": "C start_interview의 job 값 (소유 C, 소비 BACKEND, C §5.2).",
+  "properties": {
+    "job": {
+      "maxLength": 50,
+      "minLength": 1,
+      "title": "Job",
+      "type": "string"
+    }
+  },
+  "required": [
+    "job"
+  ],
+  "title": "InterviewJobContext",
+  "type": "object",
+  "x-schemaVersion": "1.0",
+  "x-owner": "C",
+  "x-consumers": [
+    "BACKEND"
+  ],
+  "x-sources": [
+    "C §5.2"
+  ]
+}

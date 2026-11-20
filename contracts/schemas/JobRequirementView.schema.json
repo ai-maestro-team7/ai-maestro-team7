@@ -1,0 +1,252 @@
+{
+  "$defs": {
+    "EligibilityRule": {
+      "additionalProperties": false,
+      "properties": {
+        "ruleId": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Ruleid",
+          "type": "string"
+        },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value"
+        },
+        "sourceQuote": {
+          "minLength": 1,
+          "title": "Sourcequote",
+          "type": "string"
+        },
+        "extractedBy": {
+          "enum": [
+            "API",
+            "LLM",
+            "MANUAL"
+          ],
+          "title": "Extractedby",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ruleId",
+        "type",
+        "value",
+        "sourceQuote",
+        "extractedBy"
+      ],
+      "title": "EligibilityRule",
+      "type": "object"
+    },
+    "Requirement": {
+      "additionalProperties": false,
+      "properties": {
+        "requirementId": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Requirementid",
+          "type": "string"
+        },
+        "name": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "REQUIRED_SKILL",
+            "PREFERRED_SKILL"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "weight": {
+          "default": 1.0,
+          "exclusiveMinimum": 0,
+          "title": "Weight",
+          "type": "number"
+        },
+        "sourceQuote": {
+          "minLength": 1,
+          "title": "Sourcequote",
+          "type": "string"
+        },
+        "extractedBy": {
+          "enum": [
+            "API",
+            "LLM",
+            "MANUAL"
+          ],
+          "title": "Extractedby",
+          "type": "string"
+        }
+      },
+      "required": [
+        "requirementId",
+        "name",
+        "kind",
+        "sourceQuote",
+        "extractedBy"
+      ],
+      "title": "Requirement",
+      "type": "object"
+    },
+    "WorkRegion": {
+      "additionalProperties": false,
+      "properties": {
+        "sido": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sido"
+        },
+        "sigungu": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sigungu"
+        },
+        "label": {
+          "maxLength": 50,
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "unknown": {
+          "title": "Unknown",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "label",
+        "unknown"
+      ],
+      "title": "WorkRegion",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "description": "A §4.4 JobRequirement 형식으로 본 공고 (소유 B, 소비 A).",
+  "properties": {
+    "jobPostingId": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Jobpostingid",
+      "type": "string"
+    },
+    "snapshotId": {
+      "title": "Snapshotid",
+      "type": "string"
+    },
+    "title": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "organization": {
+      "maxLength": 100,
+      "minLength": 1,
+      "title": "Organization",
+      "type": "string"
+    },
+    "workRegion": {
+      "$ref": "#/$defs/WorkRegion"
+    },
+    "closesAt": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Closesat"
+    },
+    "officialUrl": {
+      "maxLength": 2000,
+      "title": "Officialurl",
+      "type": "string"
+    },
+    "jobDescription": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Jobdescription"
+    },
+    "requirements": {
+      "items": {
+        "$ref": "#/$defs/Requirement"
+      },
+      "title": "Requirements",
+      "type": "array"
+    },
+    "eligibilityRules": {
+      "items": {
+        "$ref": "#/$defs/EligibilityRule"
+      },
+      "title": "Eligibilityrules",
+      "type": "array"
+    },
+    "checkedAt": {
+      "title": "Checkedat",
+      "type": "string"
+    },
+    "sourceType": {
+      "title": "Sourcetype",
+      "type": "string"
+    },
+    "isExpired": {
+      "title": "Isexpired",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "jobPostingId",
+    "snapshotId",
+    "title",
+    "organization",
+    "workRegion",
+    "officialUrl",
+    "requirements",
+    "eligibilityRules",
+    "checkedAt",
+    "sourceType",
+    "isExpired"
+  ],
+  "title": "JobRequirementView",
+  "type": "object",
+  "x-schemaVersion": "1.0",
+  "x-owner": "B",
+  "x-consumers": [
+    "A"
+  ],
+  "x-sources": [
+    "A §4.4",
+    "D-10"
+  ]
+}

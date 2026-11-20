@@ -1,0 +1,151 @@
+{
+  "contract": "AsyncTaskStatus",
+  "schemaVersion": "1.0",
+  "examples": [
+    {
+      "name": "b-pending",
+      "context": {
+        "part": "B"
+      },
+      "data": {
+        "jobId": "job-demo-001",
+        "status": "PENDING"
+      }
+    },
+    {
+      "name": "b-processing",
+      "context": {
+        "part": "B"
+      },
+      "data": {
+        "jobId": "job-demo-001",
+        "status": "PROCESSING"
+      }
+    },
+    {
+      "name": "b-completed",
+      "context": {
+        "part": "B"
+      },
+      "data": {
+        "jobId": "job-demo-001",
+        "status": "COMPLETED",
+        "result": {
+          "postingId": "ext-demo-001"
+        }
+      }
+    },
+    {
+      "name": "c-failed",
+      "context": {
+        "part": "C"
+      },
+      "data": {
+        "sessionId": "iv-demo-001",
+        "status": "FAILED",
+        "stage": "REPORT_GENERATING",
+        "error": {
+          "code": "AWS_SERVICE_ERROR",
+          "message": "외부 서비스 응답이 늦어요. 다시 시도해 주세요.",
+          "requestId": "req-demo-100",
+          "retryable": true
+        }
+      }
+    },
+    {
+      "name": "a-requires-user-review",
+      "context": {
+        "part": "A"
+      },
+      "data": {
+        "taskId": "task-demo-001",
+        "status": "REQUIRES_USER_REVIEW"
+      }
+    },
+    {
+      "name": "a-partial-success",
+      "context": {
+        "part": "A"
+      },
+      "data": {
+        "taskId": "task-demo-002",
+        "status": "PARTIAL_SUCCESS",
+        "warnings": [
+          "SCHEDULE_UNVERIFIED"
+        ]
+      }
+    },
+    {
+      "name": "c-question-generating",
+      "context": {
+        "part": "C"
+      },
+      "data": {
+        "sessionId": "iv-demo-001",
+        "status": "PROCESSING",
+        "stage": "QUESTION_GENERATING"
+      }
+    },
+    {
+      "name": "c-next-question-ready",
+      "context": {
+        "part": "C"
+      },
+      "data": {
+        "sessionId": "iv-demo-001",
+        "status": "PROCESSING",
+        "stage": "NEXT_QUESTION_READY",
+        "progress": {
+          "baseQuestionNo": 2,
+          "totalBaseQuestions": 3,
+          "isFollowUp": false
+        },
+        "report": null
+      }
+    },
+    {
+      "name": "c-transcribing",
+      "context": {
+        "part": "C"
+      },
+      "data": {
+        "sessionId": "iv-demo-001",
+        "status": "PROCESSING",
+        "stage": "TRANSCRIBING"
+      }
+    },
+    {
+      "name": "c-judging",
+      "context": {
+        "part": "C"
+      },
+      "data": {
+        "sessionId": "iv-demo-001",
+        "status": "PROCESSING",
+        "stage": "JUDGING"
+      }
+    },
+    {
+      "name": "c-report-generating",
+      "context": {
+        "part": "C"
+      },
+      "data": {
+        "sessionId": "iv-demo-001",
+        "status": "PROCESSING",
+        "stage": "REPORT_GENERATING"
+      }
+    },
+    {
+      "name": "c-report-ready",
+      "context": {
+        "part": "C"
+      },
+      "data": {
+        "sessionId": "iv-demo-001",
+        "status": "COMPLETED",
+        "stage": "REPORT_READY"
+      }
+    }
+  ]
+}
