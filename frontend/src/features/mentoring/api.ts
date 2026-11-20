@@ -174,18 +174,21 @@ export function errorMessage(error: unknown): string {
   return "서버에 연결하지 못했어요. 잠시 뒤 다시 시도해 주세요.";
 }
 
-export function createTextDocument(text: string): Promise<CreateDocumentResponse> {
+export function createTextDocument(text: string, title = "직무 진단 이력서"): Promise<CreateDocumentResponse> {
   return post(
     "/api/v1/mentoring/documents/text",
-    { text, documentType: "RESUME", title: "직무 진단 이력서" },
+    { text, documentType: "RESUME", title },
     "document-text",
   );
 }
 
-export async function createPdfDocument(file: File): Promise<CreateDocumentResponse> {
+export async function createPdfDocument(
+  file: File,
+  documentType: "RESUME" | "COVER_LETTER" = "RESUME",
+): Promise<CreateDocumentResponse> {
   const created = await post<{ documentId: string; uploadUrl: string }>(
     "/api/v1/mentoring/documents/upload-url",
-    { fileName: file.name, contentType: "application/pdf", sizeBytes: file.size, documentType: "RESUME" },
+    { fileName: file.name, contentType: "application/pdf", sizeBytes: file.size, documentType },
     "document-upload",
   );
   const uploaded = await fetch(created.uploadUrl, { method: "PUT", headers: { "content-type": "application/pdf" }, body: file });

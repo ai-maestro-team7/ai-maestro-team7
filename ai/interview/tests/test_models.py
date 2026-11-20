@@ -78,9 +78,25 @@ def test_other_invalid_inputs(field, value):
         StartInterviewInput.model_validate(start_input(**{field: value}))
 
 
+def test_job_posting_optional_camel_key():
+    # #158: jobPosting은 선택이다. JSON 키는 카멜, 안쪽 키는 title·company·text
+    assert StartInterviewInput.model_validate(start_input()).job_posting is None
+    posting = {"title": " 데이터 분석 신입 ", "text": "  " + "가" * 30}
+    parsed = StartInterviewInput.model_validate(start_input(jobPosting=posting))
+    assert parsed.job_posting.title == "데이터 분석 신입" and parsed.job_posting.company is None
+    assert parsed.job_posting.text == "가" * 30
+    assert StartInterviewInput.model_validate(start_input(job_posting=posting)).job_posting == parsed.job_posting
+
+
+@pytest.mark.parametrize("posting", [{"text": "가" * 29}, {"text": "가" * 30, "requirements": []}, "공고 본문" * 10])
+def test_job_posting_invalid_rejected(posting):
+    with pytest.raises(ValidationError):
+        StartInterviewInput.model_validate(start_input(job_posting=posting))
+
+
 def test_question_request_has_no_session_fields():
     req = QuestionRequest.model_validate({"job": "데이터 분석", "resume_text": RESUME_50, "interview_type": "JOB"})
-    assert req.profile is None
+    assert req.profile is None and req.job_posting is None
     with pytest.raises(ValidationError):
         QuestionRequest.model_validate({"job": "데이터 분석", "resume_text": RESUME_50, "interview_type": "JOB",
                                         "session_id": "x"})

@@ -30,6 +30,10 @@ FEEDBACK_BANNED_WORDS = ("합격", "불합격", "확률")
 # 입력 한도 (C §5.2, 계약 InterviewJobContext)
 JOB_MIN, JOB_MAX = 1, 50
 RESUME_MIN, RESUME_MAX = 50, 5000
+# 채용공고 입력 (#158). 제목·회사 상한은 계약 PostingForAnalysis의 title·organization과 같다
+JOB_POSTING_TEXT_MIN, JOB_POSTING_TEXT_MAX = 30, 4000  # 공백 정리 뒤 본문 길이
+JOB_POSTING_TITLE_MAX = 200
+JOB_POSTING_COMPANY_MAX = 100
 
 # LLM이 만든 질문 문장 길이 (design §8 제안 값)
 QUESTION_MIN, QUESTION_MAX = 5, 300
